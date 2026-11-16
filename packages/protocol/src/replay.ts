@@ -1,0 +1,236 @@
+import type { EventOf, RunEvent } from "./events.ts";
+import type {
+  Abstention,
+  Claim,
+  Draft,
+  Flags,
+  Mode,
+  ModelId,
+  ModelSnapshot,
+  Snapshot,
+  Source,
+  Stage,
+  Suggestion,
+  Thread,
+  Vote,
+} from "./model.ts";
+import { clone } from "./util.ts";
+
+/**
+ * What the browser knows of a run: a reduction of its event log alone. Threads, suggestions,
+ * votes, positions and every document version come out the same as in the run state.
+ */
+export interface RunView {
+  runId: string | null;
+  question: string | null;
+  mode: Mode | null;
+  models: ModelSnapshot | null;
+  status: "new" | "quoted" | "awaiting_payment" | "running" | "completed" | "failed" | "expired";
+  stage: Stage | null;
+  quote: Omit<EventOf<"run.quoted">, "key" | "batch" | "type"> | null;
+  payment: { mode: Mode; amount: number; currency: string; qr: string } | null;
+  paid: boolean;
+  drafts: Draft[];
+  claims: Record<string, Claim>;
+  sources: Source[];
+  conflicts: { first: string; second: string }[];
+  snapshots: Snapshot[];
+  suggestions: Record<string, Suggestion>;
+  threads: Record<string, Thread>;
+  positions: Record<string, Partial<Record<ModelId, string>>>;
+  votes: Vote[];
+  rejected: string[];
+  moments: { batch: number; text: string; origin: "model" | "template" }[];
+  modelStatus: Partial<Record<ModelId, "thinking" | "done" | "abstained">>;
+  flags: Flags;
+  abstentions: Abstention[];
+  spentUsd: number | null;
+  lastBatch: number;
+}
+
+export function emptyView(): RunView {
+  return {
+    runId: null,
+    question: null,
+    mode: null,
+    models: null,
+    status: "new",
+    stage: null,
+    quote: null,
+    payment: null,
+    paid: false,
+    drafts: [],
+    claims: {},
+    sources: [],
+    conflicts: [],
+    snapshots: [],
+    suggestions: {},
+    threads: {},
+    positions: {},
+    votes: [],
+    rejected: [],
+    moments: [],
+    modelStatus: {},
+    flags: {
+      fewDrafts: false,
+      mergeFallback: null,
+      budgetReached: false,
+      deadlineReached: false,
+      quorumLost: false,
+    },
+    abstentions: [],
+    spentUsd: null,
+    lastBatch: 0,
+  };
+}
+
+/**
+ * Replays events, in log order, onto a view (a fresh one by default; `base` is not changed).
+ * Events with a `seq` are sorted by it first.
+ */
+export function replay(events: readonly RunEvent[], base: RunView = emptyView()): RunView {
+  const view = clone(base);
+  const ordered = [...events].sort(
+    (a, b) => ((a as { seq?: number }).seq ?? 0) - ((b as { seq?: number }).seq ?? 0),
+  );
+  for (const e of ordered) applyEvent(view, e);
+  return view;
+}
+
+function setPosition(view: RunView, thread: string, model: ModelId, choice: string) {
+  const positions = view.positions[thread] ?? {};
+  positions[model] = choice;
+  view.positions[thread] = positions;
+}
+
+function reject(view: RunView, ids: readonly string[]) {
+  for (const id of ids) if (!view.rejected.includes(id)) view.rejected.push(id);
+}
+
+function applyEvent(view: RunView, e: RunEvent) {
+  view.lastBatch = Math.max(view.lastBatch, e.batch);
+  switch (e.type) {
+    case "run.quoted":
+      view.status = "quoted";
+      view.stage = "quoted";
+      view.quote = { class: e.class, probability: e.probability, mode: e.mode, prices: e.prices };
+      break;
+    case "payment.requested":
+      view.status = "awaiting_payment";
+      view.stage = "awaiting_payment";
+      view.payment = { mode: e.mode, amount: e.amount, currency: e.currency, qr: e.qr };
+      break;
+    case "payment.confirmed":
+      view.paid = true;
+      break;
+    case "run.expired":
+      view.status = "expired";
+      view.stage = "expired";
+      break;
+    case "run.started":
+      view.runId = e.runId;
+      view.question = e.question;
+      view.mode = e.mode;
+      view.models = e.models;
+      view.status = "running";
+      break;
+    case "stage.changed":
+      view.stage = e.stage;
+      if (e.cut === "budget") view.flags.budgetReached = true;
+      if (e.cut === "deadline") view.flags.deadlineReached = true;
+      break;
+    case "model.status":
+      view.modelStatus[e.model] = e.status;
+      if (e.status === "abstained" && e.reason) {
+        view.abstentions.push({ call: e.call, seat: e.model, stage: e.stage, reason: e.reason });
+      }
+      break;
+    case "draft.completed":
+      view.drafts.push({ model: e.model, answer: e.answer, claims: e.claims.map((c) => c.id) });
+      for (const c of e.claims) view.claims[c.id] = c;
+      view.sources.push(...e.sources);
+      break;
+    case "document.seeded":
+      view.snapshots = [e.snapshot];
+      view.conflicts = e.conflicts;
+      view.flags = { ...e.flags };
+      break;
+    case "suggestion.opened": {
+      const s = clone(e.suggestion);
+      view.suggestions[s.id] = s;
+      const thread = view.threads[s.thread];
+      if (e.newThread || !thread) {
+        view.threads[s.thread] = {
+          id: s.thread,
+          lockKey: e.lockKey,
+          block: s.target.block,
+          openedRound: s.round,
+          alternatives: [s.id],
+          state: "open",
+        };
+      } else {
+        thread.alternatives.push(s.id);
+      }
+      setPosition(view, s.thread, s.author, s.id);
+      break;
+    }
+    case "suggestion.merged":
+      view.suggestions[e.suggestion]?.coAuthors.push(e.model);
+      setPosition(view, e.thread, e.model, e.suggestion);
+      break;
+    case "vote.cast":
+      view.votes.push({
+        thread: e.thread,
+        voter: e.model,
+        round: e.round,
+        choice: e.choice,
+        reason: e.reason,
+        changed: e.changed,
+      });
+      setPosition(view, e.thread, e.model, e.choice);
+      break;
+    case "thread.accepted": {
+      const t = view.threads[e.thread];
+      if (!t) break;
+      t.state = "accepted";
+      t.winner = e.winner;
+      t.tally = e.tally;
+      reject(
+        view,
+        t.alternatives.filter((id) => id !== e.winner),
+      );
+      break;
+    }
+    case "thread.rejected": {
+      const t = view.threads[e.thread];
+      if (!t) break;
+      t.state = "rejected";
+      t.tally = e.tally;
+      reject(view, t.alternatives);
+      break;
+    }
+    case "thread.unresolved": {
+      const t = view.threads[e.thread];
+      if (!t) break;
+      t.state = "unresolved";
+      t.why = e.why;
+      t.tally = e.tally;
+      break;
+    }
+    case "snapshot.created":
+      view.snapshots.push(e.snapshot);
+      break;
+    case "moment":
+      view.moments.push({ batch: e.batch, text: e.text, origin: e.origin });
+      break;
+    case "run.completed":
+      view.status = "completed";
+      view.flags = { ...e.flags };
+      view.spentUsd = e.spentUsd;
+      break;
+    case "run.failed":
+      view.status = "failed";
+      view.spentUsd = e.spentUsd;
+      break;
+  }
+}
