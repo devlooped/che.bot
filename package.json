@@ -1,0 +1,21 @@
+{
+  "name": "che-bot",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "biome check .",
+    "cli": "tsx apps/cli/src/main.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.8",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
