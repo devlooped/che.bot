@@ -1,7 +1,9 @@
 // Defaults; an admin overrides them from the settings page. A setting names a family,
 // and resolveModels() picks the newest model of it in the Gateway catalog.
 export const MODEL_ROLES = [
-  { key: "panel.grok", kind: "language", defaultId: "spacexai/grok-4.7", defaultEffort: "medium" },
+  // Low for Grok: at medium, grok-4.7 reasoned past 180 s on a round and 66 s on the editor pass
+  // (phase 1); at low, 34 s and 17 s, inside the call timeouts.
+  { key: "panel.grok", kind: "language", defaultId: "spacexai/grok-4.7", defaultEffort: "low" },
   {
     key: "panel.claude",
     kind: "language",

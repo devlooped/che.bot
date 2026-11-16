@@ -1,5 +1,5 @@
 {
-  "files": { "includes": ["**", "!**/node_modules", "!.alta", "!pnpm-lock.yaml"] },
+  "files": { "includes": ["**", "!**/node_modules", "!.alta", "!.runs", "!pnpm-lock.yaml"] },
   "formatter": { "indentStyle": "space", "lineWidth": 100 },
   "linter": { "enabled": true }
 }

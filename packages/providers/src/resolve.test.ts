@@ -14,7 +14,7 @@ const defaults: CatalogModel[] = MODEL_ROLES.map((role) => entry(role.defaultId,
 
 test("without settings every role resolves to its default, with its default effort", () => {
   expect(resolveModels([], defaults)).toEqual({
-    "panel.grok": { id: "spacexai/grok-4.7", effort: "medium" },
+    "panel.grok": { id: "spacexai/grok-4.7", effort: "low" },
     "panel.claude": { id: "anthropic/claude-opus-5.5", effort: "medium" },
     "panel.openai": { id: "openai/gpt-6.1-sol", effort: "medium" },
     "panel.gemini": { id: "google/gemini-4-argon", effort: "medium" },

@@ -2,13 +2,7 @@ import { APICallError } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { expect, test } from "vitest";
 import { z } from "zod";
-import {
-  citedSources,
-  createGatewayProvider,
-  effortOptions,
-  gatewayCost,
-  normalizeUrl,
-} from "./gateway.ts";
+import { citedSources, createGatewayProvider, effortOptions, gatewayCost } from "./gateway.ts";
 import { type GenerateRequest, ProviderError } from "./provider.ts";
 
 type GenerateResult = Awaited<ReturnType<MockLanguageModelV4["doGenerate"]>>;
@@ -49,7 +43,7 @@ const searched = (text: string): Content => [
       results: [
         {
           url: "https://www.example.org/report/",
-          title: "Report",
+          title: "\n   Report\n  ",
           publish_date: null,
           excerpts: ["The  figure is\n42."],
         },
@@ -287,15 +281,15 @@ test("the spend of a step is the larger of cost and marketCost (BYOK reports cos
   expect(gatewayCost(undefined)).toBeUndefined();
 });
 
-test("URLs are compared without fragment, www. or trailing slash", () => {
-  expect(normalizeUrl("https://WWW.Example.org/a/?q=1#x")).toBe("example.org/a?q=1");
-  expect(normalizeUrl("ftp://example.org")).toBeUndefined();
-  expect(normalizeUrl("not a url")).toBeUndefined();
+test("a cited URL matches its search result without fragment, www. or trailing slash", () => {
   const found = new Map([
     ["example.org/a", { url: "https://example.org/a", title: "A", quote: "" }],
   ]);
   expect(citedSources({ nested: [{ text: "see (https://example.org/a)." }] }, found)).toHaveLength(
     1,
   );
+  expect(citedSources({ text: "https://www.example.org/a/#top" }, found)).toEqual([
+    { url: "https://example.org/a", title: "A", quote: "" },
+  ]);
   expect(citedSources({ text: "https://example.org/b" }, found)).toHaveLength(0);
 });

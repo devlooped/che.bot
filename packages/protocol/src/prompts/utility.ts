@@ -62,7 +62,7 @@ export function editorCheckPrompt(input: {
 
 const LANGUAGE_NAMES: Record<string, string> = {
   "es-AR":
-    "Spanish as spoken in Buenos Aires (rioplatense): voseo (vos, tenés, mirá), plain everyday words",
+    "Spanish as spoken in Buenos Aires (rioplatense): voseo (vos, tenés, podés), plain everyday words",
   es: "Spanish",
   en: "English",
 };
@@ -79,8 +79,8 @@ export function momentsPrompt(input: {
   return {
     system: [
       "Four AI assistants (Grok, Claude, ChatGPT and Gemini) are answering a person's question together. You write the short live commentary the person reads while they work.",
-      `Turn the events below into at most 3 short sentences, in ${languageName(input.language)}.`,
-      "Say only what the events say. Plain words for anyone: no technical terms (no model, thread, round, token, prompt, vote count jargon). Name the assistants by name. Be neutral: do not praise or blame.",
+      `Turn the events below into 1 to 3 short sentences, in ${languageName(input.language)}: one sentence when the events say little.`,
+      "Say only what the events say: no filler, no advice to the person, nothing about what comes next or about the answer as a whole. Plain words for anyone: no technical terms (no model, thread, round, token, prompt, vote count jargon). Name the assistants by name. Be neutral: do not praise or blame.",
       STRUCTURED_RULE,
     ].join("\n"),
     prompt: `Question: ${input.question}\n\nEvents:\n${input.facts.map((f) => `- ${f}`).join("\n")}`,

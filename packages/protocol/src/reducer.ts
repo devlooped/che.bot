@@ -39,6 +39,7 @@ import {
   placeCandidates,
   resolveThreads,
 } from "./threads.ts";
+import { normalizeUrl } from "./urls.ts";
 import { clone, hash, normalizeText, seededShuffle } from "./util.ts";
 
 // The orchestrator: pure functions over a JSON run state. `nextStep` says which calls to make,
@@ -275,6 +276,14 @@ export function createRun(
  */
 export function nextStep(state: RunState, now: number): Step {
   if (state.status !== "running") return { kind: "done" };
+  const s = stepAt(state, now);
+  // No call outlives the deadline of the run: the merge, which no check skips, gets what is left.
+  const left = Math.max(0, state.deadlineAt - now);
+  for (const c of s.calls) c.timeoutMs = Math.min(c.timeoutMs, left);
+  return s;
+}
+
+function stepAt(state: RunState, now: number): CallsStep {
   if (state.pending) return dedupeStep(state, now);
   if (state.momentsDue) return momentsStep(state, now);
   const next = state.next;
@@ -292,9 +301,9 @@ export function nextStep(state: RunState, now: number): Step {
     case "round":
       return roundStep(state, next.round, now);
     case "close":
-      return closeStep(state, null);
+      return closeStep(state, null, now);
     case "edit_check":
-      return editCheckStep(state);
+      return editCheckStep(state, now);
     case "finish":
       return finishStep(state, null);
   }
@@ -404,8 +413,9 @@ const ROUND_KIND = { 1: "round1", 2: "round2", 3: "round3" } as const;
 
 function roundStep(state: RunState, round: 1 | 2 | 3, now: number): CallsStep {
   const kind = ROUND_KIND[round];
-  if (!inTime(state, now, state.config.callTimeoutMs.round)) return closeStep(state, "deadline");
-  if (!fits(state, { [kind]: MODELS.length })) return closeStep(state, "budget");
+  if (!inTime(state, now, state.config.callTimeoutMs.round))
+    return closeStep(state, "deadline", now);
+  if (!fits(state, { [kind]: MODELS.length })) return closeStep(state, "budget", now);
   const calls = MODELS.map((m) =>
     call(state, `round:${round}:${m}`, m, kind, roundPromptFor(state, m, round)),
   );
@@ -570,14 +580,17 @@ function momentsStep(state: RunState, now: number): CallsStep {
 
 /**
  * The end of the rounds: open threads are resolved for good and accepted changes applied; then
- * the editor pass if a suggestion was accepted in the run and the budget allows it, else done.
+ * the editor pass if a suggestion was accepted in the run and the budget and the deadline leave
+ * room for it, else done (the accepted changes are applied either way).
  */
-function closeStep(state: RunState, cut: Cut | null): CallsStep {
+function closeStep(state: RunState, cut: Cut | null, now: number): CallsStep {
   const preview = clone(state);
   resolveAndApply(preview, { final: true, round: 4 }, []);
   const accepted = Object.values(preview.threads).some((t) => t.state === "accepted");
   if (!accepted) return finishStep(state, cut);
   if (!fits(state, { editor: 1, editor_check: 1 })) return finishStep(state, cut ?? "budget");
+  if (!inTime(state, now, state.config.callTimeoutMs.editor + state.config.callTimeoutMs.utility))
+    return finishStep(state, cut ?? "deadline");
   const editor = chooseEditor(state, state.config.editorPolicy);
   const snapshot = latest(preview);
   const first = state.snapshots[0];
@@ -599,10 +612,12 @@ function closeStep(state: RunState, cut: Cut | null): CallsStep {
   );
 }
 
-function editCheckStep(state: RunState): CallsStep {
+function editCheckStep(state: RunState, now: number): CallsStep {
   const rewrites = state.edit?.rewrites ?? [];
   const calls =
-    rewrites.length > 0 && fits(state, { editor_check: 1 })
+    rewrites.length > 0 &&
+    fits(state, { editor_check: 1 }) &&
+    inTime(state, now, state.config.callTimeoutMs.utility)
       ? [call(state, "edit-check:0", "utility", "editor_check", editorCheckPrompt({ rewrites }))]
       : [];
   return step(state, "editing", "edit_check", calls, null);
@@ -810,7 +825,12 @@ function valid(kind: CallKind, output: unknown): boolean {
 }
 
 function reduceDrafts(run: RunState, outputs: Map<string, Output>, events: RunEvent[]) {
-  const urls = new Map(run.sources.map((s) => [s.url, s.id]));
+  // Sources and the URLs of claims are matched by their normalized form (see normalizeUrl).
+  const urls = new Map<string, string>();
+  for (const s of run.sources) {
+    const key = normalizeUrl(s.url);
+    if (key && !urls.has(key)) urls.set(key, s.id);
+  }
   for (const model of MODELS) {
     const out = outputs.get(`draft:0:${model}`);
     if (!out) continue;
@@ -819,9 +839,10 @@ function reduceDrafts(run: RunState, outputs: Map<string, Output>, events: RunEv
     const added: Source[] = [];
     for (const f of out.sources) {
       const url = f.url.trim();
-      if (url === "") continue;
-      found.add(url);
-      if (urls.has(url)) continue;
+      const key = normalizeUrl(url);
+      if (!key) continue;
+      found.add(key);
+      if (urls.has(key)) continue;
       const source: Source = {
         id: `src${++run.counters.source}`,
         url,
@@ -829,7 +850,7 @@ function reduceDrafts(run: RunState, outputs: Map<string, Output>, events: RunEv
         quote: f.quote,
         foundBy: model,
       };
-      urls.set(url, source.id);
+      urls.set(key, source.id);
       run.sources.push(source);
       added.push(source);
     }
@@ -842,8 +863,8 @@ function reduceDrafts(run: RunState, outputs: Map<string, Output>, events: RunEv
       const sources = [
         ...new Set(
           c.sources
-            .map((u) => u.trim())
-            .filter((u) => found.has(u))
+            .map((u) => normalizeUrl(u))
+            .filter((u): u is string => u !== undefined && found.has(u))
             .map((u) => urls.get(u) as string),
         ),
       ];

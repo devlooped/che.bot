@@ -1,3 +1,4 @@
+import { normalizeUrl } from "@chebot/protocol";
 import {
   createGateway,
   type generateText as GenerateText,
@@ -298,22 +299,10 @@ function searchResults(output: unknown): FoundSource[] {
       ? result.excerpts.filter((item): item is string => typeof item === "string")
       : [];
     const quote = excerpts.join(" ").replace(/\s+/g, " ").trim().slice(0, QUOTE_CHARS);
-    const title = typeof result.title === "string" && result.title ? result.title : result.url;
+    const named = typeof result.title === "string" ? result.title.replace(/\s+/g, " ").trim() : "";
+    const title = named || result.url;
     return [{ url: result.url, title, quote }];
   });
-}
-
-/** The comparison key of a URL: no fragment, no "www.", no trailing slash. */
-export function normalizeUrl(url: string): string | undefined {
-  try {
-    const parsed = new URL(url.trim());
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return undefined;
-    const host = parsed.host.toLowerCase().replace(/^www\./, "");
-    const path = parsed.pathname.replace(/\/+$/, "");
-    return `${host}${path}${parsed.search}`;
-  } catch {
-    return undefined;
-  }
 }
 
 const URLS = /https?:\/\/[^\s<>"'`)\]]+/g;

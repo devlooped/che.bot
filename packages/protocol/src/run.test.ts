@@ -398,7 +398,7 @@ describe("stopping rules", () => {
     );
   });
 
-  test("deadline: accepted changes still get the editor pass", () => {
+  test("deadline: accepted changes are applied, without an editor pass that would end after it", () => {
     // three models propose the same deletion in round 1: accepted when the rounds end
     const unanimous: Responder = (call, state) =>
       call.kind === "round1"
@@ -421,12 +421,37 @@ describe("stopping rules", () => {
     const tick = (s: { phase: string; stage: string }) => (s.phase === "round" ? 200_000 : 1000);
     const { state, log } = drive({ mode: "thorough" }, unanimous, { tick });
     expect(eventsOf(log, "stage.changed").find((e) => e.cut)).toMatchObject({
-      stage: "editing",
+      stage: "done",
       cut: "deadline",
     });
     expect(state.threads.t1?.state).toBe("accepted");
-    expect(state.edit?.editor).toBeDefined();
+    expect(state.snapshots.at(-1)?.order).not.toContain("p2");
+    expect(state.edit).toBeNull();
     expect(state.status).toBe("completed");
+  });
+
+  test("deadline: the editor pass runs only if it and its check end before the deadline", () => {
+    // the rounds end at 240 - 75 s: room for the editor (60 s) and its check (20 s) is gone
+    const config = { callTimeoutMs: { editor: 60_000, utility: 20_000 } };
+    const tick = (s: { phase: string; stage: string }) =>
+      s.phase === "round" && s.stage === "round3" ? 155_000 : 1000;
+    const late = drive({ mode: "thorough", config }, scripted, { tick });
+    expect(late.state.edit).toBeNull();
+    expect(late.state.flags.deadlineReached).toBe(true);
+    expect(late.steps.flatMap((s) => s.calls.map((c) => c.kind))).not.toContain("editor");
+    const inTime = drive({ mode: "thorough", config }, scripted, {
+      tick: (s) => (s.phase === "round" && s.stage === "round3" ? 140_000 : 1000),
+    });
+    expect(inTime.state.edit?.editor).toBeDefined();
+  });
+
+  test("deadline: no call outlives it; the merge gets the time that is left", () => {
+    const tick = (s: { phase: string }) => (s.phase === "draft" ? 100_000 : 1000);
+    const { steps, state } = drive({ mode: "quick" }, scripted, { tick });
+    const merge = steps.find((s) => s.phase === "merge")?.calls[0];
+    expect(merge?.timeoutMs).toBe(120_000 - 100_000);
+    const draft = steps.find((s) => s.phase === "draft")?.calls[0];
+    expect(draft?.timeoutMs).toBe(state.config.callTimeoutMs.draft);
   });
 
   test("round 1 without suggestions ends the run", () => {

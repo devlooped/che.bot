@@ -1,9 +1,11 @@
 // Live contract tests against Vercel AI Gateway: skipped without AI_GATEWAY_API_KEY.
 // Tiny prompts and low output caps; a full run costs a few US cents per panel model.
+
+import { normalizeUrl } from "@chebot/protocol";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { z } from "zod";
 import { type CatalogModel, fetchGatewayCatalog } from "./catalog.ts";
-import { createGatewayProvider, normalizeUrl } from "./gateway.ts";
+import { createGatewayProvider } from "./gateway.ts";
 import { ProviderError } from "./provider.ts";
 import { type ModelSnapshot, resolveModels } from "./resolve.ts";
 import { MODEL_ROLES } from "./roles.ts";

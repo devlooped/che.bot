@@ -39,30 +39,34 @@ export interface RunConfig {
 
 export const DEFAULT_CONFIG: RunConfig = {
   budgetUsd: 3,
-  callTimeoutMs: { draft: 90_000, merge: 60_000, round: 45_000, editor: 60_000, utility: 20_000 },
+  // The editor took 10-17 s in phase 1; 35 s leaves it room before a thorough deadline more often.
+  callTimeoutMs: { draft: 90_000, merge: 60_000, round: 45_000, editor: 35_000, utility: 20_000 },
   deadlineMs: { quick: 120_000, thorough: 240_000 },
   searchResultsPerDraft: 10,
   worstCaseUsd: {
     draft: 0.25,
-    merge: 0.03,
+    merge: 0.06,
     round1: 0.1,
     round2: 0.1,
     round3: 0.06,
-    dedupe: 0.01,
+    dedupe: 0.02,
     editor: 0.15,
-    editor_check: 0.01,
+    editor_check: 0.02,
     moments: 0.005,
   },
+  // Reasoning models spend part of these on reasoning. Measured in phase 1: a draft up to 3,200
+  // output tokens, a merge of 4 long drafts 5,000, a round 2,400 (Grok at low effort); the
+  // utility model was cut off at 800 on a duplicate check of 7 suggestions and at 400 on moments.
   maxOutputTokens: {
-    draft: 4000,
-    merge: 6000,
-    round1: 2000,
-    round2: 2000,
-    round3: 1000,
-    dedupe: 800,
+    draft: 6000,
+    merge: 10000,
+    round1: 3000,
+    round2: 3000,
+    round3: 1500,
+    dedupe: 2000,
     editor: 6000,
-    editor_check: 800,
-    moments: 400,
+    editor_check: 2000,
+    moments: 800,
   },
   caps: { round1: 3, round2: 2 },
   quorum: 3,

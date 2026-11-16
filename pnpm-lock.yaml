@@ -46,6 +46,9 @@ importers:
 
   packages/providers:
     dependencies:
+      '@chebot/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       ai:
         specifier: ^7.0.173
         version: 7.0.173(zod@4.6.7)

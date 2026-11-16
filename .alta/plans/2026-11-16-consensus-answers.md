@@ -2,7 +2,7 @@
 title: Four AIs answer one question together, through a shared document with tracked suggestions
 status: in-progress
 created: 2026-11-16
-summary: Build a web app where Grok, Claude, OpenAI and Gemini draft alone, then converge on one answer through a fixed, code-run protocol of tracked suggestions and votes. Signed-in users pay per question by QR, at a price set by a quick classification. The protocol is proven headless on about 50 questions first; the Cloudflare runtime, the Spanish UI and charts follow only if it beats a single model.
+summary: Build a web app where Grok, Claude, OpenAI and Gemini draft alone, then converge on one answer through a fixed, code-run protocol of tracked suggestions and votes. Signed-in users pay per question by QR, at one of two prices set by a quick classification; the process is the same for both. The protocol is proven headless on about 50 questions first; the Cloudflare runtime, the Spanish UI and charts follow only if it beats a single model.
 ---
 
 # Four AIs answer one question together
@@ -38,14 +38,14 @@ The orchestrator is a pure function: given the state of a run and the results of
 ```mermaid
 stateDiagram-v2
   [*] --> Quoted: question classified, price set
-  Quoted --> AwaitingPayment: user confirms the mode, QR issued
+  Quoted --> AwaitingPayment: user confirms, QR issued
   Quoted --> Drafting: admin run, no charge
   AwaitingPayment --> Drafting: payment confirmed
   AwaitingPayment --> Expired: not paid in 15 minutes
   Drafting --> Merging: drafts in, or call timeout
   Drafting --> Failed: no draft at all
-  Merging --> Done: quick mode, nothing contested, or fewer than 3 drafts
-  Merging --> Round1: thorough mode and something contested
+  Merging --> Done: nothing contested, or fewer than 3 drafts
+  Merging --> Round1: something contested
   Round1 --> Round2: suggestions were made
   Round1 --> Done: no suggestions
   Round2 --> Round3: threads still open or new suggestions
@@ -133,7 +133,7 @@ The merge model does not decide what is contested. Each draft returns numbered c
 **Events** are the only thing the UI reads. They are appended to a log with a sequence number and an idempotency key:
 
 ```jsonc
-{ "seq": 3,  "type": "payment.requested", "amount": 1500, "currency": "ARS", "qr": "000201…" }
+{ "seq": 3,  "type": "payment.requested", "amount": 5000, "currency": "ARS", "qr": "000201…" }
 { "seq": 14, "type": "suggestion.opened", "batch": 2, "thread": "t3", "model": "grok", "block": "p4",
   "summary": "La cifra de 2019 no incluye las emisiones de alcance 3" }
 { "seq": 19, "type": "vote.cast", "batch": 3, "thread": "t3", "model": "claude", "choice": "s5", "changed": true,
@@ -222,14 +222,14 @@ How the guarantees are enforced:
 // packages/providers/src/limits.ts: starting values, tuned with the phase 1 measurements
 export const limits = {
   callTimeoutMs: { draft: 90_000, round: 45_000, editor: 60_000, utility: 20_000 },
-  deadlineMs: { quick: 120_000, thorough: 240_000 },
+  deadlineMs: { quick: 120_000, thorough: 240_000 },   // quick: drafts and merge only, the evaluation's arm Q
   searchResultsPerDraft: 10,
 };
 ```
 
-### Classification and payment: a price per question, paid by QR
+### Classification and payment: two prices, one process, paid by QR
 
-Asking needs a signed-in user. A question is first classified by a decision model through the Gateway; the class sets the mode and the price, and the user pays before any panel model is called.
+Asking needs a signed-in user. A question is first classified by a decision model through the Gateway as simple or complex. The class sets the price and nothing else: 5,000 ARS for a simple question, 10,000 ARS for a complex one. Every question then runs the same process, the full protocol above. The user pays before any panel model is called.
 
 ```ts
 // apps/web/src/worker/quote.ts
@@ -250,8 +250,9 @@ const { answers } = await decide({
 // answers.complexity → { type: "choice", choice: "complex", probabilities: { simple: 0.12, complex: 0.88 } }
 ```
 
-- `simple` proposes quick mode (drafts and merge) at the simple price; `complex` proposes thorough mode (the rounds) at the complex price. A choice with a probability under 0.7 counts as `complex`.
-- The user sees the class and the price and may switch the mode before paying; the price follows the mode. This keeps the quick/thorough choice of the design.
+- A choice with a probability under 0.7 counts as `complex`.
+- The user sees the class and its price before paying. There is no mode to choose: the quick/thorough toggle of the design is gone from the product, because the class now sets the spend. Running without the rounds stays in the protocol as an option of the evaluation.
+- The two amounts are defaults in the `prices` table, which an admin can change.
 - Payment uses the CheBot jobs service (`https://jobs.chebot.si`, the `chebot-job` skill). The run ID is the job ID, a UUID. The app enqueues a job with the amount in ARS and an automation hook that points back to the app; the service returns a Mercado Pago QR; when the payment is processed it calls the hook, and the run starts.
 
 ```mermaid
@@ -261,9 +262,9 @@ sequenceDiagram
   participant R as RunObject
   participant J as jobs.chebot.si
   B->>W: POST /api/runs {question}
-  W->>R: quote: classify, snapshot the prices
-  W-->>B: 201 {runId, class, mode, prices}
-  B->>W: POST /api/runs/:id/pay {mode}
+  W->>R: quote: classify, read the price of the class
+  W-->>B: 201 {runId, class, amount, currency}
+  B->>W: POST /api/runs/:id/pay
   R->>J: POST /jobs/:id {actor, name, amount, currency ARS, automation}
   R->>J: GET /jobs/:id until pending
   R-->>B: event payment.requested {amount, qr}
@@ -302,8 +303,8 @@ flowchart LR
 ```ts
 // apps/web/src/worker/run-object.ts: the shape of the driver
 export class RunObject extends DurableObject<Env> {
-  async quote(input: QuoteInput) { /* insert the run row once, store class and prices, append run.quoted */ }
-  async pay(mode: Mode)          { /* enqueue the job once, setAlarm(now) to wait for the QR */ }
+  async quote(input: QuoteInput) { /* insert the run row once, store the class and its price, append run.quoted */ }
+  async pay()                    { /* enqueue the job once, setAlarm(now) to wait for the QR */ }
   async paid()                   { /* append payment.confirmed once, snapshot the models, setAlarm(now) */ }
 
   async alarm() {
@@ -324,14 +325,14 @@ CREATE TABLE events    (seq INTEGER PRIMARY KEY, key TEXT UNIQUE, batch INTEGER,
 CREATE TABLE calls     (key TEXT PRIMARY KEY, status TEXT, started_at INTEGER, finished_at INTEGER,
                         output TEXT, usage TEXT, cost_usd REAL);
 CREATE TABLE snapshots (version INTEGER PRIMARY KEY, doc TEXT, seq INTEGER);
-CREATE TABLE run       (id TEXT PRIMARY KEY, owner TEXT, question TEXT, class TEXT, mode TEXT, state TEXT,
+CREATE TABLE run       (id TEXT PRIMARY KEY, owner TEXT, question TEXT, class TEXT, state TEXT,
                         models TEXT, amount REAL, currency TEXT, hook_token TEXT, budget_usd REAL, deadline_at INTEGER);
 
 -- D1, shared by all runs
 CREATE TABLE model_settings (role TEXT PRIMARY KEY, model_id TEXT NOT NULL, effort TEXT, updated_at TEXT NOT NULL, updated_by TEXT NOT NULL);
-CREATE TABLE prices         (mode TEXT PRIMARY KEY, amount REAL NOT NULL, currency TEXT NOT NULL, budget_usd REAL NOT NULL);
+CREATE TABLE prices         (class TEXT PRIMARY KEY, amount REAL NOT NULL, currency TEXT NOT NULL); -- simple 5000 ARS, complex 10000 ARS
 CREATE TABLE runs           (id TEXT PRIMARY KEY, owner TEXT NOT NULL, created_at TEXT NOT NULL, question TEXT NOT NULL,
-                             class TEXT, mode TEXT, status TEXT NOT NULL, amount REAL);
+                             class TEXT, status TEXT NOT NULL, amount REAL);
 ```
 
 - **Start does not wait.** Each `POST` returns at once; the run goes on without any open HTTP request.
@@ -341,8 +342,8 @@ CREATE TABLE runs           (id TEXT PRIMARY KEY, owner TEXT NOT NULL, created_a
 - **Runs are kept until deleted.** A run is readable by anyone who has its link. Its owner, or an admin, deletes it, which empties the object's storage and removes the row in `runs`.
 
 ```
-POST   /api/runs                     {question}  →  201 { runId, class, mode, prices }   signed in
-POST   /api/runs/:id/pay             {mode}      →  202                                   owner
+POST   /api/runs                     {question}  →  201 { runId, class, amount, currency }  signed in
+POST   /api/runs/:id/pay                         →  202                                   owner
 POST   /api/pay/hook                             ←  jobs.chebot.si, Bearer run token
 GET    /api/runs/:id                             →  { status, stage, version, lastSeq }   public by link
 GET    /api/runs/:id/events?after=42             →  events after 42                       public by link
@@ -421,18 +422,18 @@ Verified when:
 - [x] 8. Write the stopping rules: caps per round, early stop, budget, deadline, abstention with a quorum of 3, quick mode.
 - [x] 9. Write the prompts per stage in `packages/protocol/src/prompts/`, in English, with the rule to answer in the language of the question: independence in drafts, substance only, anonymized positions, a reason for a changed position, and the editor's "no change of substance" with its check by the utility model (a rewrite that changes a claim is dropped).
 - [x] 10. Write the classifier in `packages/providers/src/classify.ts` with `decide()` and the `classifier` role: the class, its probability, and the 0.7 rule.
-- [ ] 11. Write the local driver and `pnpm cli ask "<question>" --mode thorough --max-usd 1` in `apps/cli`: it resolves and records the model snapshot, classifies the question, runs the protocol in Node, writes the event log as JSON lines, and prints the answer, the dissent notes, the moments and the cost.
-- [ ] 12. Write the moments: templates per event type in Spanish, and the utility-model phrasing per batch.
+- [ ] 11. Write the local driver and `pnpm cli ask "<question>" --max-usd 1` in `apps/cli` (the full process by default; `--mode quick` stops after the merge, for the evaluation): it resolves and records the model snapshot, classifies the question, runs the protocol in Node, writes the event log as JSON lines, and prints the answer, the dissent notes, the moments and the cost.
+- [x] 12. Write the moments: templates per event type in Spanish, and the utility-model phrasing per batch.
 - [x] 13. Write `eval/questions.jsonl`: 50 questions, most of them in Spanish, with a category, a hand-set class (simple or complex) and a gold answer or a rubric (see "The evaluation").
 - [ ] 14. Write `pnpm cli eval --set eval/questions.jsonl --max-usd <n>`: it runs the arms, keeps every call result on disk so that a rerun never pays twice, runs the blind judging, produces the blind grading sheet of 20 answer pairs for the user, and writes `eval/results/<date>/report.md`.
-- [ ] 15. Run the evaluation; the user grades the blind sheet; read the report together and record the decision to go on, to go on with quick mode only, or to stop.
+- [ ] 15. Run the evaluation; the user grades the blind sheet; read the report together and record the decision to go on, to go on without the rounds, or to stop.
 
 Verified when:
 
 - [x] Unit tests cover each collision rule, the voting rule (including an abstention and two qualifying alternatives), locks, the rejected list, each stopping rule and the claim coverage check.
 - [x] A property test shows that the same accepted suggestions give the same snapshot whatever order the model responses arrived in.
-- [ ] Tests show that a setting with an old version resolves to the newest model of its family, and that a run uses its snapshot after the settings change.
-- [ ] A fake-provider run goes through all stages, and replaying its event log rebuilds the same final document.
+- [x] Tests show that a setting with an old version resolves to the newest model of its family, and that a run uses its snapshot after the settings change.
+- [x] A fake-provider run goes through all stages, and replaying its event log rebuilds the same final document.
 - [ ] `pnpm cli ask` against the four live models returns an answer inside the deadline and under `--max-usd`, with every model call present once in the log.
 - [ ] `eval/results/<date>/report.md` exists and reports every metric of "The evaluation", with the user's grades included.
 
@@ -444,7 +445,7 @@ Starts only after step 15 says go.
 - [ ] 17. Write the D1 migrations (`model_settings`, `prices`, `runs`) and the settings access: read the settings and the catalog, resolve the snapshot.
 - [ ] 18. Write the Auth0 check in the Worker: verify the access token against the tenant's keys, read the roles claim, and guard each route as listed in the API.
 - [ ] 19. Write `RunObject` storage: the four tables, `quote()`, `pay()` and `paid()` that are each safe to call twice, and the idempotent event append.
-- [ ] 20. Write the quote: classify with the decision model, read the prices, store both with the run, answer the `POST`.
+- [ ] 20. Write the quote: classify with the decision model, read the price of the class, store both with the run, answer the `POST`.
 - [ ] 21. Write the payment: enqueue the job with the automation hook and a per-run token, wait for the QR on alarm ticks, emit `payment.requested`, handle `POST /api/pay/hook`, expire and cancel an unpaid job after 15 minutes, and mark the job `done` or `failed` at the end of the run. Admin runs skip the job.
 - [ ] 22. Write the alarm driver with the call ledger: one stage per tick, results stored as each call lands, the retry and abstain rules, `run.failed` after repeated handler errors, and the free rerun of a paid run that failed.
 - [ ] 23. Write the read API and the WebSocket endpoint with the Hibernation API, with replay from a sequence number; write `GET /api/me/runs` and `DELETE /api/runs/:id`.
@@ -464,7 +465,7 @@ Verified when:
 ### Phase 3: the UI on the event stream
 
 - [ ] 27. Write the event client in `apps/web/src/app/`: connect, resume, the shared view reducer, the staggered playback of a batch, and the `es-AR` messages file.
-- [ ] 28. Build sign-in with Auth0 and the ask page: the question box, the class and the price, the mode switch, and the QR with its amount and its waiting state.
+- [ ] 28. Build sign-in with Auth0 and the ask page: the question box, the class and its price, and the QR with its amount and its waiting state.
 - [ ] 29. Build the ambient layer: four avatars, status chips, the stage line.
 - [ ] 30. Build the moments feed.
 - [ ] 31. Build the document view: margin marks, the "3 de 4" badge, the thread popover with reasons and votes, dissent notes, sources, and the models of the run.
@@ -509,6 +510,10 @@ Verified when:
 - **Early stop and round 3 (step 8).** A round 2 with no new suggestion and no changed position ends the rounds even if threads are open; they end unresolved, as dissent notes.
 - **Merge (step 6).** A merge that drops claims gets them back as their own contested paragraphs; a merge that fails is replaced by a document built by code from the claims. There is no retry. The merge call has its own timeout of 60 s. With one draft missing no paragraph can be `agreed`: three supporters is `majority`.
 - **Voting details (step 7).** A co-author counts as a vote in favor. A model that abstains keeps its last position; one that never took a position is not counted. "Keep" rejects a thread with at least 2 holders that are a majority of the positions held.
+- **Limits (step 11).** There is no `packages/providers/src/limits.ts`: the limits are the run configuration in `packages/protocol/src/config.ts`, because the reducer reads them and cannot depend on the providers. The values were tuned on live runs: larger output caps (reasoning tokens count against them), and an editor timeout of 35 s.
+- **The deadline is hard (step 11).** No call outlives the deadline of the run, and the editor pass runs only if it and its check fit before it; accepted changes are applied either way. This replaces "the deadline sends the run to the editor pass": the first live run ended at 241.7 s against 240 s.
+- **Grok's effort (step 11).** The default effort of `panel.grok` is `low`. At `medium`, grok-4.7 reasoned past 180 s on a round and timed out; at `low` it took 34 s. An admin setting can change it back.
+- **Live timings (step 11).** A full run took 168 to 182 s and cost US$0.35 to 0.66; the drafts take up to 88 s (Gemini with search) and the merge about 30 s. The bar of 180 s at the 95th percentile is at risk; the evaluation measures it.
 - **Line endings.** A `.gitattributes` keeps LF in every checkout, because Biome rejects the CRLF files that `core.autocrlf` produces on Windows.
 
 ## The evaluation of phase 1, and the criteria to go on
@@ -522,16 +527,16 @@ Published results on multi-agent debate are mixed, and much of the gain may come
 | Arm | What it is |
 | --- | --- |
 | S1 to S4 | Each model's draft alone |
-| Q | Drafts plus merge (quick mode) |
-| T | The full protocol (thorough mode) |
+| Q | Drafts plus merge, without the rounds |
+| T | The full protocol: what every paid question runs |
 
 **Measures:**
 
 - Correctness on the 28 questions with a known answer, judged blind against the gold answer.
 - Blind pairwise preference, Q against the best single model and T against Q, by the four models as judges with shuffled, unlabelled answers, and by the user on the sheet of 20 pairs.
 - How often the rounds changed the substance of the answer, and whether each change improved or worsened it.
-- Cost and wall-clock per question, median and 95th percentile, per mode; invalid outputs, timeouts and abstentions per model.
-- The classifier: agreement with the hand-set class, and how often a question classed simple had contested paragraphs after the merge.
+- Cost and wall-clock per question, median and 95th percentile, per arm and per class; invalid outputs, timeouts and abstentions per model.
+- The classifier: agreement with the hand-set class, and the cost of a run for each class.
 - Signs of herding: positions that changed without a new argument; how often the dissent notes were right.
 - Editor choice: the same runs finished with a rotating editor and with the model closest to the majority.
 
@@ -539,12 +544,12 @@ Published results on multi-agent debate are mixed, and much of the gain may come
 
 | Check | Bar | If it fails |
 | --- | --- | --- |
-| The protocol is sound | 95% of runs finish without an invalid output stopping them; thorough under 180 s at the 95th percentile | Fix before judging anything else |
+| The protocol is sound | 95% of runs finish without an invalid output stopping them; the full protocol under 180 s at the 95th percentile | Fix before judging anything else |
 | Collaboration beats one model | Q has no fewer correct answers than the best single model, and wins or ties 60% of blind pairs against it, by the judges and by the user | Stop. The premise does not hold with this protocol; rethink before building a runtime |
-| The rounds earn their cost | The rounds changed substance in 30% of questions that had contested paragraphs, improvements outnumber regressions 2 to 1, and T costs at most 2.5 times Q | Build phases 2 and 3 with quick mode only and one price. The suggestion threads then have little to show, so the glimpse is redesigned around the differences between drafts |
-| The classifier can set the price | It agrees with the hand-set class on 85% of questions, and at most 1 in 5 questions classed simple has contested paragraphs | Keep one price until the criteria of the classifier are rewritten and measured again |
+| The rounds earn their cost | The rounds changed substance in 30% of questions that had contested paragraphs, improvements outnumber regressions 2 to 1, and T costs at most 2.5 times Q | Build phases 2 and 3 without the rounds; the two prices stay. The suggestion threads then have little to show, so the glimpse is redesigned around the differences between drafts |
+| The classifier can set the price | It agrees with the hand-set class on 85% of questions | Charge one price until the criteria of the classifier are rewritten and measured again |
 
-Fifty questions only show large effects. A borderline result means extending the set to about 150 before deciding, not rounding up. The whole evaluation is about 1,000 model calls plus judging; the runner prints the real spend and stops at `--max-usd`. Its cost per mode is what the two prices are set from.
+Fifty questions only show large effects. A borderline result means extending the set to about 150 before deciding, not rounding up. The whole evaluation is about 1,000 model calls plus judging; the runner prints the real spend and stops at `--max-usd`. Its cost per class shows the margin that 5,000 and 10,000 ARS leave.
 
 ## Decisions
 
@@ -555,7 +560,7 @@ Made by the user in the review of this plan:
 | Decision | Choice |
 | --- | --- |
 | Who may ask | Signed-in users, with Auth0 |
-| Who pays | The user, per question: a decision model classes the question simple or complex and the class sets the price. For now the payment is a Mercado Pago QR through the CheBot jobs service; a credit balance comes later |
+| Who pays | The user, per question: a decision model classes the question simple or complex, and the class sets only the price: 5,000 ARS simple, 10,000 ARS complex. The process is the same for both. For now the payment is a Mercado Pago QR through the CheBot jobs service; a credit balance comes later |
 | Models | The flagship of each provider, through Vercel AI Gateway, configured as in the existing app: roles, version-less settings, a snapshot when the run starts |
 | Grading | The user grades about 20 blind answer pairs in phase 1 |
 | Privacy | Runs are shareable by link and kept until deleted |
@@ -568,8 +573,8 @@ Made in this plan:
 | Who drives the stages | The Durable Object, with alarms | One stage fits in one alarm; one owner of the state; Workflows' retries work against the abstain rule |
 | Language of the code | TypeScript everywhere | The phase 1 protocol is the same code the Durable Object and the browser run, and the model configuration ports as it is |
 | Agents SDK or plain Durable Object | Plain `DurableObject` | The state is an append-only log resumed by sequence number, not a synced state object |
-| Class and mode | Simple proposes quick, complex proposes thorough; the user may switch before paying and the price follows the mode | Joins the classification with the quick/thorough choice of the design |
-| An unsure classification | Under 0.7 counts as complex | The user still sees the price and can switch |
+| Quick or thorough for the user | No choice: every question runs the full process; running without the rounds stays as an option of the evaluation | The class sets the spend now, so the toggle of the design has nothing left to choose |
+| An unsure classification | Under 0.7 counts as complex | An unclear question is charged as complex; phase 1 measures how often that happens |
 | How payment is confirmed | The automation hook of the jobs service calls the app | No polling after the QR is shown; the service calls only after the payment is processed |
 | A paid run that fails | The job is marked failed and the owner reruns the same question free | The jobs service has no refund call |
 | Where settings live | D1 for settings, prices and the list of runs; SQLite in each Durable Object for the run | Settings are shared by all runs; a run stays self-contained and deletable |
@@ -588,8 +593,6 @@ These are the user's to decide. None blocks phases 0 and 1.
 
 > **Open:** Where does the new app live? `che.bot` serves the existing fact-checking app on Vercel. The choices are a subdomain for one of the two, a path of `che.bot` routed to the Worker, or the new app replacing the old one. Needed before step 26 gets a public hostname.
 
-> **Open:** What are the two prices in ARS, for a simple and for a complex question? They can be set after phase 1 shows the cost of each mode. Needed before step 26.
-
 > **Open:** What does a user get when a paid run fails? The plan gives a free rerun of the same question; a refund through Mercado Pago would need a call the jobs service does not have. Needed before launch.
 
 > **Open:** Which Auth0 tenant and roles? The plan assumes the tenant of the existing app with a new application and API, and its `admin` and `beta` roles. Needed before step 18.
@@ -602,7 +605,7 @@ These are the user's to decide. None blocks phases 0 and 1.
 - **Sycophantic convergence.** Independent drafts, anonymized positions and a reason for every changed position; the evaluation counts changes of position without a new argument.
 - **Merge and editor bias.** The status of a paragraph is derived by code, no claim may be dropped by the merge, the editor's rewrites are checked for changed claims, and the editor choice is compared with rotation.
 - **Invented numbers in charts.** No model types a value from user data, and web values need a citation found by search.
-- **The price is set before the cost is known.** A question classed simple can turn out contested. The class is measured in phase 1, the budget per mode caps the cost, and the daily cap bounds the total.
+- **The price is set before the cost is known.** Both classes run the same process, so a question charged as simple can cost as much as a complex one. The budget per question caps the cost, phase 1 measures the cost per class against the two prices, and the daily cap bounds the total.
 - **A payment confirmed while the run cannot start.** The hook is idempotent and the payment is recorded before any model call; a run that then fails gives the free rerun.
 - **One gateway in front of every model.** An outage of Vercel AI Gateway stops all four. The provider interface keeps a native adapter possible, and a failed run costs the user nothing.
 - **A new model version changes behavior without a change of settings.** That is the point of version-less settings; the snapshot records which model answered, and the evaluation can be rerun when a family moves.
