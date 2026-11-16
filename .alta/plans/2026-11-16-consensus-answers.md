@@ -1,6 +1,6 @@
 ---
 title: Four AIs answer one question together, through a shared document with tracked suggestions
-status: in-progress
+status: blocked
 created: 2026-11-16
 summary: Build a web app where Grok, Claude, OpenAI and Gemini draft alone, then converge on one answer through a fixed, code-run protocol of tracked suggestions and votes. Signed-in users pay per question by QR, at one of two prices set by a quick classification; the process is the same for both. The protocol is proven headless on about 50 questions first; the Cloudflare runtime, the Spanish UI and charts follow only if it beats a single model.
 ---
