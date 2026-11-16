@@ -408,7 +408,7 @@ eval/results/              reports (raw outputs ignored by git)
 
 Verified when:
 
-- [ ] `pnpm install`, `pnpm -r typecheck` and `pnpm -r test` pass on a clean clone.
+- [x] `pnpm install`, `pnpm -r typecheck` and `pnpm -r test` pass on a clean clone.
 
 ### Phase 1: the protocol as a headless script, and its evaluation
 
@@ -423,7 +423,7 @@ Verified when:
 - [ ] 10. Write the classifier in `packages/providers/src/classify.ts` with `decide()` and the `classifier` role: the class, its probability, and the 0.7 rule.
 - [ ] 11. Write the local driver and `pnpm cli ask "<question>" --mode thorough --max-usd 1` in `apps/cli`: it resolves and records the model snapshot, classifies the question, runs the protocol in Node, writes the event log as JSON lines, and prints the answer, the dissent notes, the moments and the cost.
 - [ ] 12. Write the moments: templates per event type in Spanish, and the utility-model phrasing per batch.
-- [ ] 13. Write `eval/questions.jsonl`: 50 questions, most of them in Spanish, with a category, a hand-set class (simple or complex) and a gold answer or a rubric (see "The evaluation").
+- [x] 13. Write `eval/questions.jsonl`: 50 questions, most of them in Spanish, with a category, a hand-set class (simple or complex) and a gold answer or a rubric (see "The evaluation").
 - [ ] 14. Write `pnpm cli eval --set eval/questions.jsonl --max-usd <n>`: it runs the arms, keeps every call result on disk so that a rerun never pays twice, runs the blind judging, produces the blind grading sheet of 20 answer pairs for the user, and writes `eval/results/<date>/report.md`.
 - [ ] 15. Run the evaluation; the user grades the blind sheet; read the report together and record the decision to go on, to go on with quick mode only, or to stop.
 
