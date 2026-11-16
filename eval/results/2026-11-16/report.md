@@ -2,7 +2,7 @@
 
 Written 2026-11-16. It covers 50 of the 50 questions selected (50 in the set).
 
-Spend of the evaluation so far: US$19.2767 against a cap of US$45.0000: runs US$12.2752, classification US$0.0008, judging US$7.0008. This invocation spent US$0.0000.
+Spend of the evaluation so far: US$19.2767 against a cap of US$Infinity: runs US$12.2752, classification US$0.0008, judging US$7.0008. This invocation spent US$0.0000.
 
 | Role | Model |
 | --- | --- |
@@ -21,7 +21,7 @@ Spend of the evaluation so far: US$19.2767 against a cap of US$45.0000: runs US$
 | The protocol is sound | Wall-clock of the full protocol, 95th percentile | 177.8 s | under 180 s | pass |
 | Collaboration beats one model | Correct answers: Q against the best single model | 26 against 27 (of 28) | Q no fewer | fail |
 | Collaboration beats one model | Blind pairs Q won or tied against the best single model, by the judges | 32% (16 of 50) | at least 60% | fail |
-| Collaboration beats one model | Blind pairs Q won or tied against the best single model, by the user | not graded yet | at least 60% | pending |
+| Collaboration beats one model | Blind pairs Q won or tied against the best single model, by the user | 20% (2 of 10) | at least 60% | fail |
 | The rounds earn their cost | Questions with contested paragraphs whose substance the rounds changed | 63% (29 of 46) | at least 30% | pass |
 | The rounds earn their cost | Improvements against regressions | 26 against 2 | 2 to 1 or better | pass |
 | The rounds earn their cost | Mean cost of T over mean cost of Q | 1.75× | at most 2.5× | pass |
@@ -71,6 +71,8 @@ The best single model, chosen after the fact: **Claude**, mean quality 4.62 over
 |   judge Claude | 37 | 33 T | 2 | 2 Q | 95% |
 |   judge ChatGPT | 37 | 36 T | 0 | 1 Q | 97% |
 |   judge Gemini | 37 | 31 T | 2 | 4 Q | 89% |
+| Q against the best single model, the user | 10 | 2 Q | 0 | 8 single | 20% |
+| T against Q, the user | 10 | 8 T | 1 | 1 Q | 90% |
 | T against the best single model (extra), majority of judges | 50 | 18 T | 17 | 15 single | 70% |
 |   judge Grok | 50 | 24 T | 10 | 16 single | 68% |
 |   judge Claude | 50 | 19 T | 7 | 24 single | 52% |
@@ -81,7 +83,7 @@ The majority is the verdict of more judges than any other; otherwise a tie. Wher
 
 T against the best single model is an extra measure, outside the criteria of the plan, whose check compares Q with the best single model; it follows the rules of that pair (T wins where the best single model had no answer, a tie where the texts are the same: 0 questions).
 
-The user has not graded the sheet yet: eval\results\2026-11-16\grading-sheet.md (20 pairs).
+The user graded 20 of the 20 pairs of the sheet.
 
 ## The rounds
 

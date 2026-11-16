@@ -30,7 +30,7 @@
       }
     },
     "questionsInSet": 50,
-    "capUsd": 45,
+    "capUsd": null,
     "spent": {
       "runs": 12.2752086,
       "classify": 0.000769902,
@@ -46,7 +46,22 @@
       "model": "claude",
       "why": "mean quality 4.62 over 50 questions"
     },
-    "user": null,
+    "user": [
+      {
+        "kind": "qs",
+        "graded": 10,
+        "firstWins": 2,
+        "ties": 0,
+        "secondWins": 8
+      },
+      {
+        "kind": "tq",
+        "graded": 10,
+        "firstWins": 8,
+        "ties": 1,
+        "secondWins": 1
+      }
+    ],
     "sheet": {
       "pairs": 20,
       "file": "eval\\results\\2026-11-16\\grading-sheet.md"
@@ -646,9 +661,9 @@
     {
       "area": "Collaboration beats one model",
       "check": "Blind pairs Q won or tied against the best single model, by the user",
-      "value": "not graded yet",
+      "value": "20% (2 of 10)",
       "bar": "at least 60%",
-      "status": "pending"
+      "status": "fail"
     },
     {
       "area": "The rounds earn their cost",
