@@ -143,11 +143,8 @@ describe("events", () => {
         quotedEvent({
           class: "complex",
           probability: 0.9,
-          mode: "thorough",
-          prices: {
-            quick: { amount: 500, currency: "ARS" },
-            thorough: { amount: 1500, currency: "ARS" },
-          },
+          amount: 10000,
+          currency: "ARS",
         }),
       ],
       10,
@@ -155,7 +152,7 @@ describe("events", () => {
     const second = appendEvents(
       first.log,
       [
-        paymentRequestedEvent({ mode: "thorough", amount: 1500, currency: "ARS", qr: "000201" }),
+        paymentRequestedEvent({ amount: 10000, currency: "ARS", qr: "000201" }),
         first.log[0] as RunEvent,
       ],
       20,
@@ -166,7 +163,8 @@ describe("events", () => {
     const view = replay(second.log);
     expect(view).toMatchObject({
       status: "awaiting_payment",
-      payment: { amount: 1500, qr: "000201" },
+      quote: { class: "complex", amount: 10000, currency: "ARS" },
+      payment: { amount: 10000, qr: "000201" },
     });
   });
 

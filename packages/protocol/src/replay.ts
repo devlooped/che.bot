@@ -28,7 +28,7 @@ export interface RunView {
   status: "new" | "quoted" | "awaiting_payment" | "running" | "completed" | "failed" | "expired";
   stage: Stage | null;
   quote: Omit<EventOf<"run.quoted">, "key" | "batch" | "type"> | null;
-  payment: { mode: Mode; amount: number; currency: string; qr: string } | null;
+  payment: { amount: number; currency: string; qr: string } | null;
   paid: boolean;
   drafts: Draft[];
   claims: Record<string, Claim>;
@@ -113,12 +113,17 @@ function applyEvent(view: RunView, e: RunEvent) {
     case "run.quoted":
       view.status = "quoted";
       view.stage = "quoted";
-      view.quote = { class: e.class, probability: e.probability, mode: e.mode, prices: e.prices };
+      view.quote = {
+        class: e.class,
+        probability: e.probability,
+        amount: e.amount,
+        currency: e.currency,
+      };
       break;
     case "payment.requested":
       view.status = "awaiting_payment";
       view.stage = "awaiting_payment";
-      view.payment = { mode: e.mode, amount: e.amount, currency: e.currency, qr: e.qr };
+      view.payment = { amount: e.amount, currency: e.currency, qr: e.qr };
       break;
     case "payment.confirmed":
       view.paid = true;

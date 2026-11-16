@@ -15,10 +15,6 @@ import type {
 
 export type QuestionClass = "simple" | "complex";
 export type Cut = "budget" | "deadline";
-export interface Price {
-  amount: number;
-  currency: string;
-}
 
 /**
  * The events of a run: the only thing the UI reads. Each carries a deterministic idempotency key
@@ -31,10 +27,10 @@ export type RunEvent = { key: string; batch: number } & (
       type: "run.quoted";
       class: QuestionClass;
       probability: number;
-      mode: Mode;
-      prices: Record<Mode, Price>;
+      amount: number;
+      currency: string;
     }
-  | { type: "payment.requested"; mode: Mode; amount: number; currency: string; qr: string }
+  | { type: "payment.requested"; amount: number; currency: string; qr: string }
   | { type: "payment.confirmed"; amount: number; currency: string }
   | { type: "run.expired" }
   | {
@@ -122,14 +118,13 @@ export function appendEvents(
 export function quotedEvent(input: {
   class: QuestionClass;
   probability: number;
-  mode: Mode;
-  prices: Record<Mode, Price>;
+  amount: number;
+  currency: string;
 }): RunEvent {
   return { key: "run.quoted", batch: 0, type: "run.quoted", ...input };
 }
 
 export function paymentRequestedEvent(input: {
-  mode: Mode;
   amount: number;
   currency: string;
   qr: string;
