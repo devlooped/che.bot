@@ -1,2 +1,9 @@
-// Placeholder: later steps replace this with ModelProvider, roles, families and the Gateway adapter.
-export type { Source } from "@chebot/protocol";
+export * from "./catalog.ts";
+export * from "./classify.ts";
+export * from "./fake.ts";
+export * from "./families.ts";
+export * from "./gateway.ts";
+export * from "./limits.ts";
+export * from "./provider.ts";
+export * from "./resolve.ts";
+export * from "./roles.ts";
