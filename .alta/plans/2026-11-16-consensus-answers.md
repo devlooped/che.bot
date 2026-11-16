@@ -413,14 +413,14 @@ Verified when:
 ### Phase 1: the protocol as a headless script, and its evaluation
 
 - [ ] 2. Write the types in `packages/protocol/src/model.ts` and the Zod schemas of the four model outputs (draft, merge, round, editor) in `schemas.ts`, with a test that each schema stays inside the simple subset.
-- [ ] 3. Write `ModelProvider` and a scripted fake provider in `packages/providers` that returns canned outputs, delays, timeouts and invalid responses.
-- [ ] 4. Port the model configuration from `C:\Code\grokeado` into `packages/providers`: `roles.ts` (the six roles), `families.ts` (`modelFamily`, `latestModel`, with its tests), `catalog.ts` (the Gateway catalog reader with its cache, keeping the `decision` kind), and `resolveModels(settings, catalog)` that returns the snapshot of a run.
-- [ ] 5. Write the Gateway adapter in `packages/providers/src/gateway.ts` (AI SDK 7, `AI_GATEWAY_API_KEY`), with a live contract test per panel model that is skipped without the key: schema round trip, abort on timeout, the cost reported by the Gateway, sources from the search tool, and whether the object comes back after a search or the `submit` fallback is needed.
+- [x] 3. Write `ModelProvider` and a scripted fake provider in `packages/providers` that returns canned outputs, delays, timeouts and invalid responses.
+- [x] 4. Port the model configuration from `C:\Code\grokeado` into `packages/providers`: `roles.ts` (the six roles), `families.ts` (`modelFamily`, `latestModel`, with its tests), `catalog.ts` (the Gateway catalog reader with its cache, keeping the `decision` kind), and `resolveModels(settings, catalog)` that returns the snapshot of a run.
+- [x] 5. Write the Gateway adapter in `packages/providers/src/gateway.ts` (AI SDK 7, `AI_GATEWAY_API_KEY`), with a live contract test per panel model that is skipped without the key: schema round trip, abort on timeout, the cost reported by the Gateway, sources from the search tool, and whether the object comes back after a search or the `submit` fallback is needed.
 - [ ] 6. Write the reducer in `packages/protocol/src/reducer.ts`: `nextStep(state, now)` and `reduce(state, step, results)` for drafting, merging (with the claim coverage check and the derived status), the three rounds and the editor pass.
 - [ ] 7. Write the suggestion engine in `packages/protocol/src/threads.ts`: lock keys, threads with alternatives, merged duplicates, the rejected list, the voting rule, and `apply(snapshot, acceptedThreads)` as one deterministic pass.
 - [ ] 8. Write the stopping rules: caps per round, early stop, budget, deadline, abstention with a quorum of 3, quick mode.
 - [ ] 9. Write the prompts per stage in `packages/protocol/src/prompts/`, in English, with the rule to answer in the language of the question: independence in drafts, substance only, anonymized positions, a reason for a changed position, and the editor's "no change of substance" with its check by the utility model (a rewrite that changes a claim is dropped).
-- [ ] 10. Write the classifier in `packages/providers/src/classify.ts` with `decide()` and the `classifier` role: the class, its probability, and the 0.7 rule.
+- [x] 10. Write the classifier in `packages/providers/src/classify.ts` with `decide()` and the `classifier` role: the class, its probability, and the 0.7 rule.
 - [ ] 11. Write the local driver and `pnpm cli ask "<question>" --mode thorough --max-usd 1` in `apps/cli`: it resolves and records the model snapshot, classifies the question, runs the protocol in Node, writes the event log as JSON lines, and prints the answer, the dissent notes, the moments and the cost.
 - [ ] 12. Write the moments: templates per event type in Spanish, and the utility-model phrasing per batch.
 - [x] 13. Write `eval/questions.jsonl`: 50 questions, most of them in Spanish, with a category, a hand-set class (simple or complex) and a gold answer or a rubric (see "The evaluation").
@@ -496,6 +496,14 @@ Verified when:
 - [ ] Tests show that no value in a chart from user data was produced by a model: every number equals the orchestrator's computation over the uploaded rows.
 - [ ] A patch that fails to compile or render never appears in a vote, and a patch that touches the theme is stripped.
 - [ ] Ten chart questions run end to end, and each web-sourced row opens its citation.
+
+## Findings and deviations during execution
+
+- **Cost of a call (step 5).** On this Gateway account xAI and Google run on the user's own provider keys (BYOK), and for them the Gateway's `cost` holds only the search fee. The adapter counts the larger of `cost` and `marketCost` per step, so the budget does not see Grok and Gemini as free.
+- **Search and the object (step 5).** In the live contract tests the four panel models returned the object after a search; the `submit` fallback was never needed. It stays in the adapter.
+- **Decision models (steps 4 and 10).** The Gateway catalog lists them with the type `evaluation`, which the catalog reader maps to the `decision` kind. The `classifier` default `typesafe-ai/jev` resolves to `typesafe-ai/jev-1.14.0`. The other five defaults are in the catalog as written.
+- **Sources (step 3).** `ModelProvider` returns the search results a call cited as `{ url, title, quote }`; the protocol assigns the source IDs and `foundBy`.
+- **Line endings.** A `.gitattributes` keeps LF in every checkout, because Biome rejects the CRLF files that `core.autocrlf` produces on Windows.
 
 ## The evaluation of phase 1, and the criteria to go on
 
