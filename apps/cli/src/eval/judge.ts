@@ -103,6 +103,8 @@ export const JUDGE_SCHEMAS = {
   gradeGold: gradeGoldSchema,
   gradeRubric: gradeRubricSchema,
   compare: compareSchema,
+  /** T against the best single model: an extra measure, asked apart so the compare calls stay as they were. */
+  compareTs: compareSchema,
   audit: auditSchema,
 } as const;
 
@@ -164,9 +166,9 @@ export function gradePrompt(q: Question, items: readonly GradeItem[]) {
 
 /**
  * A pair compared: `first` is the arm whose wins are counted (Q against the best single model,
- * T against Q, the closest editor against the rotating one).
+ * T against Q, the closest editor against the rotating one, T against the best single model).
  */
-export type PairKind = "qs" | "tq" | "ed";
+export type PairKind = "qs" | "tq" | "ed" | "ts";
 export interface PairSpec {
   kind: PairKind;
   first: string;

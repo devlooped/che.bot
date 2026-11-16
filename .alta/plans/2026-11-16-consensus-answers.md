@@ -516,6 +516,30 @@ Verified when:
 - **Live timings (step 11).** A full run took 168 to 182 s and cost US$0.35 to 0.66; the drafts take up to 88 s (Gemini with search) and the merge about 30 s. The bar of 180 s at the 95th percentile is at risk; the evaluation measures it.
 - **Line endings.** A `.gitattributes` keeps LF in every checkout, because Biome rejects the CRLF files that `core.autocrlf` produces on Windows.
 
+## Results of the evaluation (step 15, run on 2026-11-16)
+
+The evaluation ran on the 50 questions for US$19.28; the report is `eval/results/2026-11-16/report.md`. Step 15 stays open until the user grades the 20 blind pairs (`eval/results/2026-11-16/grading-sheet.md`, choices in `grades.txt`) and decides.
+
+| Check | Measured | Bar | Result |
+| --- | --- | --- | --- |
+| Runs that finish without an invalid output stopping them | 50 of 50 | 95% | pass |
+| Wall-clock of the full protocol, 95th percentile | 177.8 s | under 180 s | pass, by 2 s |
+| Correct answers, Q against the best single model (Claude) | 26 against 27, of 28 | Q no fewer | fail |
+| Blind pairs Q won or tied against the best single model, judges | 32% (16 of 50) | 60% | fail |
+| The same, by the user | not graded yet | 60% | pending |
+| Contested questions whose substance the rounds changed | 63% (29 of 46) | 30% | pass |
+| Improvements against regressions | 26 against 2 | 2 to 1 | pass |
+| Cost of T over cost of Q | 1.75 times | at most 2.5 | pass |
+| Classifier agrees with the hand-set class | 76% (38 of 50) | 85% | fail |
+
+- **Q loses to one model, T does not.** The merged document is worse than Claude's draft alone, and the rounds repair it: T beats Q in 32 of the 37 pairs where they differ. T and Claude alone have the same mean quality (4.62 of 5) and the same number of correct answers (27 of 28).
+- **T against the best single model** is not a criterion of this plan, so it was measured as an extra: by the majority of the judges T wins 18, ties 17 and loses 15 of 50. The full protocol is level with the best single model, not clearly better. Its median question costs US$0.22 and takes 103 s, against US$0.04 and 17 s for Claude alone.
+- **The classifier** agrees on 38 of 50; without the 0.7 rule it agrees on 40. It errs both ways: recent facts and misconceptions classed complex, false premises and multi-step problems classed simple.
+- **Cost per class** (classifier, full protocol, mean): simple US$0.14, complex US$0.30; the 95th percentile is US$0.51. Both prices leave a wide margin.
+- **Herding** is low: of 61 changed votes, 4 only deferred. Dissent notes were right 5 times and wrong 4 (6 unclear).
+- **Editor choice** makes no difference: the finals differ on 9 runs and the judges tie all 9.
+- **The user's sheet** follows the plan: pairs of Q against the best single model and of T against Q. It has no pair of T against the best single model.
+
 ## The evaluation of phase 1, and the criteria to go on
 
 Published results on multi-agent debate are mixed, and much of the gain may come from independent drafts plus aggregation. The evaluation is built to separate those two effects, and to check the classifier that sets the price.

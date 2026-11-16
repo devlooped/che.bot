@@ -50,6 +50,8 @@ export interface Verdicts {
   /** The pairs asked, and per judge, per pair. */
   pairs: PairKind[];
   compare: Partial<Record<ModelId, Partial<Record<PairKind, PairVerdict>>>>;
+  /** T against the best single model, an extra measure asked in calls of its own; per judge. */
+  tVsBest: { asked: boolean; verdicts: Partial<Record<ModelId, PairVerdict>> };
   audit: {
     changes: AuditChange[];
     notes: AuditNote[];
@@ -68,6 +70,7 @@ export function emptyVerdicts(): Verdicts {
     grades: {},
     pairs: [],
     compare: {},
+    tVsBest: { asked: false, verdicts: {} },
     audit: { changes: [], notes: [], verdicts: {} },
     refused: 0,
     abstained: {},
@@ -113,6 +116,13 @@ export interface ReportData {
   pairwise: {
     qVsBest: { majority: Tally3; perJudge: Partial<Record<ModelId, Tally3>>; bestMissing: number };
     tVsQ: { majority: Tally3; perJudge: Partial<Record<ModelId, Tally3>>; same: number };
+    /** Extra, outside the criteria: T against the best single model. */
+    tVsBest: {
+      majority: Tally3;
+      perJudge: Partial<Record<ModelId, Tally3>>;
+      bestMissing: number;
+      same: number;
+    };
   };
   rounds: {
     contested: number;
@@ -189,6 +199,7 @@ export interface ReportData {
     tCorrect: boolean | null;
     qVsBest: string;
     tVsQ: string;
+    tVsBest: string;
     tUsd: number | null;
     tMs: number | null;
   }[];
@@ -302,6 +313,21 @@ export function tVsQVerdict(r: QuestionRecord): PairVerdict["preference"] | null
   return majorityPair(r, "tq");
 }
 
+/** The T verdict against the best single model, by the rules of Q against it. */
+export function tVsBestVerdict(
+  r: QuestionRecord,
+  best: ModelId | null,
+): PairVerdict["preference"] | null {
+  if (!best || !r.run?.complete) return null;
+  const t = r.answers.arms.T;
+  const s = r.answers.arms[`S:${best}`];
+  if (t === null) return "second";
+  if (s === null) return "first";
+  if (sameText(t, s)) return "tie";
+  const votes = MODELS.flatMap((j) => r.judging.tVsBest.verdicts[j]?.preference ?? []);
+  return plurality(votes, "tie");
+}
+
 const ms = (s: { latencyMs: number }) => s.latencyMs;
 
 /** Cost and wall-clock of each arm of a run: a draft alone; drafts plus merge; the whole run. */
@@ -379,6 +405,20 @@ export function computeReport(
     majority: tally(covered.map((r) => tVsQVerdict(r))),
     perJudge: perJudge("tq", differ),
     same: covered.filter((r) => sameText(r.answers.arms.T, r.answers.arms.Q)).length,
+  };
+  const tsAsked = covered.filter((r) => r.judging.tVsBest.asked);
+  const tVsBest = {
+    majority: tally(covered.map((r) => tVsBestVerdict(r, best))),
+    perJudge: Object.fromEntries(
+      MODELS.map((j) => [
+        j,
+        tally(tsAsked.map((r) => r.judging.tVsBest.verdicts[j]?.preference ?? null)),
+      ]),
+    ) as Partial<Record<ModelId, Tally3>>,
+    bestMissing: qVsBest.bestMissing,
+    same: best
+      ? covered.filter((r) => sameText(r.answers.arms.T, r.answers.arms[`S:${best}`])).length
+      : 0,
   };
 
   // rounds
@@ -507,6 +547,7 @@ export function computeReport(
       const answered =
         (r.judging.grades[j] ? 1 : 0) +
         (r.judging.compare[j] ? 1 : 0) +
+        (r.judging.tVsBest.verdicts[j] ? 1 : 0) +
         (r.judging.audit.verdicts[j] ? 1 : 0);
       const abstained = r.judging.abstained[j] ?? 0;
       if (answered + abstained === 0) continue;
@@ -603,6 +644,7 @@ export function computeReport(
     const c = r.run?.complete ? armCosts(r.run) : {};
     const qs = qVsBestVerdict(r, best);
     const tq = tVsQVerdict(r);
+    const ts = tVsBestVerdict(r, best);
     const word = (v: string | null, first: string, second: string) =>
       v === null ? "" : v === "first" ? first : v === "second" ? second : "tie";
     return {
@@ -619,6 +661,10 @@ export function computeReport(
         r.run?.complete && sameText(r.answers.arms.T, r.answers.arms.Q)
           ? "same text"
           : word(tq, "T", "Q"),
+      tVsBest:
+        r.run?.complete && best && sameText(r.answers.arms.T, r.answers.arms[`S:${best}`])
+          ? "same text"
+          : word(ts, "T", "single"),
       tUsd: c.T?.usd ?? null,
       tMs: c.T?.ms ?? null,
     };
@@ -629,7 +675,7 @@ export function computeReport(
     coverage: { selected: records.length, covered: covered.length, complete },
     correctness: { questions: gold.length, arms: correctArms, agreement },
     quality: { arms: qualityArms },
-    pairwise: { qVsBest, tVsQ },
+    pairwise: { qVsBest, tVsQ, tVsBest },
     rounds,
     herding,
     editor,
@@ -800,9 +846,23 @@ export function renderReport(d: ReportData): string {
       ),
     );
   }
+  rows.push(
+    tallyRow(
+      "T against the best single model (extra), majority of judges",
+      p.tVsBest.majority,
+      "T",
+      "single",
+    ),
+  );
+  for (const j of MODELS)
+    rows.push(tallyRow(`  judge ${MODEL_NAMES[j]}`, p.tVsBest.perJudge[j], "T", "single"));
   o.push(table(pairHead, rows), "");
   o.push(
     `The majority is the verdict of more judges than any other; otherwise a tie. Where the best single model had no answer, Q wins (${p.qVsBest.bestMissing} questions). T and Q have the same text on ${p.tVsQ.same} questions.`,
+    "",
+  );
+  o.push(
+    `T against the best single model is an extra measure, outside the criteria of the plan, whose check compares Q with the best single model; it follows the rules of that pair (T wins where the best single model had no answer, a tie where the texts are the same: ${p.tVsBest.same} questions).`,
     "",
   );
   o.push(
@@ -1012,6 +1072,7 @@ export function renderReport(d: ReportData): string {
         "T correct",
         "Q vs single",
         "T vs Q",
+        "T vs single",
         "T cost",
         "T time",
       ],
@@ -1026,6 +1087,7 @@ export function renderReport(d: ReportData): string {
         x.tCorrect === null ? "" : x.tCorrect ? "yes" : "no",
         x.qVsBest,
         x.tVsQ,
+        x.tVsBest,
         x.tUsd === null ? "" : usd(x.tUsd),
         x.tMs === null ? "" : sec(x.tMs),
       ]),

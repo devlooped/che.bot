@@ -1,0 +1,1434 @@
+{
+  "context": {
+    "set": "eval/questions.jsonl",
+    "out": "eval/results/2026-11-16",
+    "date": "2026-11-16",
+    "models": {
+      "panel.grok": {
+        "id": "spacexai/grok-4.7",
+        "effort": "low"
+      },
+      "panel.claude": {
+        "id": "anthropic/claude-opus-5.5",
+        "effort": "medium"
+      },
+      "panel.openai": {
+        "id": "openai/gpt-6.1-sol",
+        "effort": "medium"
+      },
+      "panel.gemini": {
+        "id": "google/gemini-4-argon",
+        "effort": "medium"
+      },
+      "utility": {
+        "id": "anthropic/claude-haiku-5.5",
+        "effort": null
+      },
+      "classifier": {
+        "id": "typesafe-ai/jev-1.14.0",
+        "effort": null
+      }
+    },
+    "questionsInSet": 50,
+    "capUsd": 45,
+    "spent": {
+      "runs": 12.2752086,
+      "classify": 0.000769902,
+      "judging": 7.0007704
+    },
+    "spentNow": {
+      "runs": 0,
+      "classify": 0,
+      "judging": 0
+    },
+    "incomplete": null,
+    "bestSingle": {
+      "model": "claude",
+      "why": "mean quality 4.62 over 50 questions"
+    },
+    "user": null,
+    "sheet": {
+      "pairs": 20,
+      "file": "eval\\results\\2026-11-16\\grading-sheet.md"
+    }
+  },
+  "coverage": {
+    "selected": 50,
+    "covered": 50,
+    "complete": true
+  },
+  "correctness": {
+    "questions": 28,
+    "arms": {
+      "S:grok": {
+        "hits": 27,
+        "of": 28
+      },
+      "S:claude": {
+        "hits": 27,
+        "of": 28
+      },
+      "S:openai": {
+        "hits": 28,
+        "of": 28
+      },
+      "S:gemini": {
+        "hits": 26,
+        "of": 28
+      },
+      "Q": {
+        "hits": 26,
+        "of": 28
+      },
+      "T": {
+        "hits": 27,
+        "of": 28
+      }
+    },
+    "agreement": {
+      "items": 166,
+      "unanimous": 163,
+      "pairs": 996,
+      "agreeing": 987,
+      "share": 0.9909638554216867
+    }
+  },
+  "quality": {
+    "arms": {
+      "S:grok": {
+        "mean": 4.388333333333333,
+        "n": 50
+      },
+      "S:claude": {
+        "mean": 4.62,
+        "n": 50
+      },
+      "S:openai": {
+        "mean": 4.39,
+        "n": 50
+      },
+      "S:gemini": {
+        "mean": 4.216666666666667,
+        "n": 50
+      },
+      "Q": {
+        "mean": 4.246666666666667,
+        "n": 50
+      },
+      "T": {
+        "mean": 4.62,
+        "n": 50
+      }
+    }
+  },
+  "pairwise": {
+    "qVsBest": {
+      "majority": {
+        "first": 7,
+        "tie": 9,
+        "second": 34,
+        "n": 50
+      },
+      "perJudge": {
+        "grok": {
+          "first": 9,
+          "tie": 6,
+          "second": 35,
+          "n": 50
+        },
+        "claude": {
+          "first": 7,
+          "tie": 7,
+          "second": 36,
+          "n": 50
+        },
+        "openai": {
+          "first": 18,
+          "tie": 3,
+          "second": 29,
+          "n": 50
+        },
+        "gemini": {
+          "first": 9,
+          "tie": 10,
+          "second": 31,
+          "n": 50
+        }
+      },
+      "bestMissing": 0
+    },
+    "tVsQ": {
+      "majority": {
+        "first": 32,
+        "tie": 3,
+        "second": 2,
+        "n": 37
+      },
+      "perJudge": {
+        "grok": {
+          "first": 30,
+          "tie": 2,
+          "second": 5,
+          "n": 37
+        },
+        "claude": {
+          "first": 33,
+          "tie": 2,
+          "second": 2,
+          "n": 37
+        },
+        "openai": {
+          "first": 36,
+          "tie": 0,
+          "second": 1,
+          "n": 37
+        },
+        "gemini": {
+          "first": 31,
+          "tie": 2,
+          "second": 4,
+          "n": 37
+        }
+      },
+      "same": 13
+    },
+    "tVsBest": {
+      "majority": {
+        "first": 18,
+        "tie": 17,
+        "second": 15,
+        "n": 50
+      },
+      "perJudge": {
+        "grok": {
+          "first": 24,
+          "tie": 10,
+          "second": 16,
+          "n": 50
+        },
+        "claude": {
+          "first": 19,
+          "tie": 7,
+          "second": 24,
+          "n": 50
+        },
+        "openai": {
+          "first": 31,
+          "tie": 5,
+          "second": 14,
+          "n": 50
+        },
+        "gemini": {
+          "first": 12,
+          "tie": 17,
+          "second": 21,
+          "n": 50
+        }
+      },
+      "bestMissing": 0,
+      "same": 0
+    }
+  },
+  "rounds": {
+    "contested": 46,
+    "roundsRun": 46,
+    "changed": 29,
+    "improved": 26,
+    "worsened": 2,
+    "neutral": 1
+  },
+  "herding": {
+    "changes": 61,
+    "deference": 4,
+    "newArgument": 53,
+    "split": 4,
+    "byModel": {
+      "gemini": {
+        "changes": 20,
+        "deference": 2
+      },
+      "grok": {
+        "changes": 17,
+        "deference": 0
+      },
+      "claude": {
+        "changes": 15,
+        "deference": 2
+      },
+      "openai": {
+        "changes": 9,
+        "deference": 0
+      }
+    },
+    "notes": {
+      "kept": {
+        "notes": 15,
+        "right": 5,
+        "wrong": 4,
+        "unclear": 6
+      },
+      "rejected": {
+        "notes": 14,
+        "right": 5,
+        "wrong": 4,
+        "unclear": 5
+      }
+    }
+  },
+  "editor": {
+    "withEditor": 37,
+    "sameEditor": 20,
+    "differ": 9,
+    "rewrites": {
+      "closest": {
+        "rewrites": 25,
+        "kept": 14,
+        "dropped": 11
+      },
+      "rotation": {
+        "rewrites": 20,
+        "kept": 13,
+        "dropped": 7
+      }
+    },
+    "preference": {
+      "first": 0,
+      "tie": 9,
+      "second": 0,
+      "n": 9
+    }
+  },
+  "soundness": {
+    "runs": 50,
+    "completed": 50,
+    "failed": [],
+    "flags": {
+      "mergeFallback": 2
+    },
+    "perSeat": {
+      "Grok": {
+        "calls": 156,
+        "ok": 151,
+        "invalid": 0,
+        "timeout": 5,
+        "refusal": 0,
+        "error": 0
+      },
+      "Claude": {
+        "calls": 158,
+        "ok": 158,
+        "invalid": 0,
+        "timeout": 0,
+        "refusal": 0,
+        "error": 0
+      },
+      "ChatGPT": {
+        "calls": 151,
+        "ok": 151,
+        "invalid": 0,
+        "timeout": 0,
+        "refusal": 0,
+        "error": 0
+      },
+      "Gemini": {
+        "calls": 160,
+        "ok": 155,
+        "invalid": 0,
+        "timeout": 5,
+        "refusal": 0,
+        "error": 0
+      },
+      "utility": {
+        "calls": 247,
+        "ok": 245,
+        "invalid": 2,
+        "timeout": 0,
+        "refusal": 0,
+        "error": 0
+      }
+    },
+    "judges": {
+      "grok": {
+        "calls": 181,
+        "abstained": 1
+      },
+      "claude": {
+        "calls": 181,
+        "abstained": 0
+      },
+      "openai": {
+        "calls": 181,
+        "abstained": 0
+      },
+      "gemini": {
+        "calls": 181,
+        "abstained": 0
+      }
+    }
+  },
+  "cost": {
+    "arms": {
+      "S:grok": {
+        "usd": {
+          "n": 50,
+          "mean": 0.024564319999999994,
+          "median": 0.026171,
+          "p95": 0.046472
+        },
+        "ms": {
+          "n": 50,
+          "mean": 17026.16,
+          "median": 13517,
+          "p95": 37141
+        }
+      },
+      "S:claude": {
+        "usd": {
+          "n": 50,
+          "mean": 0.06471784000000001,
+          "median": 0.03908,
+          "p95": 0.193976
+        },
+        "ms": {
+          "n": 50,
+          "mean": 18725.76,
+          "median": 16723.5,
+          "p95": 39208
+        }
+      },
+      "S:openai": {
+        "usd": {
+          "n": 50,
+          "mean": 0.023612926,
+          "median": 0.027049999999999998,
+          "p95": 0.037829
+        },
+        "ms": {
+          "n": 50,
+          "mean": 12475.1,
+          "median": 9478,
+          "p95": 27861
+        }
+      },
+      "S:gemini": {
+        "usd": {
+          "n": 50,
+          "mean": 0.025152242000000002,
+          "median": 0.031264,
+          "p95": 0.04283
+        },
+        "ms": {
+          "n": 50,
+          "mean": 27405.44,
+          "median": 23129,
+          "p95": 90005
+        }
+      },
+      "Q": {
+        "usd": {
+          "n": 50,
+          "mean": 0.139555856,
+          "median": 0.13376770000000002,
+          "p95": 0.26534789999999997
+        },
+        "ms": {
+          "n": 50,
+          "mean": 41730.02,
+          "median": 39617,
+          "p95": 93280
+        }
+      },
+      "T": {
+        "usd": {
+          "n": 50,
+          "mean": 0.24371147800000004,
+          "median": 0.2209623,
+          "p95": 0.46452659999999996
+        },
+        "ms": {
+          "n": 50,
+          "mean": 99012.34,
+          "median": 103237.5,
+          "p95": 177839
+        }
+      }
+    },
+    "byClass": {
+      "hand": {
+        "simple": {
+          "questions": 21,
+          "q": {
+            "usd": {
+              "n": 21,
+              "mean": 0.11158520952380953,
+              "median": 0.10728699999999998,
+              "p95": 0.1950951
+            },
+            "ms": {
+              "n": 21,
+              "mean": 36829.52380952381,
+              "median": 31548,
+              "p95": 93280
+            }
+          },
+          "t": {
+            "usd": {
+              "n": 21,
+              "mean": 0.1825960333333333,
+              "median": 0.18488689999999997,
+              "p95": 0.3082383999999999
+            },
+            "ms": {
+              "n": 21,
+              "mean": 80606.09523809524,
+              "median": 70443,
+              "p95": 129913
+            }
+          }
+        },
+        "complex": {
+          "questions": 29,
+          "q": {
+            "usd": {
+              "n": 29,
+              "mean": 0.15981046206896554,
+              "median": 0.1785008,
+              "p95": 0.28582779999999997
+            },
+            "ms": {
+              "n": 29,
+              "mean": 45278.65517241379,
+              "median": 49763,
+              "p95": 69203
+            }
+          },
+          "t": {
+            "usd": {
+              "n": 29,
+              "mean": 0.28796748965517244,
+              "median": 0.2892021,
+              "p95": 0.5136404999999999
+            },
+            "ms": {
+              "n": 29,
+              "mean": 112341,
+              "median": 123515,
+              "p95": 183318
+            }
+          }
+        }
+      },
+      "classified": {
+        "simple": {
+          "questions": 17,
+          "q": {
+            "usd": {
+              "n": 17,
+              "mean": 0.09458492941176472,
+              "median": 0.07681270000000001,
+              "p95": 0.1899321
+            },
+            "ms": {
+              "n": 17,
+              "mean": 29859,
+              "median": 23592,
+              "p95": 93280
+            }
+          },
+          "t": {
+            "usd": {
+              "n": 17,
+              "mean": 0.1415904529411765,
+              "median": 0.1298288,
+              "p95": 0.2663185
+            },
+            "ms": {
+              "n": 17,
+              "mean": 58529.294117647056,
+              "median": 66042,
+              "p95": 111502
+            }
+          }
+        },
+        "complex": {
+          "questions": 33,
+          "q": {
+            "usd": {
+              "n": 33,
+              "mean": 0.16272269696969702,
+              "median": 0.1674011,
+              "p95": 0.28582779999999997
+            },
+            "ms": {
+              "n": 33,
+              "mean": 47845.393939393936,
+              "median": 49763,
+              "p95": 94692
+            }
+          },
+          "t": {
+            "usd": {
+              "n": 33,
+              "mean": 0.2963192787878788,
+              "median": 0.29306239999999995,
+              "p95": 0.5136404999999999
+            },
+            "ms": {
+              "n": 33,
+              "mean": 119867.24242424243,
+              "median": 125286,
+              "p95": 183318
+            }
+          }
+        }
+      }
+    }
+  },
+  "classifier": {
+    "classified": 50,
+    "failed": 0,
+    "agree": 38,
+    "unsure": 8,
+    "confusion": {
+      "simple": {
+        "simple": 13,
+        "complex": 8,
+        "failed": 0
+      },
+      "complex": {
+        "simple": 4,
+        "complex": 25,
+        "failed": 0
+      }
+    },
+    "usd": {
+      "n": 50,
+      "mean": 0.00001539804,
+      "median": 0.000015183,
+      "p95": 0.000017346
+    },
+    "ms": {
+      "n": 50,
+      "mean": 548.04,
+      "median": 314,
+      "p95": 766
+    }
+  },
+  "criteria": [
+    {
+      "area": "The protocol is sound",
+      "check": "Runs that finish without an invalid output stopping them",
+      "value": "100% (50 of 50)",
+      "bar": "at least 95%",
+      "status": "pass"
+    },
+    {
+      "area": "The protocol is sound",
+      "check": "Wall-clock of the full protocol, 95th percentile",
+      "value": "177.8 s",
+      "bar": "under 180 s",
+      "status": "pass"
+    },
+    {
+      "area": "Collaboration beats one model",
+      "check": "Correct answers: Q against the best single model",
+      "value": "26 against 27 (of 28)",
+      "bar": "Q no fewer",
+      "status": "fail"
+    },
+    {
+      "area": "Collaboration beats one model",
+      "check": "Blind pairs Q won or tied against the best single model, by the judges",
+      "value": "32% (16 of 50)",
+      "bar": "at least 60%",
+      "status": "fail"
+    },
+    {
+      "area": "Collaboration beats one model",
+      "check": "Blind pairs Q won or tied against the best single model, by the user",
+      "value": "not graded yet",
+      "bar": "at least 60%",
+      "status": "pending"
+    },
+    {
+      "area": "The rounds earn their cost",
+      "check": "Questions with contested paragraphs whose substance the rounds changed",
+      "value": "63% (29 of 46)",
+      "bar": "at least 30%",
+      "status": "pass"
+    },
+    {
+      "area": "The rounds earn their cost",
+      "check": "Improvements against regressions",
+      "value": "26 against 2",
+      "bar": "2 to 1 or better",
+      "status": "pass"
+    },
+    {
+      "area": "The rounds earn their cost",
+      "check": "Mean cost of T over mean cost of Q",
+      "value": "1.75×",
+      "bar": "at most 2.5×",
+      "status": "pass"
+    },
+    {
+      "area": "The classifier can set the price",
+      "check": "Agreement with the hand-set class",
+      "value": "76% (38 of 50)",
+      "bar": "at least 85%",
+      "status": "fail"
+    }
+  ],
+  "perQuestion": [
+    {
+      "id": "q01",
+      "category": "stable_fact",
+      "hand": "simple",
+      "classified": "simple",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "Q",
+      "tVsQ": "tie",
+      "tVsBest": "T",
+      "tUsd": 0.1899039,
+      "tMs": 96260
+    },
+    {
+      "id": "q02",
+      "category": "stable_fact",
+      "hand": "simple",
+      "classified": "simple",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "T",
+      "tUsd": 0.1656284,
+      "tMs": 66042
+    },
+    {
+      "id": "q03",
+      "category": "stable_fact",
+      "hand": "simple",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "T",
+      "tUsd": 0.2538452,
+      "tMs": 125286
+    },
+    {
+      "id": "q04",
+      "category": "stable_fact",
+      "hand": "simple",
+      "classified": "simple",
+      "status": "completed",
+      "contested": false,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "single",
+      "tVsQ": "same text",
+      "tVsBest": "single",
+      "tUsd": 0.0572228,
+      "tMs": 17765
+    },
+    {
+      "id": "q05",
+      "category": "stable_fact",
+      "hand": "simple",
+      "classified": "simple",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "tie",
+      "tVsQ": "same text",
+      "tVsBest": "tie",
+      "tUsd": 0.1298288,
+      "tMs": 74253
+    },
+    {
+      "id": "q06",
+      "category": "stable_fact",
+      "hand": "simple",
+      "classified": "simple",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "single",
+      "tVsQ": "same text",
+      "tVsBest": "single",
+      "tUsd": 0.05923680000000001,
+      "tMs": 111502
+    },
+    {
+      "id": "q07",
+      "category": "stable_fact",
+      "hand": "simple",
+      "classified": "simple",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "Q",
+      "tVsQ": "same text",
+      "tVsBest": "T",
+      "tUsd": 0.0998737,
+      "tMs": 32233
+    },
+    {
+      "id": "q08",
+      "category": "stable_fact",
+      "hand": "simple",
+      "classified": "simple",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "single",
+      "tVsQ": "same text",
+      "tVsBest": "tie",
+      "tUsd": 0.0459241,
+      "tMs": 26458
+    },
+    {
+      "id": "q09",
+      "category": "stable_fact",
+      "hand": "simple",
+      "classified": "simple",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "tie",
+      "tVsQ": "T",
+      "tVsBest": "tie",
+      "tUsd": 0.12326290000000001,
+      "tMs": 67778
+    },
+    {
+      "id": "q10",
+      "category": "stable_fact",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": false,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "tie",
+      "tVsQ": "same text",
+      "tVsBest": "single",
+      "tUsd": 0.2000132,
+      "tMs": 33985
+    },
+    {
+      "id": "q11",
+      "category": "stable_fact",
+      "hand": "simple",
+      "classified": "simple",
+      "status": "completed",
+      "contested": false,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "single",
+      "tVsQ": "same text",
+      "tVsBest": "single",
+      "tUsd": 0.08928350000000002,
+      "tMs": 25176
+    },
+    {
+      "id": "q12",
+      "category": "stable_fact",
+      "hand": "simple",
+      "classified": "simple",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "tie",
+      "tUsd": 0.1687456,
+      "tMs": 70443
+    },
+    {
+      "id": "q13",
+      "category": "recent_fact",
+      "hand": "simple",
+      "classified": "simple",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "tie",
+      "tVsQ": "same text",
+      "tVsBest": "tie",
+      "tUsd": 0.22315329999999997,
+      "tMs": 47071
+    },
+    {
+      "id": "q14",
+      "category": "recent_fact",
+      "hand": "simple",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "T",
+      "tUsd": 0.28865999999999997,
+      "tMs": 90218
+    },
+    {
+      "id": "q15",
+      "category": "recent_fact",
+      "hand": "simple",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "tie",
+      "tVsQ": "tie",
+      "tVsBest": "tie",
+      "tUsd": 0.3082383999999999,
+      "tMs": 129913
+    },
+    {
+      "id": "q16",
+      "category": "recent_fact",
+      "hand": "simple",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": false,
+      "qVsBest": "single",
+      "tVsQ": "Q",
+      "tVsBest": "single",
+      "tUsd": 0.29306239999999995,
+      "tMs": 177839
+    },
+    {
+      "id": "q17",
+      "category": "recent_fact",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "T",
+      "tUsd": 0.35730960000000006,
+      "tMs": 159172
+    },
+    {
+      "id": "q18",
+      "category": "recent_fact",
+      "hand": "simple",
+      "classified": "simple",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "Q",
+      "tVsQ": "same text",
+      "tVsBest": "T",
+      "tUsd": 0.18488689999999997,
+      "tMs": 55156
+    },
+    {
+      "id": "q19",
+      "category": "recent_fact",
+      "hand": "simple",
+      "classified": "simple",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "Q",
+      "tVsQ": "T",
+      "tVsBest": "T",
+      "tUsd": 0.21240479999999998,
+      "tMs": 70113
+    },
+    {
+      "id": "q20",
+      "category": "recent_fact",
+      "hand": "simple",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": false,
+      "tCorrect": true,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "tie",
+      "tUsd": 0.2947267,
+      "tMs": 122444
+    },
+    {
+      "id": "q21",
+      "category": "multi_step",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "T",
+      "tUsd": 0.2571259,
+      "tMs": 164343
+    },
+    {
+      "id": "q22",
+      "category": "multi_step",
+      "hand": "complex",
+      "classified": "simple",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "tie",
+      "tUsd": 0.09610490000000001,
+      "tMs": 75692
+    },
+    {
+      "id": "q23",
+      "category": "multi_step",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "tie",
+      "tUsd": 0.08459010000000002,
+      "tMs": 46983
+    },
+    {
+      "id": "q24",
+      "category": "multi_step",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "tie",
+      "tVsQ": "same text",
+      "tVsBest": "tie",
+      "tUsd": 0.0841582,
+      "tMs": 33808
+    },
+    {
+      "id": "q25",
+      "category": "multi_step",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "tie",
+      "tVsQ": "T",
+      "tVsBest": "T",
+      "tUsd": 0.13136769999999998,
+      "tMs": 83079
+    },
+    {
+      "id": "q26",
+      "category": "multi_step",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": false,
+      "tCorrect": true,
+      "qVsBest": "Q",
+      "tVsQ": "T",
+      "tVsBest": "T",
+      "tUsd": 0.11876339999999998,
+      "tMs": 118269
+    },
+    {
+      "id": "q27",
+      "category": "multi_step",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "tie",
+      "tUsd": 0.16119799999999998,
+      "tMs": 92418
+    },
+    {
+      "id": "q28",
+      "category": "multi_step",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": true,
+      "tCorrect": true,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "T",
+      "tUsd": 0.1287756,
+      "tMs": 70499
+    },
+    {
+      "id": "q29",
+      "category": "contested",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "single",
+      "tUsd": 0.5136404999999999,
+      "tMs": 148721
+    },
+    {
+      "id": "q30",
+      "category": "contested",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "T",
+      "tUsd": 0.2576674,
+      "tMs": 123515
+    },
+    {
+      "id": "q31",
+      "category": "contested",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "T",
+      "tUsd": 0.5161799999999999,
+      "tMs": 134707
+    },
+    {
+      "id": "q32",
+      "category": "contested",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "Q",
+      "tVsQ": "T",
+      "tVsBest": "T",
+      "tUsd": 0.44020750000000003,
+      "tMs": 183318
+    },
+    {
+      "id": "q33",
+      "category": "contested",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "tie",
+      "tUsd": 0.3606993,
+      "tMs": 139086
+    },
+    {
+      "id": "q34",
+      "category": "contested",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "tie",
+      "tUsd": 0.2915204,
+      "tMs": 149055
+    },
+    {
+      "id": "q35",
+      "category": "contested",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "tie",
+      "tVsQ": "T",
+      "tVsBest": "T",
+      "tUsd": 0.4296382000000001,
+      "tMs": 117920
+    },
+    {
+      "id": "q36",
+      "category": "contested",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "single",
+      "tUsd": 0.39382149999999994,
+      "tMs": 129472
+    },
+    {
+      "id": "q37",
+      "category": "how_to",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "single",
+      "tUsd": 0.43325030000000003,
+      "tMs": 172327
+    },
+    {
+      "id": "q38",
+      "category": "how_to",
+      "hand": "simple",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "Q",
+      "tVsQ": "T",
+      "tVsBest": "T",
+      "tUsd": 0.21877130000000003,
+      "tMs": 117544
+    },
+    {
+      "id": "q39",
+      "category": "how_to",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "tie",
+      "tUsd": 0.38651579999999996,
+      "tMs": 143004
+    },
+    {
+      "id": "q40",
+      "category": "how_to",
+      "hand": "simple",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "Q",
+      "tVsBest": "single",
+      "tUsd": 0.31716359999999993,
+      "tMs": 129351
+    },
+    {
+      "id": "q41",
+      "category": "how_to",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "single",
+      "tUsd": 0.4534616,
+      "tMs": 146477
+    },
+    {
+      "id": "q42",
+      "category": "how_to",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "single",
+      "tUsd": 0.46452659999999996,
+      "tMs": 189488
+    },
+    {
+      "id": "q43",
+      "category": "how_to",
+      "hand": "simple",
+      "classified": "complex",
+      "status": "completed",
+      "contested": false,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "same text",
+      "tVsBest": "single",
+      "tUsd": 0.1106936,
+      "tMs": 39883
+    },
+    {
+      "id": "q44",
+      "category": "how_to",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "tie",
+      "tUsd": 0.4473128999999999,
+      "tMs": 154327
+    },
+    {
+      "id": "q45",
+      "category": "false_premise",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "tie",
+      "tUsd": 0.1750962,
+      "tMs": 54908
+    },
+    {
+      "id": "q46",
+      "category": "false_premise",
+      "hand": "complex",
+      "classified": "simple",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "same text",
+      "tVsBest": "single",
+      "tUsd": 0.21821770000000004,
+      "tMs": 52350
+    },
+    {
+      "id": "q47",
+      "category": "false_premise",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "tie",
+      "tUsd": 0.3173330000000001,
+      "tMs": 124045
+    },
+    {
+      "id": "q48",
+      "category": "false_premise",
+      "hand": "complex",
+      "classified": "complex",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "T",
+      "tVsBest": "T",
+      "tUsd": 0.2892021,
+      "tMs": 110215
+    },
+    {
+      "id": "q49",
+      "category": "false_premise",
+      "hand": "complex",
+      "classified": "simple",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "tie",
+      "tVsQ": "tie",
+      "tVsBest": "single",
+      "tUsd": 0.2663185,
+      "tMs": 81543
+    },
+    {
+      "id": "q50",
+      "category": "false_premise",
+      "hand": "complex",
+      "classified": "simple",
+      "status": "completed",
+      "contested": true,
+      "qCorrect": null,
+      "tCorrect": null,
+      "qVsBest": "single",
+      "tVsQ": "same text",
+      "tVsBest": "single",
+      "tUsd": 0.0770411,
+      "tMs": 25163
+    }
+  ]
+}

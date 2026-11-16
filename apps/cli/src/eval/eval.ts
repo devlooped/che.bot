@@ -25,6 +25,7 @@ import {
   type JudgeOutcome,
   judgeCall,
   labelled,
+  type PairKind,
   type PairSpec,
   sameText,
   showPairs,
@@ -34,6 +35,7 @@ import {
   bestSingle,
   computeReport,
   emptyVerdicts,
+  type PairVerdict,
   type QuestionRecord,
   type ReportData,
   renderReport,
@@ -449,40 +451,69 @@ function labelOf(text: string): string {
   return /(\d+)/.exec(text)?.[1] ?? text.trim();
 }
 
-/** The pairwise preferences of a question: one call per judge with every pair it has. */
+/**
+ * The pairwise preferences of a question: one call per judge with every pair it has, and one call
+ * of its own for T against the best single model (an extra measure, so the first calls and their
+ * ledger keys stay as they were before it).
+ */
 async function compareQuestion(r: QuestionRecord, best: ModelId | null, ctx: JudgeContext) {
   const pairs = pairSpecs(r.answers, best);
+  const extra = tVsBestPair(r.answers, best);
   const v = r.judging;
   v.pairs = pairs.map((p) => p.kind);
-  if (pairs.length === 0) return;
+  v.tVsBest.asked = extra !== null;
   const guarded = judgeGuard(ctx);
+  const ask = async (
+    judge: ModelId,
+    kind: "compare" | "compareTs",
+    specs: readonly PairSpec[],
+    seed: string,
+  ) => {
+    const shown = showPairs(specs, seed);
+    const out = await judgeCall({
+      guarded,
+      models: ctx.models,
+      judge,
+      kind,
+      ...comparePrompt(r.q, shown),
+      onCall: ctx.onCall,
+    });
+    if (!landed(v, judge, out)) return null;
+    const verdicts: Partial<Record<PairKind, PairVerdict>> = {};
+    for (const p of out.output.pairs) {
+      const pair = shown.find((x) => x.label === labelOf(p.pair));
+      if (!pair || verdicts[pair.kind]) continue;
+      const preference =
+        p.preference === "tie"
+          ? "tie"
+          : (p.preference === "A") === pair.firstIsA
+            ? "first"
+            : "second";
+      verdicts[pair.kind] = { preference, substance: p.substance };
+    }
+    return verdicts;
+  };
   await Promise.all(
     MODELS.map(async (judge) => {
-      const shown = showPairs(pairs, `${r.key}|compare|${judge}`);
-      const out = await judgeCall({
-        guarded,
-        models: ctx.models,
-        judge,
-        kind: "compare",
-        ...comparePrompt(r.q, shown),
-        onCall: ctx.onCall,
-      });
-      if (!landed(v, judge, out)) return;
-      const verdicts: Verdicts["compare"][ModelId] = {};
-      for (const p of out.output.pairs) {
-        const pair = shown.find((x) => x.label === labelOf(p.pair));
-        if (!pair || verdicts[pair.kind]) continue;
-        const preference =
-          p.preference === "tie"
-            ? "tie"
-            : (p.preference === "A") === pair.firstIsA
-              ? "first"
-              : "second";
-        verdicts[pair.kind] = { preference, substance: p.substance };
+      if (pairs.length > 0) {
+        const verdicts = await ask(judge, "compare", pairs, `${r.key}|compare|${judge}`);
+        if (verdicts) v.compare[judge] = verdicts;
       }
-      v.compare[judge] = verdicts;
+      if (extra) {
+        const verdicts = await ask(judge, "compareTs", [extra], `${r.key}|compare-ts|${judge}`);
+        const ts = verdicts?.ts;
+        if (ts) v.tVsBest.verdicts[judge] = ts;
+      }
     }),
   );
+}
+
+/** T against the best single model, where both have an answer and their texts differ. */
+export function tVsBestPair(answers: Answers, best: ModelId | null): PairSpec | null {
+  const t = answers.arms.T;
+  const single = best ? answers.arms[`S:${best}` as Arm] : null;
+  if (t === null || single === null || sameText(t, single)) return null;
+  return { kind: "ts", first: t, second: single };
 }
 
 export function pairSpecs(answers: Answers, best: ModelId | null): PairSpec[] {
@@ -538,7 +569,7 @@ function writeSheet(
   for (const r of records) {
     if (!r.run?.complete) continue;
     for (const p of pairSpecs(r.answers, best)) {
-      if (p.kind === "ed") continue;
+      if (p.kind !== "qs" && p.kind !== "tq") continue;
       candidates.push({
         question: r.q.id,
         category: r.q.category,

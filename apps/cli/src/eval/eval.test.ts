@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { hash } from "@chebot/protocol";
@@ -90,7 +90,7 @@ function judgeRespond(req: GenerateRequest<unknown>): FakeOutcome | null {
       }),
     });
   }
-  if (kind === "compare")
+  if (kind === "compare" || kind === "compareTs")
     return out({
       pairs: blocks(req.prompt, "pair").map(({ label: pair, text: block }) => {
         const a = /<answer_a>([\s\S]*)<\/answer_a>/.exec(block)?.[1] ?? "";
@@ -283,7 +283,7 @@ describe("an evaluation on a small fake set", async () => {
 
   test("picks the best single model after the fact, and compares Q with it", () => {
     expect(report.context.bestSingle?.model).toBe("claude");
-    const compare = judgePrompts.filter((c) => c.callKey.startsWith("compare"));
+    const compare = judgePrompts.filter((c) => c.callKey.startsWith("compare:"));
     expect(compare).toHaveLength(16);
     for (const c of compare)
       expect(c.prompt).toContain("En Canberra viven alrededor de 460.000 personas.");
@@ -343,6 +343,54 @@ describe("an evaluation on a small fake set", async () => {
     for (const kind of ["runs", "classify", "judging"] as const)
       expect(rerun.report?.context.spent[kind]).toBeCloseTo(report.context.spent[kind], 9);
     expect(rerun.report?.criteria).toEqual(report.criteria);
+  });
+
+  test("asks T against the best single model once per judge, in a call of its own", () => {
+    const ts = judgePrompts.filter((c) => c.callKey.startsWith("compareTs:"));
+    expect(ts).toHaveLength(16); // 4 questions × 4 judges: T differs from Claude's draft on each
+    expect(new Set(ts.map((c) => c.callKey)).size).toBe(16);
+    for (const c of ts) {
+      expect(blocks(c.prompt, "pair")).toHaveLength(1);
+      expect(c.prompt).toContain("En Canberra viven alrededor de 460.000 personas.");
+    }
+    // The longer T beats the single draft by every judge.
+    expect(report.pairwise.tVsBest.majority).toEqual({ first: 4, tie: 0, second: 0, n: 4 });
+    for (const j of ["grok", "claude", "openai", "gemini"] as const)
+      expect(report.pairwise.tVsBest.perJudge[j]).toMatchObject({ first: 4, n: 4 });
+    expect(report.perQuestion.map((x) => x.tVsBest)).toEqual(["T", "T", "T", "T"]);
+    expect(md).toContain("| T against the best single model (extra), majority of judges | 4 |");
+    expect(md).toContain("is an extra measure, outside the criteria of the plan");
+    expect(md).toContain("| T vs single |");
+    const json = JSON.parse(readFileSync(join(out, "report.json"), "utf8"));
+    expect(json.pairwise.tVsBest).toEqual(report.pairwise.tVsBest);
+    expect(json.criteria).toEqual(report.criteria);
+  });
+
+  test("added to an evaluation on disk, it asks only its own calls and leaves the sheet as it was", async () => {
+    const raw = join(set, "..", "results", "raw", "set");
+    const files = [SHEET_FILE, KEY_FILE, GRADES_FILE].map((f) => join(out, f));
+    const sheetBefore = files.map((f) => readFileSync(f, "utf8"));
+    // The evaluation as it was before the measure: its judge ledgers without the new calls.
+    for (const dir of readdirSync(raw, { withFileTypes: true })) {
+      if (!dir.isDirectory()) continue;
+      const file = join(raw, dir.name, "judge.jsonl");
+      const lines = readFileSync(file, "utf8").split("\n");
+      writeFileSync(file, lines.filter((l) => !l.startsWith('{"key":"compareTs:')).join("\n"));
+    }
+    const added = deps();
+    const rerun = await evaluate(args(set), added);
+    const keys = added.provider.calls.map((c) => c.callKey);
+    expect(keys).toHaveLength(16);
+    expect(keys.every((k) => k.startsWith("compareTs:"))).toBe(true);
+    expect(keys.sort()).toEqual(
+      judgePrompts
+        .filter((c) => c.callKey.startsWith("compareTs:"))
+        .map((c) => c.callKey)
+        .sort(),
+    );
+    expect(rerun.report?.context.spentNow).toEqual({ runs: 0, classify: 0, judging: 0.16 });
+    expect(rerun.report?.pairwise).toEqual(report.pairwise);
+    expect(files.map((f) => readFileSync(f, "utf8"))).toEqual(sheetBefore);
   });
 
   test("--report rebuilds from disk; the user's grades reach the report", async () => {
