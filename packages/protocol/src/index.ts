@@ -10,3 +10,4 @@ export * from "./schemas.ts";
 export * from "./seed.ts";
 export * from "./threads.ts";
 export * from "./urls.ts";
+export { clone, hash, normalizeText, seededShuffle } from "./util.ts";

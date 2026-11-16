@@ -28,7 +28,7 @@ function deps(cls: "simple" | "complex", probability = 0.9): AskDeps & { provide
 
 const args = (extra: Partial<AskArgs> = {}): AskArgs => ({
   question: "¿Cuál es la capital de Australia?",
-  mode: null,
+  mode: "thorough",
   maxUsd: null,
   out: mkdtempSync(join(tmpdir(), "chebot-ask-")),
   ...extra,
@@ -43,7 +43,7 @@ describe("parseAskArgs", () => {
       out: ".runs",
     });
     expect(parseAskArgs(["hola", "--out", "x"])).toMatchObject({
-      mode: null,
+      mode: "thorough",
       maxUsd: null,
       out: "x",
     });
@@ -66,33 +66,39 @@ describe("ask", () => {
     expect(started).toMatchObject({ budgetUsd: 0.75 });
   });
 
-  test("the class picks the mode: simple is quick, complex is thorough", async () => {
-    const quick = await ask(args(), deps("simple"));
-    expect(quick.mode).toBe("quick");
-    expect(quick.run?.state.mode).toBe("quick");
-    expect(quick.run?.state.stage).toBe("done");
-    expect(Object.keys(quick.run?.state.calls ?? {}).some((k) => k.startsWith("round"))).toBe(
+  test("every class runs the full process; the class is printed with its probability", async () => {
+    for (const cls of ["simple", "complex"] as const) {
+      const result = await ask(args(), deps(cls, 0.82));
+      expect(result.mode).toBe("thorough");
+      expect(result.run?.state.mode).toBe("thorough");
+      expect(Object.keys(result.run?.state.calls ?? {}).some((k) => k.startsWith("round"))).toBe(
+        true,
+      );
+      expect(result.message).toContain(
+        `Class: ${cls} (${cls}, p=0.82) (sets the price); mode thorough`,
+      );
+      expect(result.code).toBe(0);
+    }
+  });
+
+  test("--mode quick stops after the merge", async () => {
+    const result = await ask(args({ mode: "quick" }), deps("complex"));
+    expect(result.run?.state.mode).toBe("quick");
+    expect(result.run?.state.stage).toBe("done");
+    expect(Object.keys(result.run?.state.calls ?? {}).some((k) => k.startsWith("round"))).toBe(
       false,
     );
-    const thorough = await ask(args(), deps("complex"));
-    expect(thorough.mode).toBe("thorough");
-    expect(thorough.code).toBe(0);
+    expect(result.message).toContain("mode quick");
   });
 
-  test("--mode overrides the class", async () => {
-    const result = await ask(args({ mode: "thorough" }), deps("simple"));
-    expect(result.mode).toBe("thorough");
-    expect(result.run?.state.mode).toBe("thorough");
-    expect(result.message).toContain("mode thorough (--mode)");
-  });
-
-  test("a failed classifier counts the question as complex", async () => {
+  test("a failed classifier counts the question as complex and still runs it", async () => {
     const d = deps("simple");
     d.classify = async () => {
       throw new Error("down");
     };
     const result = await ask(args(), d);
     expect(result.mode).toBe("thorough");
+    expect(result.code).toBe(0);
     expect(result.message).toContain("the classifier failed");
   });
 
@@ -126,7 +132,7 @@ describe("ask", () => {
     });
     for (const text of [
       "spacexai/grok-4.7",
-      "Class: complex (complex, p=0.90); mode thorough",
+      "Class: complex (complex, p=0.90) (sets the price); mode thorough",
       "Answer (version 4)",
       "majority, 3 de 4",
       "Dissent notes",

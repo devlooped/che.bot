@@ -1,13 +1,16 @@
 import { fileURLToPath } from "node:url";
 import { ASK_USAGE, type AskDeps, ask, gatewayDeps, parseAskArgs } from "./ask.ts";
+import { EVAL_USAGE, evaluate, parseEvalArgs } from "./eval/eval.ts";
 
 export const USAGE = `Usage: chebot <command>
 
 Commands:
   ask "<question>"   run the protocol on one question
-  eval               run the evaluation set
+  eval --set <file>  run the evaluation set
 
-${ASK_USAGE}`;
+${ASK_USAGE}
+
+${EVAL_USAGE}`;
 
 export async function run(
   argv: string[],
@@ -24,7 +27,16 @@ export async function run(
       return { code: 1, message: error instanceof Error ? error.message : String(error) };
     }
   }
-  if (command === "eval") return { code: 1, message: "not implemented yet" };
+  if (command === "eval") {
+    const args = parseEvalArgs(rest);
+    if ("error" in args) return { code: 2, message: `${args.error}\n\n${EVAL_USAGE}` };
+    try {
+      const result = await evaluate(args, deps());
+      return { code: result.code, message: result.message };
+    } catch (error) {
+      return { code: 1, message: error instanceof Error ? error.message : String(error) };
+    }
+  }
   return { code: 2, message: USAGE };
 }
 

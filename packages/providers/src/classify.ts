@@ -20,7 +20,7 @@ export interface ClassifyRequest {
 }
 
 export interface Classification {
-  /** The class that sets the mode and the price, after the threshold rule. */
+  /** The class that sets the price, after the threshold rule. */
   class: QuestionClass;
   /** What the decision model chose. */
   choice: QuestionClass;

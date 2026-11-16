@@ -3,6 +3,7 @@ import {
   beginStep,
   type Call,
   type CallResult,
+  type CallsStep,
   type CreateRunInput,
   createRun,
   type LoggedEvent,
@@ -76,6 +77,11 @@ export interface DriveOptions {
   onEvent?: (event: LoggedEvent) => void;
   /** Each call as it is made (or read from the ledger) and as it lands. */
   onCall?: (call: Call, phase: "start" | "end", entry?: LedgerEntry & { cached: boolean }) => void;
+  /**
+   * Each step once its calls have landed, before it is reduced: `state` is the state the step was
+   * computed from. The evaluation advances its clock here and keeps the state before the editor.
+   */
+  onStep?: (state: RunState, step: CallsStep, entries: readonly LedgerEntry[]) => void;
   /** Stops the drive between two steps; the state returned can be driven again later. */
   signal?: AbortSignal;
 }
@@ -137,6 +143,7 @@ export async function drive(
       step.calls.map((call) => execute(state, call, ledger, options, now)),
     );
     for (const entry of results) seen.set(entry.result.key, entry);
+    options.onStep?.(state, step, results);
     const reduced = reduce(
       state,
       step,

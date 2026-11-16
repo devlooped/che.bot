@@ -18,7 +18,7 @@ The full plan: [.alta/plans/2026-11-16-consensus-answers.md](.alta/plans/2026-11
 - `packages/providers`: model providers, roles, families, catalog.
 - `apps/cli`: headless runner and evaluation (Node).
 - `apps/web`: Worker, Durable Object and React app (later).
-- `eval/`: the question set and reports (later).
+- `eval/`: the question set (`questions.jsonl`) and the evaluation reports (`results/`).
 
 ## Usage
 
@@ -29,5 +29,23 @@ pnpm install
 pnpm typecheck
 pnpm test
 pnpm lint
-pnpm cli ask "your question"
 ```
+
+`AI_GATEWAY_API_KEY` must be set for the commands that call models.
+
+```sh
+# One question through the full process: the class sets only the price; --mode quick stops
+# after the merge. Logs go to .runs/.
+pnpm cli ask "¿Cuánto mide el Aconcagua?" --max-usd 1
+
+# The evaluation of phase 1. --max-usd caps the spend of the whole evaluation, earlier
+# invocations included; every call is kept under eval/results/raw/, so a rerun pays nothing twice
+# and an interrupted evaluation continues where it stopped.
+pnpm cli eval --set eval/questions.jsonl --max-usd 60
+pnpm cli eval --set eval/questions.jsonl --only q03,q22 --max-usd 5 --out eval/results/smoke
+# Rebuild the report from disk, with your grades from grades.txt, without any model call.
+pnpm cli eval --set eval/questions.jsonl --report --out eval/results/<date>
+```
+
+The evaluation writes `report.md` and `report.json`, and, once complete, `grading-sheet.md` with
+20 blind answer pairs and `grades.txt` for your choices, in `eval/results/<date>/` (or `--out`).

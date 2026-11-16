@@ -28,14 +28,15 @@ import { fileLedger } from "./file-ledger.ts";
 
 export const ASK_USAGE = `Usage: pnpm cli ask "<question>" [--mode quick|thorough] [--max-usd <n>] [--out <dir>]
 
-  --mode     quick (drafts and merge) or thorough (the rounds); by default the class of the
-             question decides: simple is quick, complex is thorough
+  Every question runs the full process; its class (simple or complex) only sets the price.
+  --mode     thorough (the default: drafts, merge and the rounds) or quick (stops after the
+             merge; it exists for the evaluation)
   --max-usd  the budget of the question in USD (default: the config's)
   --out      where the logs of the run go (default .runs)`;
 
 export interface AskArgs {
   question: string;
-  mode: Mode | null;
+  mode: Mode;
   maxUsd: number | null;
   out: string;
 }
@@ -50,8 +51,8 @@ export function parseAskArgs(argv: string[]): AskArgs | { error: string } {
   const { values, positionals } = parsed;
   const question = positionals.join(" ").trim();
   if (question === "") return { error: "A question is required." };
-  const mode = values.mode ?? null;
-  if (mode !== null && mode !== "quick" && mode !== "thorough")
+  const mode = values.mode ?? "thorough";
+  if (mode !== "quick" && mode !== "thorough")
     return { error: `--mode is quick or thorough, not ${mode}.` };
   let maxUsd: number | null = null;
   if (values["max-usd"] !== undefined) {
@@ -130,8 +131,7 @@ export async function ask(args: AskArgs, deps: AskDeps): Promise<AskResult> {
     const kind = ProviderError.isInstance(error) ? error.kind : "error";
     say(`the classifier failed (${kind}); the question counts as complex`);
   }
-  const proposed: Mode = (classification?.class ?? "complex") === "simple" ? "quick" : "thorough";
-  const mode = args.mode ?? proposed;
+  const mode = args.mode;
 
   const id = deps.runId();
   const dir = join(args.out, `${stamp(started)}-${id.slice(0, 8)}`);
@@ -183,7 +183,6 @@ export async function ask(args: AskArgs, deps: AskDeps): Promise<AskResult> {
     state: driven.state,
     classification,
     mode,
-    modeGiven: args.mode !== null,
     wallMs,
     dir,
   });
@@ -213,7 +212,6 @@ export function report(input: {
   state: RunState;
   classification: Classification | null;
   mode: Mode;
-  modeGiven: boolean;
   wallMs: number;
   dir: string;
 }): string {
@@ -227,7 +225,7 @@ export function report(input: {
   const cls = classification
     ? `${classification.class} (${classification.choice}, p=${classification.probability?.toFixed(2) ?? "?"})`
     : "unknown (the classifier failed: counted as complex)";
-  out.push(`Class: ${cls}; mode ${input.mode}${input.modeGiven ? " (--mode)" : ""}`);
+  out.push(`Class: ${cls} (sets the price); mode ${input.mode}`);
   out.push(`Status: ${state.status}${state.failure ? ` (${state.failure})` : ""}`);
   out.push("");
 

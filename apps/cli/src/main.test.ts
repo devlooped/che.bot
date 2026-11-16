@@ -1,8 +1,11 @@
 import { expect, test } from "vitest";
 import { run } from "./main.ts";
 
-test("eval is not implemented yet (exit 1)", async () => {
-  expect((await run(["eval"])).code).toBe(1);
+test("eval without --set or --max-usd prints its usage (exit 2)", async () => {
+  const result = await run(["eval"]);
+  expect(result.code).toBe(2);
+  expect(result.message).toContain("--max-usd");
+  expect((await run(["eval", "--set", "x.jsonl"])).code).toBe(2);
 });
 
 test("ask without a question, or with a bad option, prints its usage (exit 2)", async () => {

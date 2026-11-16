@@ -422,10 +422,10 @@ Verified when:
 - [x] 8. Write the stopping rules: caps per round, early stop, budget, deadline, abstention with a quorum of 3, quick mode.
 - [x] 9. Write the prompts per stage in `packages/protocol/src/prompts/`, in English, with the rule to answer in the language of the question: independence in drafts, substance only, anonymized positions, a reason for a changed position, and the editor's "no change of substance" with its check by the utility model (a rewrite that changes a claim is dropped).
 - [x] 10. Write the classifier in `packages/providers/src/classify.ts` with `decide()` and the `classifier` role: the class, its probability, and the 0.7 rule.
-- [ ] 11. Write the local driver and `pnpm cli ask "<question>" --max-usd 1` in `apps/cli` (the full process by default; `--mode quick` stops after the merge, for the evaluation): it resolves and records the model snapshot, classifies the question, runs the protocol in Node, writes the event log as JSON lines, and prints the answer, the dissent notes, the moments and the cost.
+- [x] 11. Write the local driver and `pnpm cli ask "<question>" --max-usd 1` in `apps/cli` (the full process by default; `--mode quick` stops after the merge, for the evaluation): it resolves and records the model snapshot, classifies the question, runs the protocol in Node, writes the event log as JSON lines, and prints the answer, the dissent notes, the moments and the cost.
 - [x] 12. Write the moments: templates per event type in Spanish, and the utility-model phrasing per batch.
 - [x] 13. Write `eval/questions.jsonl`: 50 questions, most of them in Spanish, with a category, a hand-set class (simple or complex) and a gold answer or a rubric (see "The evaluation").
-- [ ] 14. Write `pnpm cli eval --set eval/questions.jsonl --max-usd <n>`: it runs the arms, keeps every call result on disk so that a rerun never pays twice, runs the blind judging, produces the blind grading sheet of 20 answer pairs for the user, and writes `eval/results/<date>/report.md`.
+- [x] 14. Write `pnpm cli eval --set eval/questions.jsonl --max-usd <n>`: it runs the arms, keeps every call result on disk so that a rerun never pays twice, runs the blind judging, produces the blind grading sheet of 20 answer pairs for the user, and writes `eval/results/<date>/report.md`.
 - [ ] 15. Run the evaluation; the user grades the blind sheet; read the report together and record the decision to go on, to go on without the rounds, or to stop.
 
 Verified when:
@@ -434,7 +434,7 @@ Verified when:
 - [x] A property test shows that the same accepted suggestions give the same snapshot whatever order the model responses arrived in.
 - [x] Tests show that a setting with an old version resolves to the newest model of its family, and that a run uses its snapshot after the settings change.
 - [x] A fake-provider run goes through all stages, and replaying its event log rebuilds the same final document.
-- [ ] `pnpm cli ask` against the four live models returns an answer inside the deadline and under `--max-usd`, with every model call present once in the log.
+- [x] `pnpm cli ask` against the four live models returns an answer inside the deadline and under `--max-usd`, with every model call present once in the log.
 - [ ] `eval/results/<date>/report.md` exists and reports every metric of "The evaluation", with the user's grades included.
 
 ### Phase 2: the Durable Object runtime, sign-in, payment and the event stream
