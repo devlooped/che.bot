@@ -2,7 +2,7 @@
 
 Written 2026-11-16. It covers 50 of the 50 questions selected (50 in the set).
 
-Spend of the evaluation so far: US$19.2767 against a cap of US$Infinity: runs US$12.2752, classification US$0.0008, judging US$7.0008. This invocation spent US$0.0000.
+Spend of the evaluation so far: US$19.2767 (no cap applies): runs US$12.2752, classification US$0.0008, judging US$7.0008. This invocation spent US$0.0000.
 
 | Role | Model |
 | --- | --- |
@@ -78,12 +78,13 @@ The best single model, chosen after the fact: **Claude**, mean quality 4.62 over
 |   judge Claude | 50 | 19 T | 7 | 24 single | 52% |
 |   judge ChatGPT | 50 | 31 T | 5 | 14 single | 72% |
 |   judge Gemini | 50 | 12 T | 17 | 21 single | 58% |
+| T against the best single model (extra), the user | 0 |  |  |  |  |
 
 The majority is the verdict of more judges than any other; otherwise a tie. Where the best single model had no answer, Q wins (0 questions). T and Q have the same text on 13 questions.
 
 T against the best single model is an extra measure, outside the criteria of the plan, whose check compares Q with the best single model; it follows the rules of that pair (T wins where the best single model had no answer, a tie where the texts are the same: 0 questions).
 
-The user graded 20 of the 20 pairs of the sheet.
+The user graded 20 of the 40 pairs of the sheet.
 
 ## The rounds
 

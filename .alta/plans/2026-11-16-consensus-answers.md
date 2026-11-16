@@ -435,7 +435,7 @@ Verified when:
 - [x] Tests show that a setting with an old version resolves to the newest model of its family, and that a run uses its snapshot after the settings change.
 - [x] A fake-provider run goes through all stages, and replaying its event log rebuilds the same final document.
 - [x] `pnpm cli ask` against the four live models returns an answer inside the deadline and under `--max-usd`, with every model call present once in the log.
-- [ ] `eval/results/<date>/report.md` exists and reports every metric of "The evaluation", with the user's grades included.
+- [x] `eval/results/<date>/report.md` exists and reports every metric of "The evaluation", with the user's grades included.
 
 ### Phase 2: the Durable Object runtime, sign-in, payment and the event stream
 
@@ -518,7 +518,7 @@ Verified when:
 
 ## Results of the evaluation (step 15, run on 2026-11-16)
 
-The evaluation ran on the 50 questions for US$19.28; the report is `eval/results/2026-11-16/report.md`. Step 15 stays open until the user grades the 20 blind pairs (`eval/results/2026-11-16/grading-sheet.md`, choices in `grades.txt`) and decides.
+The evaluation ran on the 50 questions for US$19.28; the report is `eval/results/2026-11-16/report.md`. The user graded the 20 blind pairs of the plan; step 15 stays open until the user decides. The sheet (`eval/results/2026-11-16/grading-sheet.md`, choices in `grades.txt`) then got 20 more pairs, of T against the best single model, at the user's request.
 
 | Check | Measured | Bar | Result |
 | --- | --- | --- | --- |
@@ -526,7 +526,7 @@ The evaluation ran on the 50 questions for US$19.28; the report is `eval/results
 | Wall-clock of the full protocol, 95th percentile | 177.8 s | under 180 s | pass, by 2 s |
 | Correct answers, Q against the best single model (Claude) | 26 against 27, of 28 | Q no fewer | fail |
 | Blind pairs Q won or tied against the best single model, judges | 32% (16 of 50) | 60% | fail |
-| The same, by the user | not graded yet | 60% | pending |
+| The same, by the user | 20% (2 of 10) | 60% | fail |
 | Contested questions whose substance the rounds changed | 63% (29 of 46) | 30% | pass |
 | Improvements against regressions | 26 against 2 | 2 to 1 | pass |
 | Cost of T over cost of Q | 1.75 times | at most 2.5 | pass |
@@ -538,7 +538,8 @@ The evaluation ran on the 50 questions for US$19.28; the report is `eval/results
 - **Cost per class** (classifier, full protocol, mean): simple US$0.14, complex US$0.30; the 95th percentile is US$0.51. Both prices leave a wide margin.
 - **Herding** is low: of 61 changed votes, 4 only deferred. Dissent notes were right 5 times and wrong 4 (6 unclear).
 - **Editor choice** makes no difference: the finals differ on 9 runs and the judges tie all 9.
-- **The user's sheet** follows the plan: pairs of Q against the best single model and of T against Q. It has no pair of T against the best single model.
+- **The user's grades** agree with the judges: Q won or tied 2 of 10 pairs against the best single model, and T won or tied 9 of 10 against Q.
+- **The user's sheet** only grows: pairs 21 to 40 compare T with the best single model, on questions the user had not seen in pairs 1 to 20. They are an extra measure, outside the criteria, and are not graded yet.
 
 ## The evaluation of phase 1, and the criteria to go on
 

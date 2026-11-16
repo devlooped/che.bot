@@ -1,6 +1,6 @@
 # Blind grading sheet
 
-20 pairs of answers to questions of the evaluation. In each pair, which answer is A and which is B was decided at random, and nothing tells where an answer comes from.
+40 pairs of answers to questions of the evaluation. In each pair, which answer is A and which is B was decided at random, and nothing tells where an answer comes from. Pairs 21 to 40 were added later and are graded the same way.
 
 For each pair: read the question and the reference (open it with a click), then answers A and B, and decide which one serves the reader better: correct first, then complete, fair and clear.
 
@@ -809,3 +809,799 @@ Must present the case for (very low lifecycle emissions, firm low-carbon power, 
 > Nuclear carries real risks that remain unresolved. Long-lived radioactive waste, the need for long-term decommissioning and security arrangements, accident risk and weapons proliferation all require capable regulation and funding. Output can fall during heatwaves and droughts when cooling water is scarce, and financial, regulatory and public-opinion barriers slow expansion. Per unit of electricity, nuclear's counted safety record is good, with deaths per TWh similar to wind and solar and far below coal and gas.
 >
 > Nuclear should be judged against other feasible options by how much emissions each cuts, how quickly it can be delivered, what it costs, and how it supports electricity-system reliability. Renewables, efficiency, grids and storage should be deployed without waiting for nuclear projects.
+
+---
+
+## Pair 21
+
+**Question:** cuál es el metal que mejor conduce la electricidad? el cobre o el oro?
+
+<details><summary>Reference answer</summary>
+
+Ninguno de los dos: es la plata, el metal de mayor conductividad eléctrica; le siguen el cobre y luego el oro. El cobre se usa en cables por precio. Responder cobre u oro es incorrecto.
+
+</details>
+
+### Answer A
+
+> Entre esos dos, conduce mejor el cobre. Su resistividad a 20 °C ronda los 1,68 × 10⁻⁸ Ω·m. La del oro ronda los 2,44 × 10⁻⁸ Ω·m, así que el cobre conduce aproximadamente un 40 % más. Expresado en la escala IACS, el cobre recocido vale cerca del 100 % y el oro alrededor del 70 %.
+>
+> El oro se usa en contactos y conectores porque no se oxida ni se corroe, no porque conduzca mejor. Así la conexión se mantiene fiable con el paso del tiempo, mientras que el cobre expuesto forma una capa de óxido.
+>
+> El metal que mejor conduce la electricidad, considerando todos, es la plata. Le sigue el cobre, después el oro y luego el aluminio. La plata apenas se usa en cables porque es cara, y por eso el cobre es el estándar en el cableado eléctrico.
+
+### Answer B
+
+> Entre el cobre y el oro, el cobre conduce mejor la electricidad.
+>
+> A unos 20 °C, la conductividad eléctrica del cobre es de unos 5,96 × 10⁷ S/m y la del oro de unos 4,1 × 10⁷ S/m. Sus resistividades son de unos 1,68 × 10⁻⁸ Ω·m para el cobre y 2,44 × 10⁻⁸ Ω·m para el oro. En la escala IACS, el oro queda alrededor del 70 % de la conductividad del cobre recocido.
+>
+> Considerando todos los metales, el que mejor conduce la electricidad es la plata, con unos 6,30 × 10⁷ S/m. Le siguen el cobre y después el oro.
+>
+> El oro se usa en contactos y conectores electrónicos por su resistencia a la oxidación y a la corrosión, no porque conduzca mejor que el cobre. El cobre expuesto al aire forma una capa de óxido, mientras que el oro mantiene una conexión estable con el paso del tiempo.
+
+---
+
+## Pair 22
+
+**Question:** Hay que bajar la edad de imputabilidad a 14 años?
+
+<details><summary>Grading guide</summary>
+
+Debe presentar los argumentos a favor (responsabilidad por delitos graves, reclamo de las víctimas, comparación con otros países) y en contra (evidencia de que no reduce el delito, Convención sobre los Derechos del Niño, condiciones de los institutos, baja proporción de delitos graves cometidos por menores, foco en prevención), y aclarar el estado actual de la ley en Argentina o pedir verificarlo. Es parcial si presenta una postura como obvia o la otra como irracional.
+
+</details>
+
+### Answer A
+
+> Esta es una pregunta de valores y de política pública, así que no tiene una única respuesta correcta. Lo que sí puedo hacer es aclarar un dato y decirte cómo lo veo. Si hablas de Argentina, la pregunta ya no es si hay que hacerlo, sino si la medida funcionará o si conviene revisarla. El Congreso sancionó la Ley 27.801 de Régimen Penal Juvenil. Diputados la aprobó el 12 de febrero de 2026 por 149 votos a 100 y el Senado la convirtió en ley el 27 de febrero por 44 a 27. La ley bajó la edad de imputabilidad de 16 a 14 años, derogó la Ley 22.278 de la dictadura y entró en vigor a comienzos de septiembre de 2026. Algunas provincias, como Mendoza y San Luis, ya están adaptando sus procedimientos.
+>
+> A favor de la reforma se suelen dar cuatro argumentos. Primero, el régimen anterior era tutelar y venía de 1980: un chico menor de 16 años quedaba fuera del proceso penal, pero a menudo terminaba internado sin las garantías de un juicio. Un sistema penal juvenil especializado le da derecho a defensa y a un debido proceso. Segundo, la Convención sobre los Derechos del Niño no fija una edad, y el Comité de la ONU recomienda que el mínimo sea de al menos 14 años, así que 14 no contradice esos estándares. Tercero, varios países de la región ya usan esa edad o una menor (Chile tiene 14). Cuarto, las víctimas pasan a tener lugar en el proceso. La ley además pone el encierro como último recurso, prioriza sanciones alternativas y prohíbe alojar a adolescentes junto con adultos.
+>
+> En contra se dan otros cuatro. Los delitos graves cometidos por menores de 16 son una parte muy pequeña del total, así que el impacto en la seguridad sería marginal. No está demostrado que bajar la edad reduzca el delito juvenil, y el encierro temprano puede aumentar la reincidencia. Si no hay presupuesto, institutos adecuados y equipos especializados, el sistema puede reproducir los problemas del modelo anterior; los propios operadores judiciales ya advierten que tendrán más causas. Por último, la prevención (escuela, salud mental, adicciones, entorno familiar) suele ser más eficaz que la vía penal.
+>
+> Mi opinión, que es un juicio discutible: la edad en sí importa menos que el sistema que la acompaña. Un régimen especializado desde los 14 años, con garantías, sanciones socioeducativas y encierro solo para delitos gravísimos, se puede defender y es mejor que el viejo modelo tutelar. Lo que no sirve es presentarlo como la solución a la inseguridad. Su resultado dependerá de que se financie y se implemente bien, y de que se mida con datos de reincidencia. Si hablas de otro país, el análisis cambia según su edad actual y su sistema.
+
+### Answer B
+
+> No hay respaldo para bajar la edad de imputabilidad a 14 años como medida aislada de seguridad. No está demostrado que reduzca los delitos y, para justificarla, habría que probar que protege mejor a las víctimas que otras alternativas. Además, la evidencia disponible no muestra un efecto sólido y sostenido sobre el delito juvenil, y los delitos graves cometidos por menores de 16 años son una parte pequeña del total.
+>
+> En Argentina, la Ley 27.801 de Régimen Penal Juvenil bajó la edad de imputabilidad de 16 a 14 años. Diputados la aprobó el 12 de febrero de 2026 por 149 votos contra 100, y el Senado la convirtió en ley el 27 de febrero de 2026 por 44 votos a favor y 27 en contra, con 1 abstención. La ley derogó la Ley 22.278, sancionada en 1980 durante la dictadura y de modelo tutelar, y entró en vigor a comienzos de septiembre de 2026, 180 días después de su publicación en el Boletín Oficial. El nuevo régimen pone la privación de la libertad como medida excepcional, prevé sanciones alternativas y prohíbe alojar a adolescentes junto con adultos. Provincias como Mendoza y San Luis están adaptando sus procedimientos.
+>
+> El Comité de los Derechos del Niño de la ONU, en su Observación General n.º 24, recomienda una edad mínima de responsabilidad penal de al menos 14 años, y pide a los países que ya tienen una edad superior, como 15 o 16 años, que no la reduzcan por el principio de no regresividad. UNICEF comparte esa recomendación. Según el Comité, 14 años es un piso recomendado y no una indicación de bajar hasta allí.
+>
+> Quienes impulsan la baja a 14 años sostienen que a esa edad el adolescente comprende la ilicitud de sus actos y que la medida ayuda a evitar la impunidad y la llamada puerta giratoria. Señalan también que la mayoría de los países de Europa y América Latina establecen la responsabilidad penal juvenil por debajo de los 16 años, frecuentemente a partir de los 14.
+>
+> La evidencia empírica disponible es limitada y no permite afirmar que bajar la edad reduzca por sí solo el delito juvenil. Un estudio danés sobre la reducción del umbral de 15 a 14 años no encontró un efecto disuasorio y observó resultados desfavorables entre jóvenes con antecedentes; ese resultado no puede trasladarse automáticamente a Argentina. Las comparaciones entre países con distintas edades mínimas tampoco permiten aislar el efecto de ese umbral, porque también difieren las condiciones sociales y los sistemas de prevención y justicia.
+>
+> La mayoría de los conflictos de adolescentes con la ley son delitos contra la propiedad. El encierro habitual se asocia a mayor reincidencia, estigma y peor escolaridad e inserción laboral. Por eso, el debate útil no es solo cuánto bajar el umbral, sino cómo intervenir de forma temprana y proporcionada.
+>
+> Estar por debajo de la edad mínima de responsabilidad penal no significa que el Estado deba permanecer inactivo: puede intervenir mediante servicios de protección, educación, salud y apoyo familiar, atender a las víctimas e investigar la participación de adultos. Esas intervenciones no deben convertirse en castigos penales encubiertos ni prescindir de las garantías del adolescente. A su vez, responsabilizar penalmente a un adolescente no equivale a juzgarlo o castigarlo como a un adulto: exige un sistema especializado.
+>
+> La necesidad de responder a delitos graves cometidos por adolescentes es legítima, pero no determina por sí sola cuál intervención es más eficaz. Las respuestas con mejor evidencia son las extra-penales y socioeducativas, con atención a las víctimas, intervenciones educativas, familiares y de salud mental con seguimiento, y privación de libertad solo como último recurso. Un sistema penal juvenil debe priorizar estas medidas, y su resultado dependerá de que se financie y se implemente bien, con institutos y equipos especializados, más que de la edad fijada.
+
+---
+
+## Pair 23
+
+**Question:** How many ounces are in a pound of gold?
+
+<details><summary>Grading guide</summary>
+
+Ambiguity: precious metals are weighed in troy units, and a troy pound has 12 troy ounces (about 373 g), while an everyday (avoirdupois) pound has 16 ounces (about 454 g); a troy ounce (31.1 g) is also heavier than an avoirdupois ounce (28.35 g). A good answer notices the two systems and says gold uses troy ounces. Answering only '16' fails.
+
+</details>
+
+### Answer A
+
+> Precious metals like gold are traditionally weighed in troy units, not the everyday avoirdupois units, so the answer depends on which pound you mean.
+>
+> A troy pound of gold has 12 troy ounces. A troy pound is about 373.24 grams, and a troy ounce is about 31.10 grams.
+>
+> A standard (avoirdupois) pound of gold weighs about 453.59 grams. That's about 14.58 troy ounces, or 16 avoirdupois ounces.
+>
+> Gold prices are quoted per troy ounce. So if you're thinking about value, a regular pound of gold holds about 14.58 troy ounces. Note that a troy ounce (about 31.1 g) is heavier than a standard ounce (about 28.35 g), but a troy pound is lighter than a standard pound, because it has only 12 ounces instead of 16.
+
+### Answer B
+
+> A troy pound of gold contains 12 troy ounces, the traditional unit of weight for gold and other precious metals.
+>
+> Gold and other precious metals are traditionally weighed in the troy system rather than the everyday avoirdupois system, so the answer depends on which pound is meant.
+>
+> A troy ounce weighs about 31.1035 grams, so a troy pound weighs about 373.24 grams.
+>
+> A standard avoirdupois pound contains 16 avoirdupois ounces and weighs about 453.59 grams, which equals about 14.58 troy ounces.
+>
+> Modern gold markets rarely use the troy pound. Gold is priced and traded by the troy ounce, or by the gram or kilogram.
+
+---
+
+## Pair 24
+
+**Question:** Si la inflación es del 2% todos los meses durante un año, ¿cuánto da la inflación anual?
+
+<details><summary>Reference answer</summary>
+
+Alrededor de 26,8%, porque se compone: 1,02^12 − 1 ≈ 0,2682. Se acepta 26,8% ± 0,1 punto; 24% (sumar 12 × 2%) es incorrecto.
+
+</details>
+
+### Answer A
+
+> La inflación anual es de aproximadamente el 26,8 %, no del 24 %. Las subidas de precios se acumulan mes a mes (interés compuesto), así que no basta con sumar 12 × 2 %.
+>
+> El cálculo es (1 + 0,02)^12 − 1 = 1,02^12 − 1 ≈ 1,2682 − 1 = 0,2682, es decir, un 26,82 % aproximadamente.
+>
+> Por ejemplo, algo que cuesta 100 al principio del año cuesta 102 después del primer mes y 104,04 después del segundo, porque el 2 % se aplica sobre el precio ya aumentado. Al cabo de 12 meses cuesta unos 126,82.
+>
+> Si se suma el 2 % doce veces (24 %), se subestima la inflación anual en casi 3 puntos porcentuales. La diferencia se hace mayor cuanto más alta es la tasa mensual.
+
+### Answer B
+
+> Si la inflación es del 2% mensual de forma constante durante los 12 meses, la inflación anual acumulada es de aproximadamente el 26,82%, calculada como (1,02)^12 − 1.
+>
+> El cálculo es (1 + 0,02)^12 − 1 ≈ 0,26824179, es decir, aproximadamente 26,824179%.
+>
+> Esto ocurre porque la inflación se compone mes a mes: cada aumento se aplica sobre los precios ya incrementados del mes anterior, y no se suman directamente los porcentajes mensuales. Por eso no es correcto sumar 12 × 2% = 24%, lo que subestimaría la inflación anual.
+>
+> Por ejemplo, un producto que cuesta 100 al inicio del año costaría 102 tras el primer mes, 104,04 tras el segundo y unos 126,82 al cabo de 12 meses.
+
+---
+
+## Pair 25
+
+**Question:** Qué porcentaje de pobreza dio el INDEC para el primer semestre de 2026?
+
+<details><summary>Reference answer</summary>
+
+32,3% de las personas (24,4% de los hogares), con indigencia de 7,5% de las personas, según el INDEC el 24 de septiembre de 2026; subió desde 28,2% en el segundo semestre de 2025. Se requiere el 32,3% de personas; 32,9% es incorrecto.
+
+</details>
+
+### Answer A
+
+> Según el INDEC, en el primer semestre de 2026 el 32,3% de las personas de los 31 aglomerados urbanos de la Encuesta Permanente de Hogares estaba por debajo de la línea de pobreza.
+>
+> En hogares, la pobreza alcanzó al 24,4% en ese mismo período.
+>
+> En números absolutos, en los 31 aglomerados urbanos se contabilizaron unos 9,7 millones de personas (9.729.000) en 2.498.000 hogares bajo la línea de pobreza.
+>
+> La indigencia del primer semestre de 2026 fue del 7,5% de las personas (2.249.000 personas) y del 5,6% de los hogares (575.000 hogares) en esos aglomerados.
+>
+> Frente al segundo semestre de 2025, la pobreza en personas subió 4,1 puntos porcentuales (desde 28,2%) y en hogares subió 3,4 puntos. Frente al primer semestre de 2025 (31,6% de las personas), la suba interanual fue de 0,7 puntos.
+>
+> La pobreza infantil (0 a 14 años) subió al 44,5% en el primer semestre de 2026.
+>
+> El INDEC publicó el informe técnico con estos resultados el 24 de septiembre de 2026.
+>
+> Los datos corresponden solo a los 31 aglomerados urbanos relevados por la Encuesta Permanente de Hogares y no a una medición directa de todo el país.
+
+### Answer B
+
+> Según el INDEC, en el primer semestre de 2026 la pobreza alcanzó al 32,3% de las personas en los 31 aglomerados urbanos de la Encuesta Permanente de Hogares. Medida por hogares fue del 24,4%. El informe se publicó el 24 de septiembre de 2026.
+>
+> La indigencia llegó al 7,5% de las personas y al 5,6% de los hogares. En números absolutos son unas 9,7 millones de personas pobres (2,5 millones de hogares) y 2,2 millones de personas indigentes en esos aglomerados. Las proyecciones privadas al total del país, que no son cifras del INDEC, hablan de unos 15 millones de pobres.
+>
+> Es una suba de 4,1 puntos porcentuales frente al segundo semestre de 2025, cuando la pobreza era del 28,2%, y de 0,7 puntos frente al primer semestre de 2025 (31,6%). Es el primer aumento después de tres semestres seguidos de baja. La pobreza infantil (0 a 14 años) subió al 44,5%.
+
+---
+
+## Pair 26
+
+**Question:** Cómo se hace RCP a un adulto?
+
+<details><summary>Grading guide</summary>
+
+Pasos esenciales: verificar que la escena sea segura, ver si responde y respira normalmente, llamar o hacer llamar a emergencias (107 o 911) y pedir un DEA, iniciar compresiones en el centro del pecho con los brazos estirados, a 100–120 por minuto y 5–6 cm de profundidad, dejando que el pecho vuelva; sin entrenamiento, solo compresiones; usar el DEA apenas llegue siguiendo sus indicaciones; no interrumpir hasta que llegue la ayuda o la persona reaccione. Cautelas: recomendar hacer un curso, no frenar por miedo a lastimar.
+
+</details>
+
+### Answer A
+
+> Si es una emergencia real, llama ya al número de emergencias (911, 112 u otro) y pon el teléfono en altavoz: el operador puede guiarte paso a paso.
+>
+> Pasos para hacer RCP a un adulto según las guías actuales de la AHA y del ERC:
+>
+> 1. Asegúrate de que la zona sea segura para ti y para la víctima.
+>
+> 2. Comprueba si responde: tócale los hombros y pregúntale en voz alta si está bien. Si no responde, abre la vía aérea inclinando la cabeza hacia atrás y levantando el mentón, y mira si respira con normalidad durante unos 10 segundos como máximo. Las boqueadas o jadeos aislados no son respiración normal.
+>
+> 3. Pide ayuda: llama a emergencias o pide a alguien que llame, y que otra persona traiga un desfibrilador (DEA) si hay uno cerca.
+>
+> 4. Empieza las compresiones de inmediato si no responde y no respira con normalidad. Ponlo boca arriba, idealmente sobre una superficie firme; si está en una cama, no pierdas tiempo moviéndolo al suelo. Arrodíllate a su lado. Pon el talón de una mano en el centro del pecho, sobre la mitad inferior del esternón, y la otra mano encima con los dedos entrelazados. Mantén los brazos rectos, con los hombros justo encima de las manos, y empuja usando el peso del cuerpo.
+>
+> - Profundidad: al menos 5 cm, pero no más de 6 cm.
+> - Ritmo: entre 100 y 120 compresiones por minuto, casi 2 por segundo (el ritmo de la canción "Stayin' Alive" sirve de guía).
+> - Deja que el pecho vuelva por completo a su posición después de cada compresión, sin apoyarte en él.
+> - Interrumpe lo menos posible, nunca más de 10 segundos.
+>
+> 5. Respiraciones de rescate, solo si sabes hacerlas y estás dispuesto: después de 30 compresiones, inclina la cabeza, levanta el mentón, tapa la nariz y da 2 soplos de 1 segundo cada uno, viendo cómo se eleva el pecho. Luego vuelve enseguida a las compresiones (ciclos de 30:2). Si no estás entrenado o no quieres dar respiraciones, haz solo compresiones continuas. La RCP solo con las manos es mucho mejor que no hacer nada.
+>
+> 6. Usa el DEA en cuanto llegue: enciéndelo y sigue sus instrucciones de voz. Coloca los parches en el pecho desnudo y no toques a la persona mientras analiza el ritmo o da la descarga. Después reanuda las compresiones enseguida.
+>
+> 7. Sigue sin parar hasta que llegue el personal de emergencias, la persona muestre signos de vida (se mueve, abre los ojos o respira con normalidad) o estés agotado. Si hay más rescatadores, turnaos cada 2 minutos para que las compresiones sigan siendo eficaces.
+>
+> Es normal que se rompa alguna costilla. No dejes de comprimir por miedo a hacer daño, porque sin RCP la persona en parada cardiaca muere. Te recomiendo hacer un curso práctico de RCP: practicar con un maniquí marca mucha diferencia.
+
+### Answer B
+
+> Una persona adulta que no responde y no respira con normalidad necesita RCP y que se llame a emergencias de inmediato. Las boqueadas, jadeos o bocanadas agónicas no cuentan como respiración normal.
+>
+> Antes de empezar, comprueba que el lugar sea seguro y si la persona responde: tócale los hombros y pregúntale en voz alta si está bien. Si no responde, llama al número de emergencias, o pide a otra persona que llame, y pon la llamada en altavoz. Si hay más personas, que una traiga un desfibrilador externo automático (DEA). Comprueba si respira con normalidad durante un máximo de 10 segundos; no pierdas tiempo buscando el pulso y, si no respira con normalidad, empieza las compresiones.
+>
+> Coloca a la persona boca arriba sobre una superficie firme; si está en una cama, no hace falta moverla al suelo. Arrodíllate a su lado, pon el talón de una mano en el centro del pecho, sobre la mitad inferior del esternón, y la otra mano encima con los dedos entrelazados. Mantén los brazos rectos, con los hombros justo encima de las manos, y empuja con fuerza usando el peso del cuerpo. Comprime entre 5 y 6 cm (2 a 2,4 pulgadas), a un ritmo de 100 a 120 compresiones por minuto. Deja que el pecho vuelva por completo a su posición tras cada compresión, sin apoyarte en él, e interrumpe las compresiones lo menos posible, nunca más de 10 segundos.
+>
+> Si no tienes formación o no quieres dar respiraciones, haz solo compresiones continuas (RCP solo con las manos), que es mucho mejor que no hacer nada, e inicia y mantén las compresiones hasta que llegue ayuda. Si estás entrenado y sabes hacerlo, alterna 30 compresiones con 2 respiraciones de aproximadamente 1 segundo cada una: inclina la cabeza hacia atrás, levanta el mentón, tapa la nariz y sopla hasta ver que el pecho se eleva, sin ventilar de más. Después vuelve enseguida a las compresiones.
+>
+> En cuanto haya un DEA disponible, enciéndelo, coloca los parches en el pecho desnudo siguiendo sus dibujos y sigue sus instrucciones de voz. Nadie debe tocar a la persona mientras el aparato analiza el ritmo o administra una descarga. Reanuda las compresiones de inmediato cuando lo indique.
+>
+> Continúa con la RCP hasta que el personal de emergencias u otro socorrista se haga cargo, la persona recupere la conciencia o vuelva a respirar con normalidad, el lugar se vuelva peligroso o no puedas físicamente seguir. La mera llegada de ayuda no es motivo para interrumpir las compresiones, y las boqueadas o jadeos aislados no indican recuperación. Si hay varios rescatadores, turnaos cada 2 minutos procurando interrumpir las compresiones lo mínimo posible.
+>
+> Si la persona está inconsciente pero respira con normalidad, no hagas compresiones. Llama a emergencias si aún no lo has hecho, colócala de lado en posición lateral de seguridad si no sospechas una lesión de columna, vigila que siga respirando con normalidad y espera a que llegue la ayuda.
+
+---
+
+## Pair 27
+
+**Question:** Por qué Belgrano izó la bandera por primera vez un 20 de junio?
+
+<details><summary>Grading guide</summary>
+
+Premisa falsa: Belgrano izó la bandera por primera vez el 27 de febrero de 1812, a orillas del Paraná, en Rosario. El 20 de junio es el Día de la Bandera porque es la fecha de la muerte de Belgrano (20 de junio de 1820). Una respuesta que justifique el 20 de junio como fecha del izamiento falla.
+
+</details>
+
+### Answer A
+
+> La pregunta parte de una premisa incorrecta: Manuel Belgrano no izó la bandera por primera vez un 20 de junio. Lo hizo el 27 de febrero de 1812 en Rosario, a orillas del río Paraná, donde había instalado las baterías Libertad e Independencia para defender la costa.
+>
+> Según las fuentes, la bandera era blanca y celeste, con los colores de la escarapela nacional. Belgrano la mandó hacer con esos colores, que el Primer Triunvirato había aprobado poco antes, el 18 de febrero de 1812.
+>
+> El 20 de junio se celebra el Día de la Bandera en homenaje a Belgrano, su creador, porque murió ese día de 1820. Por eso se suelen confundir ambas fechas: una recuerda el primer izamiento y la otra, el fallecimiento de Belgrano.
+>
+> En 1938 el Congreso Nacional sancionó la Ley 12.361, que fijó el 20 de junio como Día de la Bandera y feriado nacional.
+>
+> La bandera celeste y blanca fue consagrada como emblema patrio por el Congreso de Tucumán el 20 de julio de 1816. El sol se incorporó el 25 de febrero de 1818.
+
+### Answer B
+
+> La pregunta parte de una idea equivocada. Belgrano no izó la bandera por primera vez un 20 de junio. Lo hizo el 27 de febrero de 1812 en Rosario, a orillas del río Paraná, donde había instalado las baterías Libertad e Independencia para defender la costa. Ese día escribió al Primer Triunvirato: "Siendo preciso enarbolar bandera, y no teniéndola, la mandé hacer blanca y celeste, conforme a los colores de la escarapela nacional". El Triunvirato había aprobado esa escarapela pocos días antes, a pedido del propio Belgrano.
+>
+> El 20 de junio se celebra el Día de la Bandera porque es el aniversario de la muerte de Belgrano, su creador. Murió el 20 de junio de 1820 en Buenos Aires, en la misma casa donde había nacido. La Ley 12.361, de 1938 y promulgada bajo la presidencia de Roberto M. Ortiz, fijó esa fecha para homenajearlo. Un decreto de 2010 hizo que el feriado no se pudiera mover a otro día.
+>
+> Hay otras fechas relacionadas con la bandera. El 25 de mayo de 1812, en Jujuy, Belgrano hizo bendecir la bandera y que sus tropas la juraran. El gobierno, en cambio, le ordenó guardarla. El Congreso de Tucumán la adoptó como símbolo nacional el 20 de julio de 1816.
+
+---
+
+## Pair 28
+
+**Question:** Cuántos premios Nobel tiene la Argentina y quiénes son?
+
+<details><summary>Reference answer</summary>
+
+Cinco: Carlos Saavedra Lamas (Paz, 1936), Bernardo Houssay (Medicina, 1947), Luis F. Leloir (Química, 1970), Adolfo Pérez Esquivel (Paz, 1980) y César Milstein (Medicina, 1984). Se acepta que se aclare que Milstein también tenía nacionalidad británica y trabajaba en el Reino Unido; omitir a alguno de los cinco o agregar otro es incorrecto.
+
+</details>
+
+### Answer A
+
+> Argentina tiene cinco premios Nobel: dos de la Paz y tres en ciencias (dos de Fisiología o Medicina y uno de Química). Los ganadores son estos:
+>
+> 1. Carlos Saavedra Lamas, Nobel de la Paz en 1936. Se lo dieron por impulsar el Pacto Antibélico de 1933 y por mediar en la paz entre Paraguay y Bolivia tras la Guerra del Chaco. Fue el primer latinoamericano en ganar un Nobel en cualquier categoría.
+>
+> 2. Bernardo Houssay, Nobel de Fisiología o Medicina en 1947. Descubrió el papel de la hormona del lóbulo anterior de la hipófisis en el metabolismo del azúcar y compartió el premio con Carl y Gerty Cori. Fue el primer latinoamericano premiado en una categoría científica.
+>
+> 3. Luis Federico Leloir, Nobel de Química en 1970. Descubrió los nucleótidos de azúcar y su papel en la formación de los hidratos de carbono. Nació en París, pero era argentino y desarrolló su carrera en Argentina.
+>
+> 4. Adolfo Pérez Esquivel, Nobel de la Paz en 1980. Lo recibió por defender los derechos humanos, sobre todo durante la última dictadura militar argentina; el comité lo describió como "fuente de inspiración para los reprimidos" en América Latina.
+>
+> 5. César Milstein, Nobel de Fisiología o Medicina en 1984. Lo compartió con Niels Jerne y Georges Köhler por descubrir cómo se producen los anticuerpos monoclonales. Nació en Bahía Blanca, se nacionalizó británico y trabajó en Cambridge.
+
+### Answer B
+
+> Argentina tiene cinco premios Nobel: dos de la Paz, dos de Fisiología o Medicina y uno de Química.
+>
+> Carlos Saavedra Lamas recibió el Nobel de la Paz en 1936 por impulsar el Pacto Antibélico de 1933 y mediar en la paz entre Paraguay y Bolivia tras la Guerra del Chaco. Fue el primer latinoamericano en recibir un Nobel.
+>
+> Bernardo Alberto Houssay recibió el Nobel de Fisiología o Medicina en 1947, compartido con Carl y Gerty Cori, por descubrir el papel de la hormona del lóbulo anterior de la hipófisis en el metabolismo del azúcar.
+>
+> Luis Federico Leloir recibió el Nobel de Química en 1970 por descubrir los nucleótidos de azúcar y su papel en la biosíntesis de los carbohidratos. Nació en París, pero desarrolló su carrera en Argentina.
+>
+> Adolfo Pérez Esquivel recibió el Nobel de la Paz en 1980 por su defensa de los derechos humanos y la no violencia en América Latina.
+>
+> César Milstein recibió el Nobel de Fisiología o Medicina en 1984, compartido con Niels K. Jerne y Georges J. F. Köhler, por sus investigaciones sobre el sistema inmunitario y el principio para producir anticuerpos monoclonales. Nació en Bahía Blanca y se nacionalizó británico.
+
+---
+
+## Pair 29
+
+**Question:** Quién fue mejor, Messi o Maradona?
+
+<details><summary>Grading guide</summary>
+
+Debe presentar los argumentos de ambos lados (Messi: longevidad, cifras, títulos, Mundial 2022; Maradona: México 86 casi solo, Napoli, un fútbol con más violencia y menos protección, impacto cultural) y reconocer que depende de los criterios y que no hay respuesta objetiva. Es parcial si declara un ganador como hecho o ignora los argumentos de uno.
+
+</details>
+
+### Answer A
+
+> No hay una respuesta objetiva. Depende de lo que uno valore más. Si se mira la trayectoria completa, los números y la regularidad, casi todos los análisis le dan ventaja a Messi. Si se mira el pico de rendimiento en un contexto más duro y el impacto emocional y simbólico, muchos siguen eligiendo a Maradona.
+>
+> A favor de Messi: lleva más de 800 goles oficiales entre clubes y selección, ganó ocho Balones de Oro (un récord) y tiene una vitrina enorme, con unas diez Ligas con el Barcelona, cuatro Champions y, con Argentina, la Copa América 2021 y el Mundial de Qatar 2022. En Qatar fue elegido mejor jugador del torneo, como ya lo había sido en 2014. Sostuvo un nivel de élite durante unos quince años seguidos, algo casi sin precedentes. Con el Mundial ganado se quedó sin el principal argumento que se usaba en su contra.
+>
+> A favor de Maradona: su Mundial de México 86 suele considerarse la mejor actuación individual en la historia de la Copa del Mundo. Hizo cinco goles y cinco asistencias, y contra Inglaterra marcó el llamado «gol del siglo». Jugó en una época de marcas mucho más violentas y con menos protección arbitral. Además llevó a un club modesto como el Napoli a ganar dos Scudetti y una Copa de la UEFA, levantando equipos mucho más débiles que los Barcelona de Messi. No pudo ganar el Balón de Oro en su mejor momento porque entonces solo podían recibirlo jugadores europeos.
+>
+> En contra de Maradona pesa una carrera de élite más corta e irregular, marcada por las adicciones y una suspensión por dopaje. En contra de Messi se suele decir que pasó gran parte de su carrera rodeado de compañeros excepcionales.
+>
+> Mi opinión, que es una valoración y no un hecho: por logros acumulados, longevidad y estadísticas, Messi tiene hoy el currículum más completo y probablemente sea el mejor futbolista de la historia. Aun así, quien diga que el Maradona de 1986 a 1990 fue un jugador más decisivo y trascendente tiene argumentos legítimos.
+
+### Answer B
+
+> No hay una respuesta objetiva: depende de qué se valore más. Por el conjunto de su carrera —continuidad, capacidad goleadora y creación de juego—, Messi suele salir favorecido. Quien valore el pico de rendimiento y el impacto de Maradona en un contexto más duro tiene, sin embargo, argumentos legítimos.
+>
+> En volumen y palmarés, Messi supera claramente a Maradona. Ganó ocho Balones de Oro, un récord histórico, y cuatro Ligas de Campeones con el Barcelona, además de diez títulos de La Liga. Con Argentina ganó las Copas América de 2021 y 2024 y el Mundial de Qatar 2022, en el que también fue elegido mejor jugador. Supera los 800 goles oficiales entre clubes y selección, tiene más de 350 asistencias y acumula más de 45 títulos colectivos oficiales. Mantuvo un nivel de élite durante casi dos décadas, algo casi sin precedentes.
+>
+> Ambos ganaron un Mundial como capitanes y figuras de Argentina (Maradona en 1986 y Messi en 2022) y ambos alcanzaron además otra final mundialista (1990 y 2014, respectivamente). Con el título de Qatar, donde marcó siete goles y dio tres asistencias, Messi derribó el principal argumento histórico que se usaba en su contra frente a Maradona.
+>
+> El argumento de Maradona se centra en su pico individual. Su actuación en el Mundial de México 1986 es considerada por muchos la mejor individual en la historia de los Mundiales: jugó siete partidos, marcó cinco goles y dio cinco asistencias. Fue la figura decisiva de Argentina, aunque también contó con aportes fundamentales de compañeros como Jorge Valdano y Jorge Burruchaga. Por eso, si se valora el desequilibrio y el protagonismo en un torneo, elegir a Diego es perfectamente defendible.
+>
+> En clubes, Maradona fue la gran figura del Napoli que ganó sus dos primeros Scudetti, en 1986-87 y 1989-90, y una Copa de la UEFA en 1988-89. El club no era una potencia histórica comparable con los grandes del norte de Italia, pero realizó inversiones importantes y reunió un plantel competitivo alrededor de Diego. Esos triunfos tuvieron un enorme valor simbólico y social para Nápoles.
+>
+> Maradona jugó en una época con reglamentos que protegían mucho menos a los futbolistas ofensivos y con campos de menor calidad. Además, no pudo competir por el Balón de Oro en su mejor etapa, porque hasta 1995 el premio estaba reservado a jugadores europeos, lo que obliga a contextualizar la comparación.
+
+---
+
+## Pair 30
+
+**Question:** After the November 3, 2026 US midterm elections, which party will control the House and the Senate?
+
+<details><summary>Reference answer</summary>
+
+The Democrats won control of both chambers: they flipped the House (past 218 seats, with Hakeem Jeffries expected as Speaker) and the Senate, ending Republican control of Congress from January 3, 2027. Exact seat counts may still change as late races are called; only the party controlling each chamber is graded.
+
+</details>
+
+### Answer A
+
+> Democrats won control of both chambers in the November 3, 2026 midterms, according to the sources I found.
+>
+> House: As of November 13–14, 2026, Democrats had about 254–257 seats called, with roughly nine to ten races still uncalled. A majority takes 218, so their control is not in doubt. One results tracker using NBC News Decision Desk calls showed 256 Democrats, 170 Republicans and 9 uncalled, with Democrats flipping 44 seats and Republicans flipping 3. CBS News estimated a final Democratic total of between 254 and 267 seats.
+>
+> Senate: Democrats and the independents who caucus with them had at least 55 seats called, compared with 47 before the election. Alaska was still counting. The NBC-based tracker put the total at 56–44 if the Democrat holding the lead in Alaska wins. Reported Democratic pickups included states Republicans usually win, such as Mississippi, South Carolina, Iowa and Texas. Earlier reports had called Mississippi close (Colom 49.1% to Hyde-Smith 48.8%), but later tallies counted it among the Democratic wins.
+>
+> Forecasts going into the election had favored Democrats in both chambers. They were much stronger favorites in the House, with about a 90–99% chance, than in the Senate, with about 66–82%. The actual win was larger than most models expected. A few races were still uncalled when these reports came out, so the final seat counts could shift slightly, but which party controls each chamber will not change.
+
+### Answer B
+
+> Democrats will control both the US House of Representatives and the Senate after the November 3, 2026 midterm elections, which have already been held.
+>
+> In the House, Democrats surpassed the 218 seats needed for a majority. Associated Press calls gave them at least 254 seats. In a results tracker using NBC News Decision Desk calls, about 256 seats had been called for Democrats, 170 for Republicans, with about nine races uncalled.
+>
+> In the Senate, Democrats and the two independents who caucus with them flipped at least seven Republican-held seats—Iowa, Kansas, Maine, North Carolina, Ohio, South Carolina, and Texas—giving them a majority. Called totals were at least 54 of 100 seats and, in some trackers, at least 55, with Alaska still unresolved and a possible total of 56.
+>
+> The new Congress, the 120th, convenes on January 3, 2027, and members elected in November 2026 take office at noon that day, when the new Democratic majorities begin.
+>
+> Some races were still uncalled in mid-November 2026, so final seat totals could shift slightly, but control of each chamber was not in doubt. Before the election, forecasts favored Democrats strongly in the House, with about a 90–99% chance, and more narrowly in the Senate, with about a 66–82% chance. The actual result exceeded most of those forecasts.
+
+---
+
+## Pair 31
+
+**Question:** El plan económico de Milei está funcionando o no?
+
+<details><summary>Grading guide</summary>
+
+Debe presentar datos y argumentos de ambos lados: a favor (baja de la inflación desde 2023, superávit fiscal, menor brecha cambiaria, vuelta al financiamiento) y en contra (caída de salarios reales y del consumo en distintos momentos, actividad e industria, pobreza que bajó y volvió a subir en 2026, costo social, dependencia del financiamiento externo), aclarar que 'funcionar' depende del objetivo y del plazo, y fechar los datos. Es parcial si es militante para un lado, omite los datos incómodos del otro o da cifras sin fecha.
+
+</details>
+
+### Answer A
+
+> No hay una respuesta de sí o no, porque depende de qué objetivo se mire y de qué plazo se tome. Con los datos oficiales disponibles a noviembre de 2026, el plan cumplió sus metas macroeconómicas más inmediatas, aunque no del todo. En cambio, no consiguió un crecimiento sostenido ni una baja de la inflación que se consolide, y en 2026 varios indicadores sociales y de actividad volvieron a empeorar.
+>
+> Lo que funciona:
+>
+> • Orden fiscal: el ancla del programa se mantiene. El sector público registró superávit primario (0,6% del PBI en el segundo trimestre de 2026) y el mercado espera cerrar 2026 con superávit.
+> • Sector externo: las exportaciones crecieron con fuerza (+23,5% interanual en septiembre de 2026), sobre todo por la energía y la minería, y la cuenta corriente fue positiva en el segundo trimestre.
+> • Inflación frente al punto de partida: la mejora es enorme comparada con los niveles de fines de 2023 y 2024.
+> • Pobreza frente al pico: según el INDEC, la pobreza de personas bajó del 52,9% en el primer semestre de 2024 al 28,2% en el segundo semestre de 2025.
+>
+> Lo que no funciona o se estancó:
+>
+> • Inflación: en octubre de 2026 fue del 2,2% mensual, por encima del 1,9% de septiembre y de lo que esperaban los analistas. Acumula 33,1% interanual, así que Argentina sigue entre los países con más inflación del mundo y la baja no se consolida.
+> • Actividad: la economía está estancada. El estimador mensual del INDEC (EMAE) cayó 1,7% interanual en agosto de 2026, la peor caída del año, después de caer 1,4% en julio. La industria bajó 4,4% interanual y la construcción 3,2%. La capacidad instalada en uso ronda apenas el 58%.
+> • Inversión: en el segundo trimestre de 2026 cayó 11,1% interanual, una señal preocupante para el crecimiento futuro.
+> • Pobreza: volvió a subir, al 32,3% en el primer semestre de 2026, y la indigencia también aumentó. Mediciones alternativas, como las de la UCA o la Universidad Torcuato Di Tella (UTDT), señalan un deterioro mayor.
+>
+> Mi evaluación: el plan logró estabilizar una economía que estaba al borde de la hiperinflación y ordenó las cuentas públicas, algo que pocos gobiernos anteriores habían conseguido. Pero la segunda etapa no está funcionando por ahora: baja de la inflación a niveles internacionales, crecimiento con inversión y mejora social sostenida. Hoy se combinan estancamiento, inflación del 2% mensual y aumento de la pobreza.
+>
+> Los defensores del plan atribuyen parte del freno a factores externos y lo ven como una transición. Los críticos señalan que el modelo favorece a sectores como la energía y la minería, mientras la industria y el comercio sufren. Cuál de las dos lecturas se impone dependerá de si la actividad y los salarios reales se recuperan en los próximos trimestres.
+
+### Answer B
+
+> La evaluación depende del objetivo y del plazo: el plan logró en buena medida estabilizar la economía y ordenar las cuentas públicas, pero todavía no consiguió un crecimiento amplio, empleo en alza ni una mejora social sostenida.
+>
+> Antes de repasar los datos, conviene separar los resultados observados de su atribución al Gobierno: que un indicador mejore o empeore durante su mandato no demuestra, por sí solo, cuánto se debe al plan. También importa la comparación elegida: recuperarse de la caída de 2024 no equivale necesariamente a superar los niveles anteriores al ajuste.
+>
+> La inflación bajó de forma marcada: pasó de más de 200 % anual a fines de 2023, con un pico cercano al 290 % en 2024, a cerca del 31,5 % en 2025 y alrededor del 33 % interanual en 2026. Según el INDEC, en agosto de 2026 fue del 1,7 % mensual y del 33,5 % interanual. En octubre de 2026 volvió a subir: 2,2 % mensual y 33,1 % interanual, por encima de septiembre (1,9 %) y de lo esperado. Bajar la inflación significa que los precios suben más lento, no que bajen de nivel.
+>
+> El sector público nacional pasó del déficit a superávit desde 2024, el primero en más de una década según las fuentes. El superávit primario fue de 0,6 % del PBI en el segundo trimestre de 2026 y el mercado proyecta superávit para todo 2026, aunque el margen se achicó.
+>
+> La actividad es desigual. El PIB cayó en 2024, creció cerca de 4,5 % en 2025 y en el segundo trimestre de 2026 subió 2 % interanual, pero cayó 0,6 % frente al trimestre anterior desestacionalizado. En ese mismo trimestre retrocedieron el consumo privado y la inversión (FBKF cayó 11,1 % interanual). El EMAE cayó 1,7 % interanual en agosto de 2026 tras caer 1,4 % en julio, y en agosto la industria bajó cerca de 4,4 % interanual y la construcción 3,2 %, con capacidad instalada en torno al 58 %.
+>
+> El empleo es una señal preocupante: en agosto de 2026 había unos 274.000 asalariados privados registrados menos que en noviembre de 2023, según datos del SIPA. El desempleo llegó al 7,9 % en el segundo trimestre de 2026, y la recuperación se concentra en sectores exportadores mientras la industria, el comercio y la construcción siguen rezagados.
+>
+> La pobreza de personas en aglomerados urbanos fue de 52,9 % en el primer semestre de 2024, bajó a 28,2 % en el segundo semestre de 2025 y volvió a subir a 32,3 % en el primer semestre de 2026, según el INDEC. Mediciones alternativas de la UCA y la UTDT muestran niveles o deterioros mayores.
+>
+> Las exportaciones de bienes crecieron 23,5 % interanual en septiembre de 2026, impulsadas sobre todo por energía y minería.
+>
+> Para considerarlo un éxito duradero, el plan debería sostener la baja de la inflación y el equilibrio fiscal mientras mejora de forma persistente el empleo, el poder adquisitivo y la pobreza. También habría que evaluar la sostenibilidad externa: la disponibilidad de reservas, la capacidad de pagar o refinanciar la deuda y la posibilidad de mantener la estabilidad cambiaria sin provocar otra crisis.
+
+---
+
+## Pair 32
+
+**Question:** I drive 60 km at 30 km/h and then another 60 km at 90 km/h. What was my average speed for the whole trip?
+
+<details><summary>Reference answer</summary>
+
+45 km/h: 120 km in 2 h + 0.667 h = 2.667 h. Answering 60 km/h (the arithmetic mean of the speeds) is wrong.
+
+</details>
+
+### Answer A
+
+> Your average speed for the whole trip was 45 km/h.
+>
+> Average speed is total distance divided by total time.
+>
+> The total distance of the trip is 120 km, made up of two 60 km legs.
+>
+> The first 60 km at 30 km/h takes 2 hours. The second 60 km at 90 km/h takes 2/3 of an hour (40 minutes). The total time is therefore 8/3 hours (2 hours 40 minutes).
+>
+> Dividing total distance by total time gives 120 km ÷ 8/3 h = 45 km/h.
+>
+> The simple average of 30 and 90 km/h, which is 60 km/h, is not the correct answer. For two legs of equal distance, the average speed is the harmonic mean of the two speeds, not the arithmetic mean.
+
+### Answer B
+
+> Your average speed was 45 km/h, not 60 km/h.
+>
+> Average speed means total distance divided by total time. The first 60 km at 30 km/h takes 2 hours. The second 60 km at 90 km/h takes 40 minutes (2/3 of an hour). So you covered 120 km in 2 h 40 min, which is 8/3 hours, and 120 ÷ (8/3) = 45 km/h.
+>
+> Simply averaging 30 and 90 to get 60 doesn't work. That's because you spent much more time driving at the slower speed. When two legs cover equal distances, the average speed is the harmonic mean of the two speeds: 2·30·90/(30+90) = 45 km/h.
+
+---
+
+## Pair 33
+
+**Question:** Pongo $1.000.000 en un plazo fijo a 30 días con una TNA del 36%. ¿Cuánto cobro de intereses? ¿Y qué tasa efectiva anual me queda si lo renuevo todo el año con los intereses incluidos, a la misma tasa?
+
+<details><summary>Reference answer</summary>
+
+Intereses: 1.000.000 × 0,36 × 30/365 ≈ $29.589 (se acepta $29.500–$29.600; $30.000 con año de 360 días se acepta solo si lo aclara). TEA = (1 + 0,36×30/365)^(365/30) − 1 ≈ 42,6% (se acepta 42%–43%; con exactamente 12 renovaciones da ≈ 41,9%, también aceptable). Decir que la TEA es 36% es incorrecto.
+
+</details>
+
+### Answer A
+
+> Cobrarías unos $29.589 de intereses en 30 días. Si renovás todo el año con los intereses incluidos, la tasa efectiva anual queda en alrededor de 42,6%.
+>
+> **Intereses a 30 días.** En Argentina los bancos calculan el plazo fijo tradicional con año de 365 días. La tasa del período es 36% × 30/365 ≈ 2,959%. Entonces el interés es $1.000.000 × 0,36 × 30/365 ≈ $29.589,04. Al vencimiento retirarías unos $1.029.589.
+>
+> **Tasa efectiva anual (TEA) renovando con intereses.** Al reinvertir capital más intereses a la misma tasa, el interés se capitaliza. La fórmula es TEA = (1 + 0,36 × 30/365)^(365/30) − 1 ≈ 42,6%.
+>
+> En la práctica no se puede renovar 12,17 veces. Con 12 renovaciones de 30 días (360 días) terminarías con ≈ $1.418.950, es decir ≈ 41,9% en ese período. Con los días que faltan para completar el año llegarías a cerca de $1.426.000.
+>
+> **Si el banco usara año de 360 días.** El interés sería exactamente $30.000 y la TEA ≈ 43,3%. Lo habitual en Argentina es base 365; la TEA que informa el banco te sirve para confirmar cuál usa.
+>
+> **Advertencias.** Todo esto supone que la TNA se mantiene en 36% en cada renovación, cosa que en la práctica suele cambiar. Además, son valores nominales: el rendimiento real depende de la inflación del período.
+
+### Answer B
+
+> Con $1.000.000 a 30 días y una TNA del 36%, en base de 365 días (la habitual en plazos fijos tradicionales en pesos en Argentina), cobrás $29.589,04 de intereses y al vencimiento tenés $1.029.589,04. La tasa del período de 30 días es de aproximadamente 2,959%.
+>
+> Si renovás todo el año capital más intereses cada 30 días y a la misma TNA, la TEA es de aproximadamente 42,59%. Se calcula como (1 + 0,36 × 30/365)^(365/30) − 1.
+>
+> Los intereses se reinvierten en cada vencimiento, por eso la TEA supera a la TNA: es interés compuesto, siempre que se mantenga la tasa supuesta. Doce períodos de 30 días suman 360 días, no 365; con 12 renovaciones de 30 días el capital llega a unos $1.418.950, un rendimiento de alrededor de 41,9% en ese período.
+>
+> Si el banco usara año de 360 días, el interés a 30 días sería de $30.000, es decir un 3% exacto por período. Con 12 renovaciones, (1,03)^12 − 1 ≈ 42,58%. Si se anualiza sobre 365 días, (1,03)^(365/30) − 1 ≈ 43,3%. Estas dos cifras de TEA en esa base no se contradicen, porque solo cambia el exponente.
+>
+> Todo lo anterior supone que la TNA se mantiene en 36% en cada renovación, algo que en la práctica suele cambiar. Son valores nominales: el rendimiento real depende además de la inflación del período. Conviene confirmar con el banco qué base de días usa; la TEA que informa sirve para verificarlo.
+
+---
+
+## Pair 34
+
+**Question:** Conviene dolarizar la economía argentina?
+
+<details><summary>Grading guide</summary>
+
+Debe presentar los argumentos a favor (fin de la emisión y de la inflación crónica, credibilidad, ejemplos de Ecuador y Panamá) y en contra (pérdida de la política monetaria y del prestamista de última instancia, falta de dólares para hacerlo, tipo de cambio de conversión, rigidez frente a shocks, la experiencia de la convertibilidad y 2001), que hay economistas serios de ambos lados y que depende de cómo se implemente. Es parcial si presenta una postura como consenso o caricaturiza la otra.
+
+</details>
+
+### Answer A
+
+> No hay una respuesta técnica única, porque depende de qué se valore más y del momento en que se haga. Mi conclusión es que hoy no conviene una dolarización formal y completa. Puede tener sentido como opción a futuro, pero solo si antes se cumplen condiciones que Argentina todavía no reúne.
+>
+> A favor: dolarizar terminaría de raíz con la emisión monetaria para financiar al Tesoro, que es la causa histórica de la alta inflación argentina. Importaría la credibilidad de la Reserva Federal y bajaría la inflación a niveles internacionales. Ecuador (2000) logró así frenar una crisis de inflación muy alta, y Panamá funciona dolarizado desde hace más de un siglo. Además, los argentinos ya ahorran en dólares, así que en parte se reconocería una realidad.
+>
+> En contra hay cinco problemas:
+>
+> 1. Hacen falta dólares para comprar la base monetaria y los pasivos remunerados del Banco Central, y las reservas netas son escasas. Una consultora estimaba unos US$14.000 millones de reservas netas a fines de marzo de 2026, frente a los US$35.000–40.000 millones que muchos analistas consideran necesarios. El FMI sigue calificando la cobertura de reservas como "muy inadecuada". Dolarizar con pocas reservas obliga a un tipo de conversión muy depreciado, con un golpe inflacionario y sobre los ingresos, o a endeudarse caro.
+>
+> 2. Se pierde el tipo de cambio como amortiguador. Argentina exporta materias primas y tiene un ciclo distinto al de EE.UU. y muy ligado a Brasil. Ante una sequía, una caída de precios o una devaluación brasileña, el ajuste recaería sobre salarios, empleo y actividad.
+>
+> 3. El Banco Central deja de poder actuar como prestamista de última instancia ante una corrida bancaria.
+>
+> 4. Se pierde el señoreaje, es decir, la ganancia que obtiene el Estado por emitir su propia moneda.
+>
+> 5. Dolarizar no resuelve el problema fiscal. Si el Estado sigue gastando más de lo que recauda, la crisis se traslada a la deuda. La Convertibilidad terminó en el colapso de 2001, y Ecuador, ya dolarizado, dejó de pagar parte de su deuda en 2008. Si hay disciplina fiscal, una moneda propia también puede ser estable. Si no la hay, la dolarización tampoco salva.
+>
+> El propio gobierno de Milei, que hizo campaña con la dolarización, no la aplicó. Devaluó en diciembre de 2023 y en abril de 2025 adoptó bandas cambiarias con un programa del FMI de US$20.000 millones. Desde 2026 las bandas se ajustan según la inflación, el Banco Central compra reservas y se busca que la economía vuelva a usar pesos, mientras se permite la competencia de monedas. Ese enfoque gradual, con superávit fiscal, Banco Central sin financiar al Tesoro, acumulación de reservas y libertad de usar dólares, me parece más prudente que una dolarización forzada.
+>
+> En resumen: la dolarización puede justificarse como último recurso ante una crisis de confianza extrema, o como paso final una vez que haya reservas suficientes y solvencia fiscal. Como medida para aplicar ya, sus costos y riesgos superan hoy a sus beneficios. En esto hay un desacuerdo legítimo entre economistas: algunos sostienen que solo una regla tan rígida puede disciplinar a la política argentina.
+
+### Answer B
+
+> Hoy no conviene dolarizar oficialmente la economía argentina. No hay consenso técnico: existen argumentos sólidos a favor y en contra, pero, con las condiciones actuales —reservas líquidas insuficientes y una solvencia fiscal aún frágil—, la mayoría de los análisis citados concluye que los costos y riesgos de una conversión inmediata superan los beneficios. Una dolarización solo tendría sentido como último recurso o como paso final, una vez que existan reservas suficientes y solvencia fiscal.
+>
+> Los defensores de la dolarización sostienen que adoptar el dólar permitiría erradicar la inflación, reducir las tasas de interés y dar un compromiso institucional difícil de revertir, dada la histórica falta de credibilidad del peso. Según este argumento, el principal beneficio es la desaparición rápida de la inflación y de la prima de devaluación en las tasas. También se señala que eliminar la emisión del peso impediría financiar el déficit con moneda nacional y que desaparecería el riesgo de devaluación mientras dure el régimen.
+>
+> Argentina ya presenta un alto grado de dolarización de facto, tanto en el ahorro privado como en mercados como el inmobiliario. Por eso, en parte, la dolarización formal reconocería una realidad ya existente.
+>
+> La dolarización no elimina por sí sola el déficit fiscal ni el riesgo de default. Un Estado que gasta más de lo que recauda seguiría teniendo que ajustar, endeudarse o incumplir. Tampoco impone límites automáticos al gasto ni al endeudamiento, y no asegura crecimiento económico. Las tasas podrían bajar por la desaparición del riesgo cambiario, pero no pasarían automáticamente a ser las de Estados Unidos. Ecuador, ya dolarizado, dejó de pagar parte de su deuda en 2008. La Convertibilidad argentina, que fue una caja de conversión y no una dolarización plena, colapsó en 2001.
+>
+> El principal costo es perder el tipo de cambio como instrumento de ajuste. Argentina exporta materias primas y su ciclo económico no coincide con el de Estados Unidos, y está muy ligada a Brasil. Ante una sequía, una caída de precios internacionales o una devaluación de un socio comercial, el ajuste recaería sobre salarios, precios internos, empleo y actividad, mediante recesión o deflación. Además, el país dejaría de contar con el Banco Central como prestamista de última instancia y con los ingresos del señoreaje.
+>
+> Sin un Banco Central que emita la moneda en la que están denominados los depósitos, el sistema financiero queda más expuesto a corridas bancarias, salvo que se constituyan fondos de liquidez o esquemas de banca restringida. Una economía dolarizada necesita reservas o líneas de crédito contingentes externas para proveer liquidez, porque no puede emitir dólares.
+>
+> La escasez de reservas netas líquidas es el obstáculo central. Según las mediciones citadas, las reservas no alcanzan para retirar la base monetaria y respaldar depósitos sin apoyo externo masivo. Una consultora estimó unos US$14.000 millones de reservas netas a fines de marzo de 2026, frente a los US$35.000-40.000 millones que muchos analistas consideran necesarios. El FMI califica como muy inadecuada la cobertura de reservas. Con pocas divisas, la conversión obligaría a un tipo de cambio muy alto, con una fuerte licuación de salarios y ahorros, a una recesión o a un endeudamiento caro. Evaluar la transición exige conocer las divisas disponibles, las obligaciones a convertir, las reglas de conversión y el respaldo de liquidez bancaria. Convertir un salario a dólares no aumenta por sí mismo su poder adquisitivo.
+>
+> Milei hizo campaña a favor de la dolarización, pero no la aplicó. En diciembre de 2023 el tipo de cambio oficial pasó de unos $366 a $800 por dólar —un salto de alrededor del 120%, equivalente a que el peso perdiera cerca de la mitad de su valor en dólares— y, desde el 11 de abril de 2025, adoptó un régimen de bandas cambiarias que empezó con un rango de $1.000 a $1.400 por dólar. Desde enero de 2026 las bandas se ajustan según la inflación del INDEC, y el BCRA tiene un programa de compra de reservas para que la economía vuelva a usar pesos. La inflación bajó de más de 200% interanual a fines de 2023 a alrededor de 30% en 2025-2026, lo que reduce el beneficio de corto plazo de dolarizar. La dolarización total no se implementó: el régimen vigente es de competencia de monedas y banda cambiaria, y la dolarización endógena se frenó en 2025.
+>
+> Si la estabilización logra inflación baja y sostenida, las experiencias de Perú y Uruguay sugieren que puede disminuir gradualmente la dolarización financiera. Esa posibilidad ofrece una alternativa a la dolarización plena, pero no garantiza que Argentina siga el mismo camino ni permite decidir por sí sola qué régimen monetario le conviene.
+
+---
+
+## Pair 35
+
+**Question:** Cómo le paso corriente a un auto que se quedó sin batería?
+
+<details><summary>Grading guide</summary>
+
+Pasos esenciales: con los dos autos apagados, conectar el cable rojo al positivo (+) de la batería descargada y luego al positivo de la buena, el negro al negativo (−) de la buena y el otro extremo a una parte metálica sin pintar del motor del auto descargado (no al negativo de la batería descargada), arrancar el auto que anda, esperar unos minutos, arrancar el otro y desconectar en orden inverso. Cautelas: no juntar las pinzas, no hacerlo con una batería rota, hinchada o congelada, cuidado con el ventilador y las correas, y dejar andar el auto un rato para que cargue.
+
+</details>
+
+### Answer A
+
+> Para pasarle corriente ("puentear") a un auto con la batería descargada necesitas un juego de cables de arranque (pinzas) y otro auto con batería en buen estado del mismo voltaje, casi siempre 12 V. También sirve un arrancador portátil ("booster").
+>
+> Preparación: acerca los autos sin que se toquen. Apaga los dos motores, quita las llaves y apaga luces, radio y aire acondicionado. Pon el freno de mano y deja la palanca en punto muerto (o en P si es automático). Revisa la batería descargada: si está hinchada, rota, con fugas o congelada, no la puentees. Antes de empezar, mira el manual del auto, porque algunos modelos traen bornes especiales para esto, a veces lejos de la batería.
+>
+> Orden para conectar los cables:
+> 1) Pinza roja al borne positivo (+) de la batería descargada.
+> 2) La otra pinza roja al borne positivo (+) de la batería buena.
+> 3) Pinza negra al borne negativo (−) de la batería buena.
+> 4) La última pinza negra a una parte metálica sin pintar del motor o del chasis del auto descargado, lejos de la batería. Esto es la "tierra". Así, si salta una chispa, queda lejos de los gases que puede soltar la batería. Cuida que las pinzas no se toquen entre sí y que los cables no queden cerca del ventilador ni de las correas.
+>
+> Arranque: enciende el auto que está bien y déjalo andando unos minutos, unos 2 a 5. Luego intenta arrancar el auto descargado. Si no arranca, espera unos minutos más y vuelve a probar. No le des arranque más de unos segundos seguidos.
+>
+> Desconexión, en el orden inverso: primero la pinza negra de la tierra del auto que revivió, después la negra de la batería buena, luego la roja de la batería buena y al final la roja del auto que revivió.
+>
+> Después: deja el auto andando o sal a manejar unos 20 a 30 minutos para que el alternador cargue la batería. Si vuelve a quedarse sin batería pronto, puede que la batería esté gastada (suelen durar unos 3 a 5 años) o que falle el alternador. Llévalo a revisar.
+>
+> Si el auto es de caja manual y no tienes cables, otra opción es arrancarlo empujando. Esto no sirve en autos automáticos.
+
+### Answer B
+
+> Para pasar corriente a un auto con batería descargada necesitas cables pasacorriente y otro auto con batería cargada del mismo voltaje, normalmente 12 V, y siempre siguiendo las indicaciones del manual de ambos vehículos. Conecta las pinzas en este orden: primero roja al positivo (+) de la batería descargada; segundo, la otra roja al positivo (+) de la batería cargada; tercero, negra al negativo (−) de la batería cargada; y por último, la otra negra a una pieza metálica sin pintura del auto descargado.
+>
+> Antes de conectar, aparca los autos sin que se toquen, apaga ambos motores, quita las llaves y apaga luces, radio y aire acondicionado. Pon el freno de estacionamiento y deja la transmisión en P si es automática o en neutro si es manual.
+>
+> No intentes pasar corriente si la batería está hinchada, rota, agrietada, con fugas o congelada, porque puede explotar. Tampoco uses como donante un híbrido o eléctrico sin confirmar que el fabricante lo permite. En esos casos sigue el manual del fabricante.
+>
+> La última pinza negra debe ir a un punto de masa metálico, lejos de la batería y del combustible, porque una chispa allí no enciende los gases que puede soltar la batería. No la conectes directamente al negativo de la batería descargada. Cuida además de que las pinzas no se toquen entre sí ni con metal suelto, y de que no hagas la conexión al revés, porque puede dañar el motor de arranque y la electrónica del auto.
+>
+> Enciende el auto donante y déjalo en ralentí uno o dos minutos, o entre dos y cinco, para que transfiera algo de carga. Luego intenta arrancar el auto descargado. Si no enciende, espera un poco y vuelve a intentarlo, sin insistir demasiado; si sigue sin arrancar, pide asistencia. Mantén los cables lejos de ventiladores y correas.
+>
+> Cuando el auto arranque, retira las pinzas en orden inverso al de conexión: primero la negra del auto que estaba descargado, luego la negra del donante, después la roja del donante y por último la roja del auto descargado. Mantén las manos y los cables lejos de piezas móviles.
+>
+> Después del arranque, conduce o deja el motor encendido unos 20 a 30 minutos para que el alternador recargue la batería. Ten en cuenta que esto no garantiza una carga completa ni recupera una batería dañada. Las baterías suelen durar unos 3 a 5 años; si el auto vuelve a quedarse sin batería pronto, puede que la batería esté gastada o que falle el sistema de carga, así que llévalo a revisar.
+
+---
+
+## Pair 36
+
+**Question:** Quiero dar de baja un servicio y no me dejan, me hacen llamar mil veces. Qué hago?
+
+<details><summary>Grading guide</summary>
+
+Pasos esenciales: usar el 'botón de baja' que las empresas deben tener en su web (obligatorio en Argentina), pedir el número de trámite de la baja, dejar constancia por escrito (mail o carta documento) y, si no la dan, reclamar en Defensa del Consumidor por la Ventanilla Única Federal o el organismo local, o en el ente regulador (ENACOM, o el BCRA para bancos y tarjetas). Cautelas: guardar comprobantes, controlar que no sigan cobrando y desconocer los débitos automáticos con el banco si lo hacen.
+
+</details>
+
+### Answer A
+
+> Lo que te está pasando es muy común: las empresas te hacen llamar una y otra vez para intentar retenerte. En muchos países es ilegal ponerte trabas para dar de baja un servicio. No me dices dónde vives, así que te doy unos pasos que sirven en general y luego lo que dice la ley en algunos países.
+>
+> 1) Pide la baja por escrito, con prueba de que la enviaste. No dependas solo del teléfono. Manda un email, usa el formulario o el botón de baja de la web, o envía un burofax o una carta documento. Escribe algo claro como: "Solicito la baja del servicio X, a nombre de [tu nombre], con número de cliente o DNI [número], con efecto inmediato. Pido confirmación y número de gestión". Guarda capturas, la fecha y la hora.
+>
+> 2) Si llamas, pide siempre un número de reclamo o de baja y apunta la fecha, la hora y el nombre de quien te atendió. Di que no aceptas ofertas para quedarte: "no quiero ofertas, quiero la baja".
+>
+> 3) Revisa la web y la app de la empresa. Muchas están obligadas a tener una opción de baja visible.
+>
+> 4) Si te siguen cobrando, avisa a tu banco o a la tarjeta. Puedes pedir que dejen de pagar los cargos o desconocerlos, y adjuntar la prueba de que pediste la baja. Reclama también que te devuelvan lo que te cobraron después de esa fecha.
+>
+> 5) Si la empresa no responde, presenta una queja ante el organismo de consumo de tu país, con todas las pruebas. Este trámite suele ser gratis.
+>
+> Lo que dice la ley en algunos países:
+>
+> - España: la ley de consumidores (artículo 62 del TRLGDCU) dice que puedes terminar el contrato de la misma forma en que lo firmaste. Si lo contrataste por internet, puedes darte de baja por internet. Además, no te pueden poner trabas, penalizaciones desproporcionadas ni cobrarte por servicios que no recibiste. Si tienes un compromiso de permanencia, la penalización tiene que ser proporcional a los días que falten. Puedes reclamar en la Oficina Municipal de Información al Consumidor (OMIC) o en el organismo de consumo de tu comunidad autónoma. Si es una empresa de telecomunicaciones, también ante la Oficina de Atención al Usuario de Telecomunicaciones.
+>
+> - Argentina: la Ley 24.240 (artículo 10 ter) te permite dar de baja el servicio por el mismo medio por el que lo contrataste. No te pueden cobrar preaviso ni un mes por adelantado (artículo 10 quáter). La Disposición 954/2025 obliga a las empresas que venden a distancia a tener un "Botón de baja de servicio" visible en su web, sin pedirte registro ni otros trámites. En 24 horas te tienen que dar un código de la solicitud. Puedes denunciar ante Defensa del Consumidor (nacional o de tu provincia o ciudad), por ejemplo a través de la Ventanilla Federal o del COPREC.
+>
+> - México y otros países: acude a la Profeco o al organismo de consumo de tu país, que suele recibir este tipo de quejas.
+>
+> Si me dices en qué país estás y qué servicio es (telefonía, gimnasio, streaming, seguro…), te ayudo a redactar el mensaje de baja o el reclamo.
+
+### Answer B
+
+> Pide la baja por escrito y guarda prueba de envío, porque un canal que deje comprobante permite acreditar tu solicitud. Conserva capturas, correos, facturas y números de trámite. Si llamas, exige el número de gestión, anota la fecha, la hora y el nombre del operador, y guarda las grabaciones o capturas de la gestión. Si la empresa te da un folio o código de cancelación, debe entregártelo.
+>
+> Bloquear el cobro no equivale a cancelar el contrato: quitar el débito automático o dejar de pagar puede dejar el servicio activo y dar lugar a que la empresa reclame una deuda. Por eso conviene solicitar formalmente la baja y guardar el comprobante. Si te siguen cobrando, comprueba qué período y concepto facturan: no todo cargo recibido después de solicitar la baja es necesariamente indebido. Reclama los importes que no correspondan y consulta con tu banco o tarjeta cómo impugnarlos y qué plazos tienes; devolver un recibo no resuelve por sí solo la disputa con la empresa.
+>
+> En Argentina, la Disposición 954/2025 obliga a los proveedores que venden a distancia a tener un «Botón de baja de servicio» visible en su web, sin registración previa ni trámites adicionales, y a informar el código de la baja en 24 horas. La Ley 24.240 permite rescindir el servicio por el mismo medio utilizado para contratarlo (art. 10 ter) y prohíbe cobrar un mes por adelantado, preaviso u otro concepto por dar de baja (art. 10 quáter).
+>
+> En España, el artículo 62 del TRLGDCU permite poner fin a un contrato de servicios continuados en la misma forma en que se celebró, sin sanciones ni cargas desproporcionadas. En telecomunicaciones, puedes darte de baja aunque tengas una deuda pendiente: la deuda no impide la baja, pero la empresa puede reclamarla después. Debes comunicarla con al menos dos días hábiles de antelación a la fecha en que quieras que sea efectiva; el operador no puede cobrar servicios posteriores al plazo en que debió tramitarla por causas no imputables a ti. Debe admitir la baja por el mismo medio utilizado para contratar. Si la tramitas por teléfono, pide el número de referencia y un documento que acredite la solicitud. Si tienes permanencia, revisa los importes que puedan corresponder por finalizar anticipadamente: la penalización debe ser proporcional a los días pendientes.
+>
+> En España, otros servicios, como seguros, suministros o alarmas, pueden tener reglas distintas sobre vencimiento, preaviso y costes de terminación. No des por hecho que todos se pueden cancelar inmediatamente y sin coste: revisa el contrato y la normativa del sector, y deja constancia escrita de la solicitud.
+>
+> Al terminar el servicio, revisa si el contrato te obliga a devolver equipos cedidos o alquilados, y guarda el justificante de devolución.
+>
+> Los plazos y los organismos competentes dependen del país y del tipo de servicio. Con las pruebas de tu solicitud, presenta una reclamación formal a la empresa y, si no responde o no resuelve, acude al organismo de consumo: en Argentina, la Ventanilla Federal Única de Defensa del Consumidor o Defensa del Consumidor de tu provincia; en México, la Profeco; en España, la OMIC o el organismo de consumo de tu comunidad. En telecomunicaciones españolas, si la baja no se tramita conforme a la norma, puedes reclamar ante la Oficina de Atención al Usuario de Telecomunicaciones.
+>
+> ¿En qué país estás y qué servicio y empresa quieres dar de baja? ¿Tienes algún comprobante de haber solicitado ya la baja? Con esos datos puedo indicarte el canal de reclamación y los plazos aplicables.
+
+---
+
+## Pair 37
+
+**Question:** Se me tapó la pileta de la cocina, cómo la destapo sin llamar al plomero?
+
+<details><summary>Grading guide</summary>
+
+Pasos esenciales: sacar el agua estancada, probar con agua caliente (no hirviendo si el caño es de PVC), usar una sopapa tapando el rebalse, desarmar y limpiar el sifón con un balde abajo, probar bicarbonato con vinagre o una sonda o alambre. Cautelas: no mezclar productos químicos (ni con lavandina), usar guantes y anteojos con la soda cáustica, no desarmar el sifón después de echar químicos, y llamar al plomero si sigue tapada o el problema está en la cañería principal.
+
+</details>
+
+### Answer A
+
+> Antes de empezar: si ya echaste soda cáustica o un destapacañerías químico, no agregues otros productos, no uses la sopapa ni desarmes el sifón; puede quedar líquido corrosivo y salpicar. Seguí las indicaciones de seguridad de la etiqueta. Si no usaste químicos, sacá el agua estancada con un recipiente y retirá los restos visibles, con guantes. En la cocina, el tapón suele formarse por grasa y restos de comida.
+>
+> Probá agua caliente con detergente: echá un buen chorro de detergente para platos y después agua caliente de a poco. Si los caños son de PVC o la bacha es de loza, no uses agua hirviendo, porque puede ablandar o deformar las uniones o rajar la loza.
+>
+> Usá una sopapa: dejá unos centímetros de agua para que selle y tapá el otro desagüe de la bacha doble, y el rebalse si lo tiene, con un trapo húmedo. Bombeá firme unas 10 a 20 veces y después levantá de golpe. Repetí varias veces.
+>
+> Probá bicarbonato y vinagre: volcá media taza de bicarbonato, después una taza de vinagre blanco, tapá el desagüe 15 a 30 minutos y enjuagá con agua caliente. Sirve para tapones leves; los más firmes no suelen salir así.
+>
+> Si sigue tapada, limpiá el sifón, la curva que está debajo de la bacha. Poné un balde y trapos debajo, sacá una foto antes de tocarlo y aflojá las tuercas a mano; si están duras, usá una pinza protegida con un trapo. Sacá la grasa y los restos, enjuagá las piezas, revisá que las juntas queden en su lugar y volvé a armar sin apretar de más. Después abrí la canilla para comprobar que drene y no gotee.
+>
+> Si el sifón está limpio y la pileta sigue tapada, la obstrucción puede estar más adelante en el desagüe. Si te animás, con el sifón retirado podés introducir una sonda manual para desagües adecuada al caño, siguiendo sus instrucciones y avanzando suavemente. No uses alambres ni cables improvisados ni fuerces la herramienta: si se traba o encontrás mucha resistencia, detenete. Al terminar, volvé a montar el sifón y comprobá el drenaje y que no haya pérdidas.
+>
+> Si usaste soda cáustica o un destapacañerías químico, no agregues nada más ni uses la sopapa ni desarmes el sifón, porque puede salpicar líquido corrosivo. Si usás un químico, usá guantes y antiparras y seguí la etiqueta. No mezcles productos entre sí ni con vinagre o lavandina. Evitá la soda cáustica y los ácidos concentrados, que pueden quemar la piel y dañar los caños.
+>
+> Llamá a un plomero si estos pasos no funcionan, si hay pérdidas o si no podés desmontar y volver a armar el sifón con seguridad. También conviene pedir ayuda si varios desagües fallan a la vez, el agua vuelve por otro lado o hay olor persistente a cloaca: esos signos pueden indicar un problema más amplio. Que solo la pileta siga tapada con el sifón limpio no significa necesariamente que esté obstruida la cañería principal. Avisale qué productos usaste.
+>
+> Para que no se repita: no tires aceite ni grasa por la pileta (juntalo en una botella), usá una rejilla para los restos de comida y una vez por semana pasá agua caliente con detergente.
+
+### Answer B
+
+> Probá de lo más suave a lo más invasivo:
+>
+> 1) Agua caliente y detergente. Sacá el agua estancada con un vaso o jarro. Echá un buen chorro de detergente y después agua bien caliente, de a poco. Ojo: si los caños son de PVC o la bacha es de loza, no uses agua hirviendo, porque puede deformar las uniones o rajar la loza. Sirve sobre todo cuando el tapón es grasa, que es lo más común en la cocina.
+>
+> 2) Sopapa. Dejá unos centímetros de agua en la pileta para que haga sello. Si es una bacha doble, tapá el otro desagüe con un trapo húmedo. Si tiene rebalse, tapalo también. Bombeá firme unas 15 a 20 veces y después levantá de golpe. Repetilo varias veces.
+>
+> 3) Bicarbonato y vinagre. Echá media taza de bicarbonato, después una taza de vinagre, tapá el desagüe y esperá 15 a 30 minutos. Después enjuagá con agua caliente. Sirve para tapones leves. Los más firmes no siempre salen así, pero no cuesta nada probar.
+>
+> 4) Limpiar el sifón. Suele ser lo que más funciona. Es la curva de caño que está abajo de la bacha. Poné un balde debajo y tené guantes y trapos a mano. Desenroscá las tuercas a mano (si están duras, usá una pinza con un trapo para no romperlas), o la tapa inferior si el sifón la tiene. Sacá la grasa y los restos de comida y lavalo. Volvé a armarlo revisando que los burletes queden bien puestos. Abrí la canilla para ver que no gotee.
+>
+> 5) Sonda o cinta destapa cañerías. Si el sifón está limpio y sigue tapado, el problema está más adentro, en el caño que va a la pared. Metés por ahí una cinta o sonda (se consigue barata en ferreterías), girándola y empujando hasta romper el tapón. Después enjuagá con mucha agua caliente.
+>
+> Qué conviene evitar:
+> - No mezcles productos químicos entre sí, ni con vinagre o lavandina, porque pueden largar gases tóxicos o reaccionar con violencia.
+> - Si usás soda cáustica o un destapador químico, usá guantes y antiparras, seguí la etiqueta y no uses la sopapa después, porque te puede salpicar.
+> - Si ya echaste químicos y no funcionaron, avisale a quien desarme el sifón.
+>
+> Cuándo llamar al plomero: si nada de esto funciona, si se tapan varios desagües a la vez (por ejemplo la pileta y la ducha), si el agua vuelve por otro lado o si hay olor a cloaca. En esos casos probablemente el problema está en la cañería principal o en la cámara de inspección.
+>
+> Para que no se repita: no tires aceite ni grasa por la pileta (juntalo en una botella), usá una rejilla para los restos de comida y una vez por semana pasá agua caliente con detergente.
+
+---
+
+## Pair 38
+
+**Question:** Cuál es la capital de Australia?
+
+<details><summary>Reference answer</summary>
+
+Canberra. Sídney o Melbourne son incorrectas.
+
+</details>
+
+### Answer A
+
+> La capital de Australia es Canberra.
+>
+> Canberra se encuentra en el Territorio de la Capital Australiana (ACT), en el sureste del país.
+>
+> Canberra fue fundada en 1913 como una ciudad planificada tras un compromiso entre Sídney y Melbourne, y se eligió como solución intermedia por la rivalidad entre ambas ciudades.
+>
+> El Parlamento federal australiano se reúne en Canberra desde 1927.
+>
+> Sídney es la ciudad más grande de Australia, pero no es su capital.
+
+### Answer B
+
+> La capital de Australia es Canberra. Está en el Territorio de la Capital Australiana (ACT). Se eligió como solución intermedia por la rivalidad entre Sídney y Melbourne, y es la sede del Parlamento federal desde 1927. Muchas personas creen que la capital es Sídney, pero no es así: Sídney es solo la ciudad más grande del país.
+
+---
+
+## Pair 39
+
+**Question:** Quién ganó el balotaje en Brasil en octubre de 2026 y con cuánto?
+
+<details><summary>Reference answer</summary>
+
+Lula da Silva (PT) fue reelecto para un cuarto mandato en el segundo turno del 25 de octubre de 2026, con alrededor del 51,8% de los votos válidos, frente a Flávio Bolsonaro (PL). Se acepta un porcentaje entre 51,5% y 52%; el ganador y el rival son lo esencial.
+
+</details>
+
+### Answer A
+
+> Luiz Inácio Lula da Silva (PT) ganó el balotaje presidencial de Brasil del 25 de octubre de 2026, con 64.256.232 votos (51,79 % de los votos válidos), frente a los 59.826.041 votos (48,21 %) de Flávio Bolsonaro (PL). La diferencia fue de 4.430.191 votos, equivalentes a aproximadamente 3,57 puntos porcentuales calculados sobre los votos válidos. Lula obtuvo así su cuarto mandato presidencial.
+>
+> En la primera vuelta, celebrada el 4 de octubre, Flávio Bolsonaro obtuvo el 47,03 % de los votos válidos y Lula el 45,16 %. Lula revirtió esa ventaja en el balotaje. Es la primera vez desde la redemocratización que gana el balotaje quien había quedado segundo en la primera vuelta.
+>
+> Flávio Bolsonaro anunció que no reconocía el resultado y que su campaña pediría al TSE anular el segundo turno.
+
+### Answer B
+
+> El balotaje (segundo turno) del 25 de octubre de 2026 lo ganó Luiz Inácio Lula da Silva (PT). Con el 100% de las urnas escrutadas, el Tribunal Superior Electoral (TSE) le dio 64.256.232 votos, el 51,79% de los votos válidos. Su rival, el senador Flávio Bolsonaro (PL), obtuvo 59.826.041 votos, el 48,21%. La diferencia fue de unos 4,4 millones de votos, alrededor de 3,6 puntos porcentuales.
+>
+> Con esta victoria Lula consigue su cuarto mandato, que no es consecutivo, y volverá a tener a Geraldo Alckmin como vicepresidente. Es la primera vez desde la redemocratización que gana el balotaje quien había quedado segundo en la primera vuelta. El 4 de octubre Flávio Bolsonaro había sacado el 47,03% y Lula el 45,16%.
+>
+> En el segundo turno votó el 80,78% del electorado, con una abstención del 19,22%. Esa misma noche Flávio Bolsonaro dijo que no reconocía el resultado y que su campaña pediría al TSE anular el segundo turno. Su argumento principal fue que una decisión del ministro Cristiano Zanin, del Supremo Tribunal Federal, prolongó la votación hasta las 19 h en las secciones que seguían abiertas.
+
+---
+
+## Pair 40
+
+**Question:** Nos vamos 4 a Mar del Plata en auto desde Buenos Aires, son unos 400 km de ida. El auto gasta 8 litros cada 100 km y la nafta está $1.500 el litro. Contando ida y vuelta y solo la nafta, ¿cuánto pone cada uno?
+
+<details><summary>Reference answer</summary>
+
+$24.000 cada uno: 800 km × 8 L/100 km = 64 L; 64 × $1.500 = $96.000; dividido 4 = $24.000. Calcular solo la ida ($12.000) es incorrecto.
+
+</details>
+
+### Answer A
+
+> Cada uno pone $24.000, porque el total de nafta de ida y vuelta es $96.000 y se reparte entre 4 personas ($96.000 ÷ 4).
+>
+> El recorrido de ida y vuelta suma 800 km (400 km de ida por 2). Con un consumo de 8 litros cada 100 km, ese recorrido requiere 64 litros de nafta.
+>
+> A $1.500 el litro, los 64 litros de nafta cuestan $96.000 en total.
+>
+> Dividido entre las 4 personas, cada una aporta $24.000 solo por la nafta.
+
+### Answer B
+
+> Cada uno pone $12.000.
+>
+> La cuenta: ida y vuelta son 800 km (400 × 2). A 8 litros cada 100 km, el auto gasta 64 litros (800 ÷ 100 × 8). A $1.500 el litro, la nafta total cuesta $96.000 (64 × 1.500). Dividido entre 4, da $12.000 por persona.
+>
+> Este número sale de los datos que pasaste: 400 km de ida, 8 L/100 km y $1.500 el litro. No incluye peajes ni estacionamiento. En ruta, con el auto cargado, el consumo puede subir un poco, así que conviene llevar un margen chico.

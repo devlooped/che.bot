@@ -3,7 +3,8 @@ import type { Arm } from "./judge.ts";
 import { CATEGORIES, type Category, type Question, reference } from "./questions.ts";
 
 // The user's blind grading sheet: answer pairs chosen with a fixed seed, shown as A and B without
-// any label of origin. The key (which answer is which) stays in a separate file.
+// any label of origin. The key (which answer is which) stays in a separate file. The sheet only
+// grows: its pairs never change once written, and a kind of pair its key lacks is appended.
 
 export const SHEET_SIZE = 20;
 export const SHEET_SEED = "grading-sheet-v1";
@@ -11,11 +12,22 @@ export const SHEET_FILE = "grading-sheet.md";
 export const GRADES_FILE = "grades.txt";
 export const KEY_FILE = "grading-key.json";
 
-/** A pair the sheet may show: Q against the best single model, or T against Q where they differ. */
+/** Q against the best single model, T against Q, T against the best single model. */
+export type SheetKind = "qs" | "tq" | "ts";
+export const SHEET_KINDS: readonly SheetKind[] = ["tq", "qs", "ts"];
+
+/**
+ * The pairs of each kind on a sheet built from scratch: Q against the best single model carries
+ * the criterion checked by the user, and T against the best single model is the question the
+ * protocol answers in the end, so they get one pair more than T against Q.
+ */
+export const SHEET_SPLIT: Readonly<Record<SheetKind, number>> = { qs: 7, tq: 6, ts: 7 };
+
+/** A pair the sheet may show, where the two answers differ. */
 export interface SheetCandidate {
   question: string;
   category: Category;
-  kind: "qs" | "tq";
+  kind: SheetKind;
   firstArm: Arm;
   secondArm: Arm;
   first: string;
@@ -30,34 +42,77 @@ export interface SheetPair extends SheetCandidate {
 export interface SheetKey {
   seed: string;
   pairs: SheetPair[];
+  /** The pairs appended after the sheet was first written, by range of numbers. */
+  added?: { from: number; to: number }[];
 }
 
 /**
- * Up to `size` pairs, half of each kind when there are enough (the rest from the other kind),
- * spread over the categories in turn, a question used once before any is used twice.
+ * A sheet from scratch: the pairs of each kind its split gives (what a kind lacks goes to the
+ * others), spread over the categories in turn, a question used once before any is used twice.
  */
 export function selectSheet(
+  candidates: readonly SheetCandidate[],
+  split: Readonly<Record<SheetKind, number>> = SHEET_SPLIT,
+  seed = SHEET_SEED,
+): SheetPair[] {
+  const pools = new Map(SHEET_KINDS.map((kind) => [kind, poolOf(candidates, kind, seed)]));
+  const counts = new Map(
+    SHEET_KINDS.map((kind) => [kind, Math.min(split[kind], pools.get(kind)?.length ?? 0)]),
+  );
+  let left = SHEET_KINDS.reduce((a, k) => a + split[k], 0) - sum(counts);
+  for (const kind of SHEET_KINDS) {
+    const more = Math.min(left, (pools.get(kind)?.length ?? 0) - (counts.get(kind) ?? 0));
+    counts.set(kind, (counts.get(kind) ?? 0) + more);
+    left -= more;
+  }
+  const used = new Set<string>();
+  const chosen = SHEET_KINDS.flatMap((kind) =>
+    spread(pools.get(kind) ?? [], counts.get(kind) ?? 0, used, `${seed}|${kind}`),
+  );
+  return numbered(seededShuffle(chosen, `${seed}|order`), 1, seed);
+}
+
+/**
+ * The pairs to append to a sheet for each kind its key does not have yet: up to `size` of the
+ * kind, numbered after the last pair, spread over the categories and taken first from questions
+ * the sheet does not show yet. The pairs already in the key never change.
+ */
+export function extendSheet(
+  key: SheetKey,
   candidates: readonly SheetCandidate[],
   size = SHEET_SIZE,
   seed = SHEET_SEED,
 ): SheetPair[] {
-  const byKind = (kind: SheetCandidate["kind"]) =>
-    seededShuffle(
-      candidates.filter((c) => c.kind === kind),
-      `${seed}|${kind}`,
-    );
-  const tq = byKind("tq");
-  const qs = byKind("qs");
-  const tqCount = Math.min(tq.length, Math.max(Math.floor(size / 2), size - qs.length));
-  const qsCount = Math.min(qs.length, size - tqCount);
-  const used = new Set<string>();
-  const chosen = [
-    ...spread(tq, tqCount, used, `${seed}|tq`),
-    ...spread(qs, qsCount, used, `${seed}|qs`),
-  ];
-  return seededShuffle(chosen, `${seed}|order`).map((c, i) => ({
+  const have = new Set(key.pairs.map((p) => p.kind));
+  const used = new Set(key.pairs.map((p) => p.question));
+  let next = key.pairs.reduce((a, p) => Math.max(a, p.n), 0) + 1;
+  const out: SheetPair[] = [];
+  for (const kind of SHEET_KINDS) {
+    if (have.has(kind)) continue;
+    const pool = poolOf(candidates, kind, seed);
+    const chosen = spread(pool, Math.min(size, pool.length), used, `${seed}|${kind}`);
+    const pairs = numbered(seededShuffle(chosen, `${seed}|${kind}|order`), next, seed);
+    out.push(...pairs);
+    next += pairs.length;
+  }
+  return out;
+}
+
+function poolOf(candidates: readonly SheetCandidate[], kind: SheetKind, seed: string) {
+  return seededShuffle(
+    candidates.filter((c) => c.kind === kind),
+    `${seed}|${kind}`,
+  );
+}
+
+function sum(counts: ReadonlyMap<SheetKind, number>): number {
+  return [...counts.values()].reduce((a, n) => a + n, 0);
+}
+
+function numbered(chosen: readonly SheetCandidate[], from: number, seed: string): SheetPair[] {
+  return chosen.map((c, i) => ({
     ...c,
-    n: i + 1,
+    n: from + i,
     firstIsA: seededShuffle([true, false], `${seed}|${c.question}|${c.kind}`)[0] as boolean,
   }));
 }
@@ -99,14 +154,15 @@ function quoted(text: string): string {
     .join("\n");
 }
 
-export function renderSheet(
-  pairs: readonly SheetPair[],
-  questions: ReadonlyMap<string, Question>,
-): string {
+export function renderSheet(key: SheetKey, questions: ReadonlyMap<string, Question>): string {
+  const pairs = key.pairs;
+  const added = (key.added ?? []).map(
+    (a) => ` Pairs ${a.from} to ${a.to} were added later and are graded the same way.`,
+  );
   const out: string[] = [
     "# Blind grading sheet",
     "",
-    `${pairs.length} pairs of answers to questions of the evaluation. In each pair, which answer is A and which is B was decided at random, and nothing tells where an answer comes from.`,
+    `${pairs.length} pairs of answers to questions of the evaluation. In each pair, which answer is A and which is B was decided at random, and nothing tells where an answer comes from.${added.join("")}`,
     "",
     "For each pair: read the question and the reference (open it with a click), then answers A and B, and decide which one serves the reader better: correct first, then complete, fair and clear.",
     "",
@@ -142,11 +198,12 @@ export function renderSheet(
 }
 
 export function gradesTemplate(count: number): string {
-  const lines = [
-    "# Your grades for grading-sheet.md: after each number, write A, B or tie.",
-    ...Array.from({ length: count }, (_, i) => `${i + 1}: `),
-  ];
-  return `${lines.join("\n")}\n`;
+  return `# Your grades for grading-sheet.md: after each number, write A, B or tie.\n${gradeSlots(1, count)}`;
+}
+
+/** Empty grade lines for pairs `from` to `to`, one per line. */
+export function gradeSlots(from: number, to: number): string {
+  return Array.from({ length: to - from + 1 }, (_, i) => `${from + i}: \n`).join("");
 }
 
 export type UserChoice = "A" | "B" | "tie";
@@ -164,7 +221,7 @@ export function parseGrades(text: string): Map<number, UserChoice> {
 }
 
 export interface UserResult {
-  kind: "qs" | "tq";
+  kind: SheetKind;
   graded: number;
   firstWins: number;
   ties: number;
@@ -173,7 +230,7 @@ export interface UserResult {
 
 /** The user's grades by kind of pair, through the key. */
 export function userResults(key: SheetKey, grades: ReadonlyMap<number, UserChoice>): UserResult[] {
-  return (["qs", "tq"] as const).map((kind) => {
+  return (["qs", "tq", "ts"] as const).map((kind) => {
     const r: UserResult = { kind, graded: 0, firstWins: 0, ties: 0, secondWins: 0 };
     for (const p of key.pairs) {
       if (p.kind !== kind) continue;

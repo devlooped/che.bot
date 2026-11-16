@@ -49,3 +49,5 @@ pnpm cli eval --set eval/questions.jsonl --report --out eval/results/<date>
 
 The evaluation writes `report.md` and `report.json`, and, once complete, `grading-sheet.md` with
 20 blind answer pairs and `grades.txt` for your choices, in `eval/results/<date>/` (or `--out`).
+The sheet only grows: its pairs and your grades never change, and a kind of pair added to the
+evaluation later is appended after them.

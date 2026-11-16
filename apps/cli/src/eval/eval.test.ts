@@ -11,10 +11,10 @@ import {
 import { describe, expect, test } from "vitest";
 import { CATALOG, respond as runRespond } from "../fake-script.ts";
 import { type EvalArgs, type EvalDeps, evaluate, parseEvalArgs } from "./eval.ts";
-import { questionKey } from "./questions.ts";
+import { questionKey, readQuestions } from "./questions.ts";
 import { bestSingle, emptyVerdicts, type QuestionRecord } from "./report.ts";
 import { runId } from "./runs.ts";
-import { GRADES_FILE, KEY_FILE, SHEET_FILE, type SheetKey } from "./sheet.ts";
+import { GRADES_FILE, KEY_FILE, renderSheet, SHEET_FILE, type SheetKey } from "./sheet.ts";
 
 // A small fake set: every question gets the scripted run of the fake provider (the Canberra run,
 // which goes through every stage); the judges are scripted from their prompts.
@@ -253,7 +253,9 @@ describe("an evaluation on a small fake set", async () => {
     ])
       expect(md).toContain(heading);
     expect(md).toContain("It covers 4 of the 4 questions selected");
-    expect(md).toMatch(/runs US\$[\d.]+, classification US\$[\d.]+, judging US\$[\d.]+/);
+    expect(md).toMatch(
+      /against a cap of US\$50\.0000: runs US\$[\d.]+, classification US\$[\d.]+, judging US\$[\d.]+/,
+    );
     const json = JSON.parse(readFileSync(join(out, "report.json"), "utf8"));
     expect(json.criteria).toHaveLength(9);
     expect(json.coverage.covered).toBe(4);
@@ -325,12 +327,16 @@ describe("an evaluation on a small fake set", async () => {
   test("writes the grading sheet without labels of origin, and a grades file with empty slots", () => {
     const sheet = readFileSync(join(out, SHEET_FILE), "utf8");
     const key = JSON.parse(readFileSync(join(out, KEY_FILE), "utf8")) as SheetKey;
-    expect(key.pairs.length).toBe(8); // 4 questions × (Q against Claude, T against Q)
-    expect(sheet).toContain("## Pair 8");
+    // 4 questions × (Q against Claude, T against Q, T against Claude)
+    expect(key.pairs.length).toBe(12);
+    for (const kind of ["qs", "tq", "ts"])
+      expect(key.pairs.filter((p) => p.kind === kind)).toHaveLength(4);
+    expect(key.added).toBeUndefined();
+    expect(sheet).toContain("## Pair 12");
     expect(sheet).toContain(GRADES_FILE);
     expect(sheet).not.toMatch(NAMES);
     expect(sheet).not.toMatch(/firstArm|"Q"|S:|T \(/);
-    expect(readFileSync(join(out, GRADES_FILE), "utf8")).toContain("\n8: \n");
+    expect(readFileSync(join(out, GRADES_FILE), "utf8")).toMatch(/\n12: \n$/);
   });
 
   test("a rerun makes no provider call, asks the same prompts and pays nothing", async () => {
@@ -410,11 +416,102 @@ describe("an evaluation on a small fake set", async () => {
     const user = rebuilt.report?.context.user ?? [];
     expect(user.find((u) => u.kind === "qs")).toMatchObject({ graded: 4, firstWins: 4 });
     expect(user.find((u) => u.kind === "tq")).toMatchObject({ graded: 4, firstWins: 4 });
+    expect(user.find((u) => u.kind === "ts")).toMatchObject({ graded: 4, firstWins: 4 });
     const userCheck = rebuilt.report?.criteria.find((c) => c.check.endsWith("by the user"));
     expect(userCheck).toMatchObject({ status: "pass", value: "100% (4 of 4)" });
-    expect(readFileSync(join(out, "report.md"), "utf8")).toContain(
-      "The user graded 8 of the 8 pairs",
+    const md = readFileSync(join(out, "report.md"), "utf8");
+    expect(md).toContain("The user graded 12 of the 12 pairs");
+    expect(md).toContain(
+      "| T against the best single model (extra), the user | 4 | 4 T | 0 | 0 single | 100% |",
     );
+    expect(md).toContain("(no cap applies): runs US$");
+    expect(md).not.toContain("Infinity");
+    const json = JSON.parse(readFileSync(join(out, "report.json"), "utf8"));
+    expect(json.context.user).toEqual(user);
+  });
+});
+
+describe("a sheet the user has graded", async () => {
+  // An evaluation whose sheet predates T against the best single model: pairs of the two first
+  // kinds, on e1 and e2 only, partly graded by the user.
+  const set = writeSet();
+  const out = (await evaluate(args(set), deps())).out as string;
+  const full = JSON.parse(readFileSync(join(out, KEY_FILE), "utf8")) as SheetKey;
+  const oldPairs = full.pairs
+    .filter((p) => p.kind !== "ts" && (p.question === "e1" || p.question === "e2"))
+    .map((p, i) => ({ ...p, n: i + 1 }));
+  const oldKey: SheetKey = { seed: full.seed, pairs: oldPairs };
+  const oldSheet = renderSheet(oldKey, new Map(readQuestions(set).map((q) => [q.id, q])));
+  const oldGrades = "# my grades\n1: A\n2: tie\n3:  b\n4: \n";
+  writeFileSync(join(out, KEY_FILE), `${JSON.stringify(oldKey, null, 2)}\n`);
+  writeFileSync(join(out, SHEET_FILE), oldSheet);
+  writeFileSync(join(out, GRADES_FILE), oldGrades);
+  const offline = () => {
+    const d = deps(new FakeProvider());
+    d.catalog = async () => {
+      throw new Error("no catalog in --report");
+    };
+    return d;
+  };
+  const first = offline();
+  const rebuilt = await evaluate(args(set, { report: true, maxUsd: null }), first);
+  const files = [KEY_FILE, SHEET_FILE, GRADES_FILE].map((f) => join(out, f));
+  const after = files.map((f) => readFileSync(f, "utf8"));
+  const key = JSON.parse(after[0] ?? "") as SheetKey;
+
+  test("appends the kind the key lacks after the existing pairs, which stay as they were", () => {
+    expect(first.provider.calls).toEqual([]);
+    expect(key.pairs.slice(0, 4)).toEqual(oldPairs);
+    const added = key.pairs.slice(4);
+    expect(added.map((p) => p.n)).toEqual([5, 6, 7, 8]);
+    expect(added.every((p) => p.kind === "ts" && p.firstArm === "T")).toBe(true);
+    expect(added.map((p) => p.secondArm)).toEqual(Array(4).fill("S:claude"));
+    expect(added.map((p) => p.question).sort()).toEqual(["e1", "e2", "e3", "e4"]);
+    expect(key.added).toEqual([{ from: 5, to: 8 }]);
+  });
+
+  test("keeps the text of the existing pairs and the user's grades", () => {
+    const sheet = after[1] ?? "";
+    const pairs = oldSheet.slice(oldSheet.indexOf("## Pair 1\n"));
+    expect(sheet).toContain(`\n${pairs}\n---\n\n## Pair 5\n`);
+    expect(sheet).toContain("Pairs 5 to 8 were added later and are graded the same way.");
+    expect(sheet).not.toMatch(NAMES);
+    expect(after[2]).toBe(`${oldGrades}5: \n6: \n7: \n8: \n`);
+    const user = rebuilt.report?.context.user ?? [];
+    expect(user.find((u) => u.kind === "ts")).toMatchObject({ graded: 0 });
+    expect(user.reduce((a, u) => a + u.graded, 0)).toBe(3);
+    expect(readFileSync(join(out, "report.md"), "utf8")).toContain(
+      "The user graded 3 of the 8 pairs",
+    );
+  });
+
+  test("running again appends nothing more", async () => {
+    const again = offline();
+    await evaluate(args(set, { report: true, maxUsd: null }), again);
+    expect(again.provider.calls).toEqual([]);
+    expect(files.map((f) => readFileSync(f, "utf8"))).toEqual(after);
+  });
+
+  test("the user's grades of the new pairs reach the report", async () => {
+    const added = key.pairs.slice(4);
+    writeFileSync(
+      join(out, GRADES_FILE),
+      `${oldGrades}${added.map((p) => `${p.n}: ${p.firstIsA ? "B" : "A"}\n`).join("")}`,
+    );
+    const graded = await evaluate(args(set, { report: true, maxUsd: null }), offline());
+    const user = graded.report?.context.user ?? [];
+    expect(user.find((u) => u.kind === "ts")).toEqual({
+      kind: "ts",
+      graded: 4,
+      firstWins: 0,
+      ties: 0,
+      secondWins: 4,
+    });
+    expect(readFileSync(join(out, "report.md"), "utf8")).toContain(
+      "| T against the best single model (extra), the user | 4 | 0 T | 0 | 4 single | 0% |",
+    );
+    // The criteria keep their user check on Q against the best single model.
+    expect(graded.report?.criteria).toEqual(rebuilt.report?.criteria);
   });
 });
 

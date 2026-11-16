@@ -752,7 +752,7 @@ export function renderReport(d: ReportData): string {
   o.push(
     `Written ${c.date}. It covers ${d.coverage.covered} of the ${d.coverage.selected} questions selected (${c.questionsInSet} in the set).`,
     "",
-    `Spend of the evaluation so far: ${usd(spentTotal)} against a cap of ${usd(c.capUsd)}: runs ${usd(c.spent.runs)}, classification ${usd(c.spent.classify)}, judging ${usd(c.spent.judging)}. This invocation spent ${usd(c.spentNow.runs + c.spentNow.classify + c.spentNow.judging)}.`,
+    `Spend of the evaluation so far: ${usd(spentTotal)}${Number.isFinite(c.capUsd) ? ` against a cap of ${usd(c.capUsd)}` : " (no cap applies)"}: runs ${usd(c.spent.runs)}, classification ${usd(c.spent.classify)}, judging ${usd(c.spent.judging)}. This invocation spent ${usd(c.spentNow.runs + c.spentNow.classify + c.spentNow.judging)}.`,
     "",
   );
   if (c.models) {
@@ -836,16 +836,20 @@ export function renderReport(d: ReportData): string {
   );
   for (const j of MODELS)
     rows.push(tallyRow(`  judge ${MODEL_NAMES[j]}`, p.tVsQ.perJudge[j], "T", "Q"));
-  for (const u of c.user ?? []) {
-    rows.push(
-      tallyRow(
-        u.kind === "qs" ? "Q against the best single model, the user" : "T against Q, the user",
-        { first: u.firstWins, tie: u.ties, second: u.secondWins, n: u.graded },
-        u.kind === "qs" ? "Q" : "T",
-        u.kind === "qs" ? "single" : "Q",
-      ),
-    );
-  }
+  const userRow = (kind: UserResult["kind"], label: string, first: string, second: string) => {
+    const u = c.user?.find((x) => x.kind === kind);
+    if (u)
+      rows.push(
+        tallyRow(
+          label,
+          { first: u.firstWins, tie: u.ties, second: u.secondWins, n: u.graded },
+          first,
+          second,
+        ),
+      );
+  };
+  userRow("qs", "Q against the best single model, the user", "Q", "single");
+  userRow("tq", "T against Q, the user", "T", "Q");
   rows.push(
     tallyRow(
       "T against the best single model (extra), majority of judges",
@@ -856,6 +860,7 @@ export function renderReport(d: ReportData): string {
   );
   for (const j of MODELS)
     rows.push(tallyRow(`  judge ${MODEL_NAMES[j]}`, p.tVsBest.perJudge[j], "T", "single"));
+  userRow("ts", "T against the best single model (extra), the user", "T", "single");
   o.push(table(pairHead, rows), "");
   o.push(
     `The majority is the verdict of more judges than any other; otherwise a tie. Where the best single model had no answer, Q wins (${p.qVsBest.bestMissing} questions). T and Q have the same text on ${p.tVsQ.same} questions.`,

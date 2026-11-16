@@ -44,7 +44,9 @@ import {
 } from "./report.ts";
 import { runQuestion } from "./runs.ts";
 import {
+  extendSheet,
   GRADES_FILE,
+  gradeSlots,
   gradesTemplate,
   KEY_FILE,
   parseGrades,
@@ -557,35 +559,69 @@ function writeSheet(
   const keyFile = join(out, KEY_FILE);
   const gradesFile = join(out, GRADES_FILE);
   const sheetFile = join(out, SHEET_FILE);
-  const grades = existsSync(gradesFile) ? parseGrades(readFileSync(gradesFile, "utf8")) : new Map();
-  const kept = existsSync(keyFile) ? (JSON.parse(readFileSync(keyFile, "utf8")) as SheetKey) : null;
-  // Once the user has graded, the sheet and its key are frozen.
-  if (kept && grades.size > 0) {
-    return { pairs: kept.pairs.length, file: sheetFile, user: userResults(kept, grades) };
+  let key = existsSync(keyFile) ? (JSON.parse(readFileSync(keyFile, "utf8")) as SheetKey) : null;
+  // The sheet only grows: the pairs of the key stay as they are, with the user's grades.
+  if (complete) {
+    const candidates = sheetCandidates(records, best);
+    const questions = new Map(records.map((r) => [r.q.id, r.q]));
+    mkdirSync(out, { recursive: true });
+    if (!key) {
+      key = { seed: SHEET_SEED, pairs: selectSheet(candidates) };
+      writeFileSync(keyFile, `${JSON.stringify(key, null, 2)}\n`);
+      writeFileSync(sheetFile, renderSheet(key, questions));
+      writeFileSync(gradesFile, gradesTemplate(key.pairs.length));
+    } else {
+      const added = extendSheet(key, candidates);
+      const first = added[0];
+      const last = added[added.length - 1];
+      if (first && last) {
+        key = {
+          ...key,
+          pairs: [...key.pairs, ...added],
+          added: [...(key.added ?? []), { from: first.n, to: last.n }],
+        };
+        writeFileSync(keyFile, `${JSON.stringify(key, null, 2)}\n`);
+        writeFileSync(sheetFile, renderSheet(key, questions));
+        if (existsSync(gradesFile)) {
+          const text = readFileSync(gradesFile, "utf8");
+          const end = text === "" || text.endsWith("\n") ? "" : "\n";
+          writeFileSync(gradesFile, `${text}${end}${gradeSlots(first.n, last.n)}`);
+        } else writeFileSync(gradesFile, gradesTemplate(last.n));
+      }
+    }
   }
-  if (!complete)
-    return { pairs: kept?.pairs.length ?? 0, file: kept ? sheetFile : null, user: null };
+  const grades = existsSync(gradesFile) ? parseGrades(readFileSync(gradesFile, "utf8")) : new Map();
+  return {
+    pairs: key?.pairs.length ?? 0,
+    file: key ? sheetFile : null,
+    user: key && grades.size > 0 ? userResults(key, grades) : null,
+  };
+}
+
+/** Every pair the sheet may show: Q and T against the best single model, T against Q. */
+function sheetCandidates(
+  records: readonly QuestionRecord[],
+  best: ModelId | null,
+): SheetCandidate[] {
+  const single = `S:${best}` as Arm;
+  const arms = { qs: ["Q", single], tq: ["T", "Q"], ts: ["T", single] } as const;
   const candidates: SheetCandidate[] = [];
   for (const r of records) {
     if (!r.run?.complete) continue;
-    for (const p of pairSpecs(r.answers, best)) {
-      if (p.kind !== "qs" && p.kind !== "tq") continue;
+    const ts = tVsBestPair(r.answers, best);
+    for (const p of [...pairSpecs(r.answers, best), ...(ts ? [ts] : [])]) {
+      if (p.kind !== "qs" && p.kind !== "tq" && p.kind !== "ts") continue;
+      const [firstArm, secondArm] = arms[p.kind];
       candidates.push({
         question: r.q.id,
         category: r.q.category,
         kind: p.kind,
-        firstArm: p.kind === "qs" ? "Q" : "T",
-        secondArm: p.kind === "qs" ? (`S:${best}` as Arm) : "Q",
+        firstArm,
+        secondArm,
         first: p.first,
         second: p.second,
       });
     }
   }
-  const pairs = selectSheet(candidates);
-  const key: SheetKey = { seed: SHEET_SEED, pairs };
-  mkdirSync(out, { recursive: true });
-  writeFileSync(keyFile, `${JSON.stringify(key, null, 2)}\n`);
-  writeFileSync(sheetFile, renderSheet(pairs, new Map(records.map((r) => [r.q.id, r.q]))));
-  writeFileSync(gradesFile, gradesTemplate(pairs.length));
-  return { pairs: pairs.length, file: sheetFile, user: null };
+  return candidates;
 }
