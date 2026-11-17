@@ -1,6 +1,6 @@
 ---
 title: Four AIs answer one question together, through a shared document with tracked suggestions
-status: blocked
+status: in-progress
 created: 2026-11-16
 summary: Build a web app where Grok, Claude, OpenAI and Gemini draft alone, then converge on one answer through a fixed, code-run protocol of tracked suggestions and votes. Signed-in users pay per question by QR, at one of two prices set by a quick classification; the process is the same for both. The protocol is proven headless on about 50 questions first; the Cloudflare runtime, the Spanish UI and charts follow only if it beats a single model.
 ---
@@ -426,7 +426,7 @@ Verified when:
 - [x] 12. Write the moments: templates per event type in Spanish, and the utility-model phrasing per batch.
 - [x] 13. Write `eval/questions.jsonl`: 50 questions, most of them in Spanish, with a category, a hand-set class (simple or complex) and a gold answer or a rubric (see "The evaluation").
 - [x] 14. Write `pnpm cli eval --set eval/questions.jsonl --max-usd <n>`: it runs the arms, keeps every call result on disk so that a rerun never pays twice, runs the blind judging, produces the blind grading sheet of 20 answer pairs for the user, and writes `eval/results/<date>/report.md`.
-- [ ] 15. Run the evaluation; the user grades the blind sheet; read the report together and record the decision to go on, to go on without the rounds, or to stop.
+- [x] 15. Run the evaluation; the user grades the blind sheet; read the report together and record the decision to go on, to go on without the rounds, or to stop.
 
 Verified when:
 
@@ -518,7 +518,7 @@ Verified when:
 
 ## Results of the evaluation (step 15, run on 2026-11-16)
 
-The evaluation ran on the 50 questions for US$19.28; the report is `eval/results/2026-11-16/report.md`. The user graded the 20 blind pairs of the plan; step 15 stays open until the user decides. The sheet (`eval/results/2026-11-16/grading-sheet.md`, choices in `grades.txt`) then got 20 more pairs, of T against the best single model, at the user's request.
+The evaluation ran on the 50 questions for US$19.28; the report is `eval/results/2026-11-16/report.md`. The user graded the 20 blind pairs of the plan and decided to go on with the full protocol: the goal is to bring together the thoughts and votes of all the AIs, not to beat one model (see "Decisions"). The sheet (`eval/results/2026-11-16/grading-sheet.md`, choices in `grades.txt`) then got 20 more pairs, of T against the best single model, at the user's request.
 
 | Check | Measured | Bar | Result |
 | --- | --- | --- | --- |
@@ -590,6 +590,13 @@ Made by the user in the review of this plan:
 | Grading | The user grades about 20 blind answer pairs in phase 1 |
 | Privacy | Runs are shareable by link and kept until deleted |
 | Language | Spanish by default, rioplatense |
+
+Made by the user after the evaluation of phase 1 (step 15):
+
+| Decision | Choice |
+| --- | --- |
+| The goal | To bring together the thoughts and the votes of all the AIs in one answer, not necessarily to beat any single model. Cross-checking data and sources between the models matters most for data and charts |
+| Step 15 | Go on with the full protocol. The check "collaboration beats one model" failed and is kept as a measure; it does not stop the build |
 
 Made in this plan:
 
