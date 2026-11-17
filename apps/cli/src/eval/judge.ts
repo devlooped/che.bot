@@ -1,3 +1,4 @@
+import type { LedgerEntry } from "@chebot/driver";
 import {
   MODELS,
   type ModelId,
@@ -11,7 +12,6 @@ import {
 } from "@chebot/protocol";
 import { ProviderError } from "@chebot/providers";
 import { z } from "zod";
-import type { LedgerEntry } from "../driver.ts";
 import { CallRefused, type Guarded } from "./budget.ts";
 import { type Question, reference, sha } from "./questions.ts";
 

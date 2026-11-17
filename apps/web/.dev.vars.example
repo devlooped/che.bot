@@ -1,0 +1,7 @@
+# Copy to .dev.vars for `vite dev` (never commit .dev.vars). In production these are secrets:
+# `wrangler secret put <NAME>`.
+AI_GATEWAY_API_KEY=
+JOBS_URL=https://jobs.chebot.si
+JOBS_TOKEN=
+AUTH0_DOMAIN=
+AUTH0_AUDIENCE=

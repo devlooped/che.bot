@@ -441,14 +441,14 @@ Verified when:
 
 Starts only after step 15 says go.
 
-- [ ] 16. Scaffold `apps/web`: Worker, `wrangler.jsonc` with the `RunObject` and `SpendMeter` SQLite classes and the D1 database, the Cloudflare Vite plugin, and the secrets `AI_GATEWAY_API_KEY`, `JOBS_URL`, `JOBS_TOKEN`, `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`.
-- [ ] 17. Write the D1 migrations (`model_settings`, `prices`, `runs`) and the settings access: read the settings and the catalog, resolve the snapshot.
+- [x] 16. Scaffold `apps/web`: Worker, `wrangler.jsonc` with the `RunObject` and `SpendMeter` SQLite classes and the D1 database, the Cloudflare Vite plugin, and the secrets `AI_GATEWAY_API_KEY`, `JOBS_URL`, `JOBS_TOKEN`, `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`.
+- [x] 17. Write the D1 migrations (`model_settings`, `prices`, `runs`) and the settings access: read the settings and the catalog, resolve the snapshot.
 - [ ] 18. Write the Auth0 check in the Worker: verify the access token against the tenant's keys, read the roles claim, and guard each route as listed in the API.
-- [ ] 19. Write `RunObject` storage: the four tables, `quote()`, `pay()` and `paid()` that are each safe to call twice, and the idempotent event append.
+- [x] 19. Write `RunObject` storage: the four tables, `quote()`, `pay()` and `paid()` that are each safe to call twice, and the idempotent event append.
 - [ ] 20. Write the quote: classify with the decision model, read the price of the class, store both with the run, answer the `POST`.
 - [ ] 21. Write the payment: enqueue the job with the automation hook and a per-run token, wait for the QR on alarm ticks, emit `payment.requested`, handle `POST /api/pay/hook`, expire and cancel an unpaid job after 15 minutes, and mark the job `done` or `failed` at the end of the run. Admin runs skip the job.
-- [ ] 22. Write the alarm driver with the call ledger: one stage per tick, results stored as each call lands, the retry and abstain rules, `run.failed` after repeated handler errors, and the free rerun of a paid run that failed.
-- [ ] 23. Write the read API and the WebSocket endpoint with the Hibernation API, with replay from a sequence number; write `GET /api/me/runs` and `DELETE /api/runs/:id`.
+- [x] 22. Write the alarm driver with the call ledger: one stage per tick, results stored as each call lands, the retry and abstain rules, `run.failed` after repeated handler errors, and the free rerun of a paid run that failed.
+- [x] 23. Write the read API and the WebSocket endpoint with the Hibernation API, with replay from a sequence number; write `GET /api/me/runs` and `DELETE /api/runs/:id`.
 - [ ] 24. Write the guardrails: `SpendMeter` (one object, a daily cap in USD, reserve at start and settle at the end, runs refused when the cap is reached), the rate limiting binding on `POST /api/runs`, a length limit on the question, and the `admin` or `beta` role required to ask until launch.
 - [ ] 25. Write the admin API for model settings and prices, with the family names offered from the catalog.
 - [ ] 26. Deploy to a preview hostname and run one paid question end to end with a small real amount.
@@ -459,7 +459,7 @@ Verified when:
 - [ ] A client that disconnects and reconnects with `after=<seq>` receives every event once, in order, including the QR.
 - [ ] A model that times out produces `model.status: abstained` and the run completes with three models; an exhausted budget sends the run to the editor pass; an unpaid run expires and its job is cancelled.
 - [ ] A request without a valid token cannot ask, pay or delete; a run is readable by its link without signing in; a deleted run answers 404.
-- [ ] A change of `model_settings` during a run does not change the models of that run.
+- [x] A change of `model_settings` during a run does not change the models of that run.
 - [ ] A paid run on the preview deployment against the live models completes with the browser tab closed, and its job ends as `done`.
 
 ### Phase 3: the UI on the event stream
@@ -514,6 +514,10 @@ Verified when:
 - **The deadline is hard (step 11).** No call outlives the deadline of the run, and the editor pass runs only if it and its check fit before it; accepted changes are applied either way. This replaces "the deadline sends the run to the editor pass": the first live run ended at 241.7 s against 240 s.
 - **Grok's effort (step 11).** The default effort of `panel.grok` is `low`. At `medium`, grok-4.7 reasoned past 180 s on a round and timed out; at `low` it took 34 s. An admin setting can change it back.
 - **Live timings (step 11).** A full run took 168 to 182 s and cost US$0.35 to 0.66; the drafts take up to 88 s (Gemini with search) and the merge about 30 s. The bar of 180 s at the 95th percentile is at risk; the evaluation measures it.
+- **One driver (steps 11 and 22).** The loop that runs the calls of a step (the model of the seat, the timeout, the abstention, the ledger) lives in `packages/driver`, used by the CLI and by `RunObject`. A call cut short by a restart is retried once.
+- **Workers runtime (step 16).** AI SDK 7 and the Gateway adapter run unchanged in the Workers runtime, without `nodejs_compat`. The assets keys are `not_found_handling: "single-page-application"` and `run_worker_first: ["/api/*"]`; the Vite plugin adds the directory. The tests use `@cloudflare/vitest-plugin`, the current name of the Workers test pool for vitest 5.
+- **Failed runs (step 22).** A run fails after 3 handler errors on one stage. A paid run that failed gets one free rerun, through `POST /api/runs/:id/rerun`, which the API list did not have; its event and call keys carry the attempt. How many free reruns a user gets is the user's to confirm.
+- **Tables (step 19).** The `run` row also keeps the probability, the status, the timestamps, the attempt and the protocol state; `calls` keeps the whole ledger entry in one column.
 - **Line endings.** A `.gitattributes` keeps LF in every checkout, because Biome rejects the CRLF files that `core.autocrlf` produces on Windows.
 
 ## Results of the evaluation (step 15, run on 2026-11-16)

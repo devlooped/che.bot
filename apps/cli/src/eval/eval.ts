@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 import { parseArgs } from "node:util";
+import type { LedgerEntry } from "@chebot/driver";
 import { MODELS, type ModelId, type ModelSnapshot } from "@chebot/protocol";
 import {
   type CatalogModel,
@@ -10,7 +11,6 @@ import {
   ProviderError,
   resolveModels,
 } from "@chebot/providers";
-import type { LedgerEntry } from "../driver.ts";
 import { Budget, guard, priorSpend, RAW_FILES } from "./budget.ts";
 import {
   type Answers,

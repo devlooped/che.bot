@@ -132,13 +132,18 @@ function applyEvent(view: RunView, e: RunEvent) {
       view.status = "expired";
       view.stage = "expired";
       break;
-    case "run.started":
+    case "run.started": {
+      // A second run.started is a new attempt of the same question (the free rerun of a failed
+      // run): what the earlier attempt built is cleared; the quote and the payment stay.
+      const { quote, payment, paid } = view;
+      Object.assign(view, emptyView(), { quote, payment, paid, lastBatch: view.lastBatch });
       view.runId = e.runId;
       view.question = e.question;
       view.mode = e.mode;
       view.models = e.models;
       view.status = "running";
       break;
+    }
     case "stage.changed":
       view.stage = e.stage;
       if (e.cut === "budget") view.flags.budgetReached = true;

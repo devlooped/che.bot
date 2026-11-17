@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import { type CallKind, type ConfigOverrides, type RunConfig, resolveConfig } from "./config.ts";
-import type { Cut, RunEvent } from "./events.ts";
+import type { Cut, FailureReason, RunEvent } from "./events.ts";
 import {
   type AbstainReason,
   type Abstention,
@@ -156,7 +156,7 @@ export interface RunState {
   deadlineAt: number;
   updatedAt: number;
   status: "running" | "completed" | "failed";
-  failure: null | "no_drafts" | "budget" | "deadline";
+  failure: null | FailureReason;
   stage: RunStage | null; // the stage of the last step; null before the first
   next: Next;
   batch: number;
@@ -1148,7 +1148,26 @@ function reduceFinish(run: RunState, s: CallsStep, events: RunEvent[]) {
   });
 }
 
-function fail(run: RunState, reason: NonNullable<RunState["failure"]>, events: RunEvent[]) {
+/**
+ * Ends a running run as failed for a reason outside the protocol, such as a driver that kept
+ * failing ("error"): the failed stage and `run.failed`. A run that already ended is returned as it is.
+ */
+export function failRun(
+  state: RunState,
+  reason: FailureReason,
+  now: number,
+): { state: RunState; events: RunEvent[] } {
+  if (state.status !== "running") return { state, events: [] };
+  const run = clone(state);
+  const events: RunEvent[] = [];
+  run.updatedAt = now;
+  fail(run, reason, events);
+  run.recent = [];
+  run.momentsDue = false;
+  return { state: run, events };
+}
+
+function fail(run: RunState, reason: FailureReason, events: RunEvent[]) {
   if (run.stage !== "failed") {
     events.push({
       key: "stage.changed:failed",

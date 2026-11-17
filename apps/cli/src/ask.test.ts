@@ -1,10 +1,10 @@
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { CATALOG, script } from "@chebot/driver/testing";
 import { type Classification, FakeProvider } from "@chebot/providers";
 import { describe, expect, test } from "vitest";
 import { type AskArgs, type AskDeps, ask, parseAskArgs } from "./ask.ts";
-import { CATALOG, script } from "./fake-script.ts";
 
 function deps(cls: "simple" | "complex", probability = 0.9): AskDeps & { provider: FakeProvider } {
   let t = 1_800_000_000_000;

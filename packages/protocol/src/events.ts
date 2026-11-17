@@ -14,6 +14,8 @@ import type {
 } from "./model.ts";
 
 export type QuestionClass = "simple" | "complex";
+/** Why a run failed: no draft at all, the budget or deadline before any draft, or a driver error. */
+export type FailureReason = "no_drafts" | "budget" | "deadline" | "error";
 export type Cut = "budget" | "deadline";
 
 /**
@@ -86,7 +88,7 @@ export type RunEvent = { key: string; batch: number } & (
   | { type: "snapshot.created"; snapshot: Snapshot; cause: "round" | "edit"; threads: string[] }
   | { type: "moment"; text: string; origin: "model" | "template" }
   | { type: "run.completed"; version: number; flags: Flags; spentUsd: number }
-  | { type: "run.failed"; reason: "no_drafts" | "budget" | "deadline"; spentUsd: number }
+  | { type: "run.failed"; reason: FailureReason; spentUsd: number }
 );
 
 export type EventType = RunEvent["type"];

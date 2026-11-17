@@ -8,7 +8,7 @@ import {
 import { FakeProvider, type ModelSetting, resolveModels } from "@chebot/providers";
 import { describe, expect, test } from "vitest";
 import { drive, memoryLedger, startRun } from "./driver.ts";
-import { CATALOG, catalogEntry, script } from "./fake-script.ts";
+import { CATALOG, catalogEntry, script } from "./testing.ts";
 
 const T0 = 1_800_000_000_000;
 
@@ -234,5 +234,27 @@ describe("the ledger", () => {
     expect(driven.state.status).toBe("completed");
     expect(provider.calls.map((c) => c.callKey)).not.toContain("draft:0:grok");
     expect(partial.entries.size).toBe(Object.keys(driven.state.calls).length);
+  });
+
+  test("a call cut short by a restart is made once more; cut short twice, it abstains without a request", async () => {
+    const once = memoryLedger();
+    await once.begin?.("draft:0:grok", T0);
+    const provider = new FakeProvider(script());
+    const retried = await drive(newRun(), { provider, ledger: once, now: clock() });
+    expect(provider.calls.filter((c) => c.callKey === "draft:0:grok")).toHaveLength(1);
+    expect(retried.state.calls["draft:0:grok"]?.status).toBe("ok");
+
+    const twice = memoryLedger();
+    await twice.begin?.("draft:0:grok", T0);
+    await twice.begin?.("draft:0:grok", T0);
+    const again = new FakeProvider(script());
+    const abstained = await drive(newRun(), { provider: again, ledger: twice, now: clock() });
+    expect(again.calls.map((c) => c.callKey)).not.toContain("draft:0:grok");
+    expect(abstained.state.calls["draft:0:grok"]).toMatchObject({
+      status: "abstained",
+      reason: "error",
+    });
+    expect(abstained.calls.find((c) => c.key === "draft:0:grok")?.error).toContain("restart");
+    expect(abstained.state.status).toBe("completed");
   });
 });

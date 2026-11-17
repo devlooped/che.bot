@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
+import { type CallLedger, type Driven, drive, startRun } from "@chebot/driver";
 import {
   type Answer,
   type LoggedEvent,
@@ -23,7 +24,6 @@ import {
   ProviderError,
   resolveModels,
 } from "@chebot/providers";
-import { type CallLedger, type Driven, drive, startRun } from "./driver.ts";
 import { fileLedger } from "./file-ledger.ts";
 
 export const ASK_USAGE = `Usage: pnpm cli ask "<question>" [--mode quick|thorough] [--max-usd <n>] [--out <dir>]

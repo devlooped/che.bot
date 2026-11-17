@@ -1,9 +1,19 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
 import { selectAnswer } from "./answer.ts";
-import { abstain, drive, eventsOf, ok, type Responder, scripted, T0 } from "./fixtures.ts";
+import { appendEvents, paymentConfirmedEvent, quotedEvent } from "./events.ts";
+import {
+  abstain,
+  drive,
+  eventsOf,
+  ok,
+  type Responder,
+  SNAPSHOT_MODELS,
+  scripted,
+  T0,
+} from "./fixtures.ts";
 import { MODELS, type Paragraph } from "./model.ts";
-import { chooseEditor, nextStep, reduce } from "./reducer.ts";
+import { chooseEditor, createRun, failRun, nextStep, reduce } from "./reducer.ts";
 import { replay } from "./replay.ts";
 import { clone, seededShuffle } from "./util.ts";
 
@@ -306,6 +316,42 @@ describe("stopping rules", () => {
     expect(eventsOf(log, "run.failed")).toHaveLength(1);
     expect(eventsOf(log, "stage.changed").at(-1)?.stage).toBe("failed");
     expect(nextStep(state, T0)).toEqual({ kind: "done" });
+  });
+
+  test("a driver error fails a running run once; an ended run is left as it is", () => {
+    const { state: started } = createRun(
+      { id: "run-1", question: "?", mode: "thorough", models: SNAPSHOT_MODELS },
+      T0,
+    );
+    const failed = failRun(started, "error", T0 + 5);
+    expect(failed.state.status).toBe("failed");
+    expect(failed.state.failure).toBe("error");
+    expect(failed.events.map((e) => e.type)).toEqual(["stage.changed", "run.failed"]);
+    expect(started.status).toBe("running");
+    expect(failRun(failed.state, "error", T0 + 6).events).toEqual([]);
+    expect(nextStep(failed.state, T0 + 6)).toEqual({ kind: "done" });
+  });
+
+  test("a second run.started in the log is a new attempt: replay keeps the payment and drops the first attempt", () => {
+    const none: Responder = (call, state) =>
+      call.kind === "draft" ? abstain(call) : scripted(call, state);
+    const first = drive({ mode: "thorough" }, none);
+    const second = drive({ mode: "thorough" }, scripted);
+    const paidEvents = [
+      quotedEvent({ class: "simple", probability: 0.9, amount: 5000, currency: "ARS" }),
+      paymentConfirmedEvent({ amount: 5000, currency: "ARS" }),
+    ];
+    let log = appendEvents([], paidEvents, T0).log;
+    log = appendEvents(log, first.log, T0).log;
+    const again = second.log.map((e) => ({ ...e, key: `a2:${e.key}` }));
+    log = appendEvents(log, again, T0).log;
+    const view = replay(log);
+    expect(view.status).toBe("completed");
+    expect(view.paid).toBe(true);
+    expect(view.quote?.amount).toBe(5000);
+    expect(view.snapshots).toEqual(second.state.snapshots);
+    expect(view.drafts).toEqual(second.state.drafts);
+    expect(selectAnswer(view)).toEqual(selectAnswer(second.state));
   });
 
   test("a merge that fails falls back to a code-built document, without retry", () => {

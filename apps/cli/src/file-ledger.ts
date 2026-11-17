@@ -1,5 +1,5 @@
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import type { CallLedger, LedgerEntry } from "./driver.ts";
+import type { CallLedger, LedgerEntry } from "@chebot/driver";
 
 /**
  * A ledger in a JSON-lines file, one `{ key, entry }` per finished call, appended as each lands.

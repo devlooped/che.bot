@@ -1,0 +1,37 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "chebot-web",
+  "main": "./src/worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  "observability": { "enabled": true },
+  // The built single-page app. With the Cloudflare Vite plugin the directory is the client build
+  // (the plugin writes it into the deploy config); /api/* always reaches the Worker, and any other
+  // path that is not a file gets index.html.
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "RUNS", "class_name": "RunObject" },
+      { "name": "SPEND", "class_name": "SpendMeter" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RunObject", "SpendMeter"] }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "chebot-web",
+      // Replaced by the id `wrangler d1 create chebot-web` prints, at the first deploy (step 26).
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    // The budget of one question in USD; empty means the protocol's default (RunConfig.budgetUsd).
+    "RUN_BUDGET_USD": ""
+  },
+  "secrets": {
+    "required": ["AI_GATEWAY_API_KEY", "JOBS_URL", "JOBS_TOKEN", "AUTH0_DOMAIN", "AUTH0_AUDIENCE"]
+  }
+}

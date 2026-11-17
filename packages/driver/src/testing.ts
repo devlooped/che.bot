@@ -1,6 +1,7 @@
-// Test support: a FakeProvider script that takes a run through every stage, the run of the
-// protocol's own scripted test, read from the prompts as a model would (claim ids from the merge
-// prompt, pair ids from the dedupe prompt). Thread and suggestion ids follow from the order.
+// Test support (`@chebot/driver/testing`): a FakeProvider script that takes a run through every
+// stage, the run of the protocol's own scripted test, read from the prompts as a model would (claim
+// ids from the merge prompt, pair ids from the dedupe prompt). Thread and suggestion ids follow
+// from the order.
 import type { ModelId } from "@chebot/protocol";
 import {
   type CatalogModel,

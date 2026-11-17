@@ -1,12 +1,12 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import type { CallLedger, LedgerEntry } from "@chebot/driver";
 import {
   type GenerateRequest,
   type GenerateResult,
   type ModelProvider,
   ProviderError,
 } from "@chebot/providers";
-import type { CallLedger, LedgerEntry } from "../driver.ts";
 import { fileLedger } from "../file-ledger.ts";
 
 // The spend of the whole evaluation. Every model call goes through a gate that reserves the call's

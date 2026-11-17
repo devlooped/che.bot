@@ -1,6 +1,7 @@
 import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { CATALOG, respond as runRespond } from "@chebot/driver/testing";
 import { hash } from "@chebot/protocol";
 import {
   type Classification,
@@ -9,7 +10,6 @@ import {
   type GenerateRequest,
 } from "@chebot/providers";
 import { describe, expect, test } from "vitest";
-import { CATALOG, respond as runRespond } from "../fake-script.ts";
 import { type EvalArgs, type EvalDeps, evaluate, parseEvalArgs } from "./eval.ts";
 import { questionKey, readQuestions } from "./questions.ts";
 import { bestSingle, emptyVerdicts, type QuestionRecord } from "./report.ts";

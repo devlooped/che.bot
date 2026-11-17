@@ -1,8 +1,8 @@
 import { appendFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { LedgerEntry } from "@chebot/driver";
 import { expect, test } from "vitest";
-import type { LedgerEntry } from "./driver.ts";
 import { fileLedger } from "./file-ledger.ts";
 
 const entry = (key: string, costUsd: number): LedgerEntry => ({

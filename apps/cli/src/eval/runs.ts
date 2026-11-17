@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { drive, type LedgerEntry, startRun } from "@chebot/driver";
 import {
   type CallsStep,
   chooseEditor,
@@ -9,7 +10,6 @@ import {
   type RunState,
 } from "@chebot/protocol";
 import type { ModelProvider } from "@chebot/providers";
-import { drive, type LedgerEntry, startRun } from "../driver.ts";
 import { type Budget, guard, RAW_FILES } from "./budget.ts";
 import type { Question } from "./questions.ts";
 
