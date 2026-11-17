@@ -10,10 +10,11 @@ import {
   type ModelProvider,
 } from "@chebot/providers";
 import type { JWTVerifyGetKey } from "jose";
-import { auth0Identity, auth0Jwks } from "./auth0.ts";
+import { auth0Jwks } from "./auth0.ts";
 import type { Env } from "./env.ts";
 import type { IdentityResolver } from "./identity.ts";
 import { createJobsClient, type JobsClient } from "./jobs.ts";
+import { sessionIdentity } from "./session.ts";
 
 // What the runtime takes from the outside world, in one place: the Worker and the Durable Objects
 // read these, and tests replace them with `overrideDeps` (the tests run in the same isolate as the
@@ -32,9 +33,11 @@ export interface Deps {
   classifier(env: Env): Classifier;
   /** The payment jobs (jobs.ts). */
   jobs(env: Env): JobsClient;
-  /** The public keys that sign the access tokens: the tenant's JWKS, cached per isolate. */
+  /** The public keys that sign the tenant's ID tokens: its JWKS, cached per isolate. */
   jwks(env: Env): JWTVerifyGetKey;
-  /** Who calls: the Auth0 check of auth0.ts. */
+  /** The requests to the tenant's token endpoint (auth0.ts). */
+  auth0Fetch(request: Request): Promise<Response>;
+  /** Who calls: the session cookie of session.ts. */
   identify: IdentityResolver;
   /** The run configuration: the protocol's defaults, with the budget of RUN_BUDGET_USD. */
   runConfig(env: Env): ConfigOverrides;
@@ -77,7 +80,8 @@ const defaults: Deps = {
   classifier: (env) => ({ classify: (req) => classify(req, { apiKey: env.AI_GATEWAY_API_KEY }) }),
   jobs: (env) => createJobsClient({ url: env.JOBS_URL, token: env.JOBS_TOKEN }),
   jwks: (env) => auth0Jwks(env),
-  identify: (request, env) => auth0Identity(request, env, deps.jwks(env)),
+  auth0Fetch: (request) => fetch(request),
+  identify: sessionIdentity,
   runConfig: budgetOverride,
   renderer: () => lazyRenderer,
   tickDelayMs: 0,

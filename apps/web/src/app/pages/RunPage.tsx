@@ -24,7 +24,7 @@ import { errorText } from "../view/errors.ts";
  */
 export function RunPage({ params }: { params: Record<string, string> }) {
   const runId = (params.id ?? "").toLowerCase();
-  const { api, user, auth } = useSession();
+  const { api, user, local } = useSession();
   const { stream, summary, error, refresh } = useRun(runId);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
@@ -142,12 +142,8 @@ export function RunPage({ params }: { params: Record<string, string> }) {
               paying={paying}
               error={payError ?? actionError}
               onPay={pay}
-              onSimulatePayment={
-                auth?.simulatePayment ? () => auth.simulatePayment?.(runId) : undefined
-              }
-              onSimulateExpiry={
-                auth?.simulateExpiry ? () => auth.simulateExpiry?.(runId) : undefined
-              }
+              onSimulatePayment={local ? () => local.simulatePayment(runId) : undefined}
+              onSimulateExpiry={local ? () => local.simulateExpiry(runId) : undefined}
               askingAgain={busy}
               onAskAgain={askAgain}
             />

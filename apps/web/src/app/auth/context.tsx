@@ -8,15 +8,20 @@ import {
   useState,
 } from "react";
 import { type Api, createApi } from "../api.ts";
-import { loadAuth } from "./load.ts";
-import type { Auth, AuthUser } from "./types.ts";
+import { loadLocalMode } from "./load.ts";
+import type { AuthUser, LocalMode } from "./types.ts";
+
+// Sign-in happens in the Worker (src/worker/auth0.ts): "Entrar" goes to /auth/login and comes back
+// with a session cookie, "Salir" goes to /auth/logout, and the page learns who is signed in from
+// GET /api/me. The local mode signs in through its picker instead.
 
 interface Session {
   /** False until the sign-in state is known. */
   ready: boolean;
   user: AuthUser | null;
   api: Api;
-  auth: Auth | null;
+  /** The local mode's additions; null in production. */
+  local: LocalMode | null;
   /** Starts a sign-in that comes back to `returnTo` (the current page by default). */
   signIn(returnTo?: string): void;
   signOut(): void;
@@ -26,68 +31,71 @@ interface Session {
 
 const SessionContext = createContext<Session | null>(null);
 
+/** Whether the Worker sent the page back from a failed sign-in (`?signin=failed`); drops the flag. */
+function takeFailedSignIn(): boolean {
+  const url = new URL(window.location.href);
+  if (url.searchParams.get("signin") !== "failed") return false;
+  url.searchParams.delete("signin");
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  return true;
+}
+
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [auth, setAuth] = useState<Auth | null>(null);
+  const api = useMemo(() => createApi(), []);
+  const [local, setLocal] = useState<LocalMode | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [picking, setPicking] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
+
+  const refresh = useCallback(
+    () =>
+      api
+        .me()
+        .then(setUser)
+        .catch(() => setUser(null)),
+    [api],
+  );
+
+  useEffect(() => {
+    if (takeFailedSignIn()) setFailed(true);
+  }, []);
 
   useEffect(() => {
     let live = true;
-    loadAuth()
-      .then(async (a) => {
-        if (!live) return;
-        setAuth(a);
-        const u = await a.init().catch(() => {
-          setFailed(true);
-          return null;
-        });
-        if (live) setUser(u);
-      })
-      .catch(() => setFailed(true))
-      .finally(() => {
-        if (live) setReady(true);
-      });
+    Promise.all([loadLocalMode().then((l) => live && setLocal(() => l)), refresh()]).finally(
+      () => live && setReady(true),
+    );
     return () => {
       live = false;
     };
-  }, []);
-
-  const api = useMemo(() => createApi(() => (auth ? auth.token() : Promise.resolve(null))), [auth]);
+  }, [refresh]);
 
   const signIn = useCallback(
-    (returnTo = window.location.pathname) => {
-      if (!auth) return;
+    (returnTo = `${window.location.pathname}${window.location.search}`) => {
       setFailed(false);
-      if (auth.Picker) setPicking(returnTo);
-      else auth.signIn(returnTo).catch(() => setFailed(true));
+      if (local) setPicking(true);
+      else window.location.assign(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
     },
-    [auth],
+    [local],
   );
 
-  const signOut = useCallback(() => {
-    auth
-      ?.signOut()
-      .then(() => setUser(null))
-      .catch(() => setFailed(true));
-  }, [auth]);
+  const signOut = useCallback(() => window.location.assign("/auth/logout"), []);
 
   const value = useMemo(
-    () => ({ ready, user, api, auth, signIn, signOut, failed }),
-    [ready, user, api, auth, signIn, signOut, failed],
+    () => ({ ready, user, api, local, signIn, signOut, failed }),
+    [ready, user, api, local, signIn, signOut, failed],
   );
-  const Picker = auth?.Picker;
+  const Picker = local?.Picker;
   return (
     <SessionContext.Provider value={value}>
       {children}
-      {Picker && picking !== null && (
+      {Picker && picking && (
         <Picker
-          returnTo={picking}
-          onClose={() => setPicking(null)}
-          onSignedIn={(u) => {
-            setUser(u);
-            setPicking(null);
+          onClose={() => setPicking(false)}
+          onSignedIn={() => {
+            setPicking(false);
+            refresh();
           }}
         />
       )}

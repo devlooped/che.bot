@@ -104,7 +104,7 @@ describe("deleting a run", () => {
     const { id } = await quoted(user());
     const deleted = await api(`/api/runs/${id}`, {
       method: "DELETE",
-      headers: as(user(), ["admin"]),
+      headers: as(user(), ["Admin"]),
     });
     expect(deleted.status).toBe(204);
     expect((await api(`/api/runs/${id}`)).status).toBe(404);
@@ -118,7 +118,7 @@ describe("running a failed run again", () => {
     const { id } = await paidRun(owner);
     expect((await api(`/api/runs/${id}/rerun`, { method: "POST" })).status).toBe(401);
     expect(
-      (await api(`/api/runs/${id}/rerun`, { method: "POST", headers: as(user(), ["admin"]) }))
+      (await api(`/api/runs/${id}/rerun`, { method: "POST", headers: as(user(), ["Admin"]) }))
         .status,
     ).toBe(403);
     const running = await api(`/api/runs/${id}/rerun`, { method: "POST", headers: as(owner) });

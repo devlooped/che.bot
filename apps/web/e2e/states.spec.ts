@@ -95,7 +95,7 @@ test("an expired payment says so, and its owner asks again", async ({ page }) =>
 });
 
 test("a reload in the middle of a run catches up at once and goes on live", async ({ page }) => {
-  await signIn(page, newUser(["admin"]));
+  await signIn(page, newUser(["Admin"]));
   await ask(page, uniqueQuestion());
   await page.getByRole("button", { name: t.quote.adminRun }).click();
   await expect(page.getByTestId("paragraph").first()).toBeVisible({ timeout: 30_000 });

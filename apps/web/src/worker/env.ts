@@ -12,12 +12,17 @@ export interface Env {
   RUN_BUDGET_USD: string;
   /** The global spend cap of a day (UTC) in USD, over every run. */
   DAILY_CAP_USD: string;
-  /** "true" opens asking to every signed-in user; until then it needs the admin or beta role. */
+  /** "true" opens asking to every signed-in user; until then it needs the Admin or Contrib role. */
   LAUNCHED: string;
   // Secrets
   AI_GATEWAY_API_KEY: string;
   JOBS_URL: string;
   JOBS_TOKEN: string;
+  /** The Auth0 tenant, such as tenant.us.auth0.com. */
   AUTH0_DOMAIN: string;
-  AUTH0_AUDIENCE: string;
+  /** The regular web application of the tenant that signs users in (auth0.ts). */
+  AUTH0_CLIENT_ID: string;
+  AUTH0_CLIENT_SECRET: string;
+  /** Signs the session and sign-in cookies (session.ts); at least 32 characters. */
+  SESSION_SECRET: string;
 }

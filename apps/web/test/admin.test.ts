@@ -2,9 +2,9 @@ import { env } from "cloudflare:workers";
 import { CATALOG, catalogEntry } from "@chebot/driver/testing";
 import { describe, expect, test } from "vitest";
 import { resolveRunModels } from "../src/worker/settings.ts";
-import { api, as, ask, beta, fakes } from "./helpers.ts";
+import { api, as, ask, contrib, fakes } from "./helpers.ts";
 
-const admin = () => as(`admin-${crypto.randomUUID()}`, ["admin"]);
+const admin = () => as(`admin-${crypto.randomUUID()}`, ["Admin"]);
 const put = (path: string, headers: Record<string, string>, body: unknown) =>
   api(path, { method: "PUT", headers, body: JSON.stringify(body) });
 
@@ -18,8 +18,8 @@ describe("the admin API", () => {
     fakes();
     for (const path of ["/api/admin/models", "/api/admin/prices"]) {
       expect((await api(path)).status).toBe(401);
-      expect((await api(path, { headers: beta("user-b") })).status).toBe(403);
-      expect((await put(path, beta("user-b"), {})).status).toBe(403);
+      expect((await api(path, { headers: contrib("user-b") })).status).toBe(403);
+      expect((await put(path, contrib("user-b"), {})).status).toBe(403);
       expect((await api(path, { headers: admin() })).status).toBe(200);
       expect((await api(path, { method: "POST", headers: admin() })).status).toBe(405);
     }
@@ -141,7 +141,7 @@ describe("the admin API", () => {
     });
     classifier.choice = "simple";
     classifier.probability = 0.95;
-    const quote = await ask(beta(`user-${crypto.randomUUID()}`));
+    const quote = await ask(contrib(`user-${crypto.randomUUID()}`));
     expect(await quote.json()).toMatchObject({ class: "simple", amount: 6500, currency: "ARS" });
   });
 });

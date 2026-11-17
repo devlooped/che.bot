@@ -1,10 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import {
-  authHeader,
   CHART_QUESTION,
   DONE,
   finishedRun,
+  fromApp,
   newUser,
   SAMPLE_CSV,
   signIn,
@@ -79,13 +79,12 @@ test("the price, the QR and an expired payment", async ({ page }) => {
   expect(await violations(page)).toEqual([]);
 });
 
-test("Mis preguntas, its confirmation, and the admin page", async ({ page, request }) => {
-  const admin = newUser(["admin"]);
-  await request.post("/api/runs", {
-    headers: authHeader(admin),
+test("Mis preguntas, its confirmation, and the admin page", async ({ page }) => {
+  await signIn(page, newUser(["Admin"]));
+  await page.request.post("/api/runs", {
+    headers: fromApp,
     data: { question: uniqueQuestion() },
   });
-  await signIn(page, admin);
   await page.goto("/mis-preguntas");
   await expect(page.getByTestId("my-run")).toHaveCount(1);
   expect(await violations(page)).toEqual([]);

@@ -1,7 +1,9 @@
 import type { FailureReason, LoggedEvent, QuestionClass, Stage } from "@chebot/protocol";
+import type { AuthUser } from "./auth/types.ts";
 
-// The HTTP API of the Worker (src/worker/api.ts), as the browser calls it. A refusal becomes an
-// ApiError with a `kind` the pages turn into plain words (t.errors).
+// The HTTP API of the Worker (src/worker/api.ts), as the browser calls it, on the origin of the
+// page: the browser sends the session cookie with every call. A refusal becomes an ApiError with a
+// `kind` the pages turn into plain words (t.errors).
 
 export type ApiErrorKind =
   | "not_signed_in"
@@ -108,9 +110,6 @@ export interface Price {
   currency: string;
 }
 
-/** Gives the access token of the signed-in user, or null when nobody is signed in. */
-export type TokenSource = () => Promise<string | null>;
-
 export const MAX_QUESTION_CHARS = 2_000;
 
 /** The paid attempt of a question and its one free rerun (MAX_ATTEMPTS of src/worker/run-object.ts). */
@@ -140,13 +139,9 @@ function kindOf(status: number, path: string, body: ErrorBody): ApiErrorKind {
   return "other";
 }
 
-export function createApi(token: TokenSource, base = "") {
-  async function call<T>(path: string, init: RequestInit = {}, auth = true): Promise<T> {
+export function createApi(base = "") {
+  async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
     const headers = new Headers(init.headers);
-    if (auth) {
-      const value = await token();
-      if (value) headers.set("authorization", `Bearer ${value}`);
-    }
     if (init.body) headers.set("content-type", "application/json");
     let response: Response;
     try {
@@ -166,6 +161,8 @@ export function createApi(token: TokenSource, base = "") {
   }
 
   return {
+    /** The signed-in user, or null. */
+    me: () => call<AuthUser | null>("/api/me"),
     /** A quote for a question; with `chart`, for its answer as a chart. */
     ask: (question: string, chart: ChartRequest | null = null) =>
       call<Quote>("/api/runs", {
@@ -191,18 +188,11 @@ export function createApi(token: TokenSource, base = "") {
         method: "PUT",
         body: JSON.stringify({ prices }),
       }).then((r) => r.prices),
-    /** With the token when there is one (for `mine`); a token refused does not hide the run. */
-    async summary(runId: string): Promise<RunSummary> {
-      try {
-        return await call<RunSummary>(`/api/runs/${runId}`);
-      } catch (error) {
-        if (!(error instanceof ApiError && error.kind === "not_signed_in")) throw error;
-        return { ...(await call<RunSummary>(`/api/runs/${runId}`, {}, false)), mine: false };
-      }
-    },
-    /** Public: no token, so that a stale token never hides a shared run. */
+    /** Public; `mine` says whether the signed-in user owns it. */
+    summary: (runId: string) => call<RunSummary>(`/api/runs/${runId}`),
+    /** Public. */
     events: (runId: string, after: number) =>
-      call<{ events: LoggedEvent[] }>(`/api/runs/${runId}/events?after=${after}`, {}, false).then(
+      call<{ events: LoggedEvent[] }>(`/api/runs/${runId}/events?after=${after}`).then(
         (r) => r.events,
       ),
   };

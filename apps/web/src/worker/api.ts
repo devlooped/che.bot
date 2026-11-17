@@ -1,16 +1,19 @@
 import { CSV_LIMITS, resolveConfig } from "@chebot/protocol";
 import { readModels, updateModels, updatePrices } from "./admin.ts";
+import { handleAuth } from "./auth0.ts";
 import { deps } from "./deps.ts";
 import type { Env } from "./env.ts";
 import { type Identity, isAdmin, mayAsk, type User } from "./identity.ts";
 import { chartOf, questionOf, quoteQuestion } from "./quote.ts";
 import { runStub } from "./run-object.ts";
+import { fromThisOrigin } from "./session.ts";
 import { listRuns, readPrices } from "./settings.ts";
 import { spendMeter } from "./spend-meter.ts";
 
-// The HTTP API. Who may call each route:
+// The HTTP API, and the sign-in routes of auth0.ts under /auth/. Who may call each route:
 //
-//   POST   /api/runs                  signed in, admin or beta role until launch: the quote
+//   GET    /api/me                    anyone: the signed-in user, or null
+//   POST   /api/runs                  signed in, Admin or Contrib role until launch: the quote
 //   POST   /api/runs/:id/pay          the owner (an admin owner runs free, with no job)
 //   POST   /api/runs/:id/rerun        the owner, after a paid run failed
 //   DELETE /api/runs/:id              the owner or an admin
@@ -20,8 +23,10 @@ import { spendMeter } from "./spend-meter.ts";
 //   GET|PUT /api/admin/models|prices  admin
 //   POST   /api/pay/hook              the jobs service, with the token of the run as Bearer
 //
-// The caller's identity is resolved once per request (deps.identify, the Auth0 check); a request
-// with a token that is not valid answers 401 on every route, the public ones included.
+// The caller's identity is resolved once per request (deps.identify, the session cookie); a
+// cookie that is not valid is no user. Because the identity is a cookie, a request that changes
+// something (any method but GET and HEAD) must come from a page of this origin; the hook of the
+// jobs service, which carries its own token and no cookie, is the one exception.
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -78,7 +83,7 @@ async function bodyOf(request: Request): Promise<{ body: unknown } | Response> {
 
 /**
  * POST /api/runs, the guardrails in order, cheapest first and before any model call: signed in;
- * the admin or beta role until launch; the rate limit of the user; the question and its length;
+ * the Admin or Contrib role until launch; the rate limit of the user; the question and its length;
  * room under the daily cap for the worst case of a run. Then the quote: classify, price, create.
  */
 async function ask(request: Request, env: Env, identity: Identity): Promise<Response> {
@@ -131,20 +136,30 @@ async function payHook(request: Request, env: Env): Promise<Response> {
 
 export async function handle(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
+  if (url.pathname.startsWith("/auth/")) return handleAuth(request, env);
   if (!url.pathname.startsWith("/api/")) return error(404, "Not found.");
   const method = request.method;
 
-  // Called by the jobs service, with the token of the run instead of an Auth0 token.
+  // Called by the jobs service, with the token of the run instead of a session.
   if (url.pathname === "/api/pay/hook") {
     if (method !== "POST") return error(405, "Method not allowed.");
     return payHook(request, env);
   }
 
-  let identity: Identity;
-  try {
-    identity = await deps.identify(request, env);
-  } catch {
-    return error(401, "The access token is not valid.");
+  if (method !== "GET" && method !== "HEAD" && !fromThisOrigin(request))
+    return error(403, "This request does not come from this site.");
+
+  const identity = await deps.identify(request, env);
+
+  if (url.pathname === "/api/me") {
+    if (method !== "GET") return error(405, "Method not allowed.");
+    if (identity.kind !== "user") return json(200, null);
+    return json(200, {
+      id: identity.userId,
+      name: identity.name,
+      admin: isAdmin(identity),
+      mayAsk: mayAsk(identity, env),
+    });
   }
 
   if (url.pathname === "/api/runs") {

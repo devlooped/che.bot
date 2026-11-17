@@ -1,39 +1,42 @@
 // The browser side of the local mode, loaded only by a build in `--mode fakes` (see
-// src/app/auth/load.ts): a sign-in that picks a test user instead of going to Auth0, and a way to
-// play the payment of a QR. Never part of a production bundle (scripts/check-build.mjs).
-import { useEffect, useRef } from "react";
-import type { Auth, AuthUser } from "../app/auth/types.ts";
+// src/app/auth/load.ts): a sign-in that picks a test user instead of going to Auth0 (the local
+// Worker sets the same session cookie as the real sign-in), and a way to play the payment of a QR.
+// Never part of a production bundle (scripts/check-build.mjs).
+import { useEffect, useRef, useState } from "react";
+import type { LocalMode } from "../app/auth/types.ts";
 import { t } from "../app/i18n/index.ts";
 import { LOCAL_MODE_MARKER } from "./marker.ts";
-import { localToken } from "./token.ts";
 
-const KEY = `${LOCAL_MODE_MARKER}:user`;
+/** A test user of the local mode: who signs in, with the roles of the tenant. */
+export interface LocalUser {
+  id: string;
+  name: string;
+  roles: string[];
+}
 
-/** The test users of the local mode. */
-export const LOCAL_USERS: (AuthUser & { label: keyof typeof t.local.users })[] = [
-  { id: "local|ana", name: "Ana", roles: ["beta"], label: "beta" },
-  { id: "local|admin", name: "Admin", roles: ["admin"], label: "admin" },
+/** The test users of the picker. */
+export const LOCAL_USERS: (LocalUser & { label: keyof typeof t.local.users })[] = [
+  { id: "local|ana", name: "Ana", roles: ["Contrib"], label: "contrib" },
+  { id: "local|admin", name: "Admin", roles: ["Admin"], label: "admin" },
   { id: "local|juan", name: "Juan", roles: [], label: "outsider" },
 ];
 
-function stored(): AuthUser | null {
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as AuthUser) : null;
-  } catch {
-    return null;
-  }
+/**
+ * Signs `user` in: the local Worker answers with a session cookie. The marker it sends keeps
+ * LOCAL_MODE_MARKER in this module, so that the build check finds it if it ever leaks.
+ */
+export async function signInLocally(user: LocalUser): Promise<void> {
+  const response = await fetch("/api/local/sign-in", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-local-mode": LOCAL_MODE_MARKER },
+    body: JSON.stringify(user),
+  });
+  if (!response.ok) throw new Error(`The local sign-in answered ${response.status}.`);
 }
 
-function Picker({
-  onClose,
-  onSignedIn,
-}: {
-  returnTo: string;
-  onClose: () => void;
-  onSignedIn: (user: AuthUser) => void;
-}) {
+function Picker({ onClose, onSignedIn }: { onClose: () => void; onSignedIn: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     ref.current?.showModal();
   }, []);
@@ -50,6 +53,11 @@ function Picker({
           {t.local.title}
         </h2>
         <p className="muted">{t.local.lede}</p>
+        {failed && (
+          <p className="error" role="alert">
+            {t.errors.signInFailed}
+          </p>
+        )}
         <ul className="local-users">
           {LOCAL_USERS.map((u) => (
             <li key={u.id}>
@@ -57,9 +65,10 @@ function Picker({
                 type="button"
                 className="button button-quiet"
                 onClick={() => {
-                  const user = { id: u.id, name: u.name, roles: u.roles };
-                  localStorage.setItem(KEY, JSON.stringify(user));
-                  onSignedIn(user);
+                  setFailed(false);
+                  signInLocally({ id: u.id, name: u.name, roles: u.roles })
+                    .then(onSignedIn)
+                    .catch(() => setFailed(true));
                 }}
               >
                 {t.local.users[u.label]}
@@ -75,17 +84,8 @@ function Picker({
   );
 }
 
-export function createLocalAuth(): Auth {
+export function createLocalMode(): LocalMode {
   return {
-    init: async () => stored(),
-    signIn: async () => {},
-    signOut: async () => {
-      localStorage.removeItem(KEY);
-    },
-    token: async () => {
-      const user = stored();
-      return user ? localToken({ sub: user.id, roles: user.roles }) : null;
-    },
     Picker,
     simulatePayment: async (runId) => {
       await fetch(`/api/local/pay/${runId}`, { method: "POST" });

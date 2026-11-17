@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev --mode fakes",
-    "dev:live": "vite dev",
+    "dev:live": "vite dev --port 3000 --strictPort",
     "build": "vite build && node scripts/check-build.mjs",
     "preview": "vite build && vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p src/app/tsconfig.json && tsc --noEmit -p test/tsconfig.json && tsc --noEmit -p e2e/tsconfig.json",
@@ -13,7 +13,6 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@auth0/auth0-spa-js": "^2.30.0",
     "@chebot/charts": "workspace:*",
     "@chebot/driver": "workspace:*",
     "@chebot/protocol": "workspace:*",

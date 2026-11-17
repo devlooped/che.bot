@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 
 // The tests run inside the Workers runtime, with the bindings of wrangler.jsonc, local D1 and
 // Durable Objects, and no network: the providers, the catalog, the classifier, the jobs service and
-// the keys of the tenant are replaced in each test (see src/worker/deps.ts).
+// the Auth0 tenant are replaced in each test (see src/worker/deps.ts).
 export default defineConfig({
   plugins: [
     cloudflareTest(async () => ({
@@ -16,7 +16,9 @@ export default defineConfig({
           JOBS_URL: "https://jobs.invalid",
           JOBS_TOKEN: "",
           AUTH0_DOMAIN: "chebot-test.auth0.invalid",
-          AUTH0_AUDIENCE: "https://api.chebot.test",
+          AUTH0_CLIENT_ID: "chebot-test-client",
+          AUTH0_CLIENT_SECRET: "chebot-test-client-secret",
+          SESSION_SECRET: "chebot-test-session-secret-of-at-least-32-chars",
           DAILY_CAP_USD: "20",
           LAUNCHED: "false",
         },

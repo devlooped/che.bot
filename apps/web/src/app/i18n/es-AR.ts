@@ -776,7 +776,7 @@ export const esAR = {
     title: "Elegí con quién entrar",
     lede: "Modo local: no hay cuentas reales. Elegí un usuario de prueba.",
     users: {
-      beta: "Ana, de la prueba privada",
+      contrib: "Ana, de la prueba privada",
       admin: "Admin",
       outsider: "Juan, sin acceso todavía",
     },

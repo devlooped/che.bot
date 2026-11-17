@@ -65,7 +65,7 @@ evaluation later is appended after them.
 
 ```sh
 pnpm --filter @chebot/web dev       # the local mode: every outside service is a fake, see below
-pnpm --filter @chebot/web dev:live  # real services: apps/web/.dev.vars and .env (see the .example files)
+pnpm --filter @chebot/web dev:live  # real services, on http://localhost:3000: apps/web/.dev.vars, see below
 pnpm --filter @chebot/web test      # the Worker in the Workers runtime, then the app's own tests in Node
 pnpm --filter @chebot/web test:e2e  # Playwright against the local mode (needs a browser, see below)
 pnpm --filter @chebot/web build     # the production build, then a check that no fake reached it
@@ -78,7 +78,8 @@ suggestions and votes, a change of position, an accepted change and one without 
 that does not answer, the editor), a classifier (up to 80 characters is simple), a jobs service
 whose QR appears at once (`POST /api/local/pay/:id`, or the "Simular el pago" button, plays the
 payment and calls the hook), a Gateway catalog with a few more families for the admin page, and a
-sign-in that picks a test user (beta, admin, or no access). The production entry never imports
+sign-in that picks a test user (`Contrib`, `Admin`, or no role) and sets the same session cookie as
+the real sign-in (`POST /api/local/sign-in`; "Salir" only clears it). The production entry never imports
 `src/local`, and `pnpm build` fails if anything of it is in the output (`scripts/check-build.mjs`).
 
 A run asked for a chart ("Quiero un gráfico" on the ask page) plays the scripted chart run of
@@ -115,20 +116,25 @@ The end-to-end tests start the local mode themselves. They need Playwright's Chr
 `e2e/a11y.spec.ts` checks the main pages and states with axe (WCAG 2.1 A and AA, and its best
 practices).
 
-The browser app signs in with the Auth0 SPA SDK, configured by public build variables:
-`VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID` and `VITE_AUTH0_AUDIENCE` (see `apps/web/.env.example`).
+`dev:live` runs the real Worker against the real services on http://localhost:3000, whose
+`/auth/callback` the Auth0 application allows. Its `apps/web/.dev.vars` (see `.dev.vars.example`)
+needs `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET` and `SESSION_SECRET` to sign in,
+`AI_GATEWAY_API_KEY` to ask, and `JOBS_URL` and `JOBS_TOKEN` to pay (the jobs service calls the
+hook back on the origin of the page, which it cannot reach on localhost).
 
-| Route                                                                        | Who may call it                                                    |
-| ---------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `POST /api/runs {question, chart?}` → `201 {runId, class, amount, currency}` | signed in; the `admin` or `beta` role until `LAUNCHED` is `"true"` |
-| `POST /api/runs/:id/pay` → `202`                                             | the owner; an `admin` owner runs free, with no payment job         |
-| `POST /api/runs/:id/rerun` → `202`                                           | the owner, once, after a paid run failed                           |
-| `DELETE /api/runs/:id`                                                       | the owner or an admin                                              |
-| `GET /api/runs/:id`, `/events?after=`, `/ws?after=`, `/snapshots/:v`         | anyone with the link (`mine` in the summary: the caller owns it)   |
-| `GET /api/runs/:id/charts/:v.svg`                                            | anyone with the link: the render of version `v` of a chart run     |
-| `GET /api/me/runs`                                                           | signed in                                                          |
-| `GET`, `PUT /api/admin/models`, `/api/admin/prices`                          | `admin`                                                            |
-| `POST /api/pay/hook`                                                         | the jobs service, with the run's own token as Bearer               |
+| Route                                                                        | Who may call it                                                       |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `GET /auth/login?returnTo=/path`, `/auth/callback`, `/auth/logout`           | anyone: the sign-in, see below                                        |
+| `GET /api/me` → `{id, name, admin, mayAsk}` or `null`                        | anyone: the signed-in user                                            |
+| `POST /api/runs {question, chart?}` → `201 {runId, class, amount, currency}` | signed in; the `Admin` or `Contrib` role until `LAUNCHED` is `"true"` |
+| `POST /api/runs/:id/pay` → `202`                                             | the owner; an `Admin` owner runs free, with no payment job            |
+| `POST /api/runs/:id/rerun` → `202`                                           | the owner, once, after a paid run failed                              |
+| `DELETE /api/runs/:id`                                                       | the owner or an admin                                                 |
+| `GET /api/runs/:id`, `/events?after=`, `/ws?after=`, `/snapshots/:v`         | anyone with the link (`mine` in the summary: the caller owns it)      |
+| `GET /api/runs/:id/charts/:v.svg`                                            | anyone with the link: the render of version `v` of a chart run        |
+| `GET /api/me/runs`                                                           | signed in                                                             |
+| `GET`, `PUT /api/admin/models`, `/api/admin/prices`                          | `Admin`                                                               |
+| `POST /api/pay/hook`                                                         | the jobs service, with the run's own token as Bearer                  |
 
 A chart run is asked with `chart` in the body: `{ "chart": {} }` for data from the web, or
 `{ "chart": { "csv": "<the text of the file>" } }` for an upload, parsed when it is asked (at most
@@ -159,17 +165,38 @@ chart of an upload says that every number comes from the table, and the calculat
 agreed on in plain words. The layers the models voted on (the kind of chart, the title, the
 explanation, the calculation) open their discussions like the paragraphs of a text.
 
-Sign-in is an Auth0 access token (`Authorization: Bearer`), verified with the tenant's JWKS
-(RS256, issuer `https://AUTH0_DOMAIN/`, audience `AUTH0_AUDIENCE`); the roles are read from any
-claim named `roles`, or ending in `/roles` (such as `https://che.bot/roles`).
+Sign-in happens in the Worker (`src/worker/auth0.ts`), with the authorization code flow of the
+regular web application of the existing app's Auth0 tenant. `/auth/login` redirects to the
+tenant's `/authorize` (scope `openid profile email`, state, nonce and PKCE S256, kept 10 minutes in
+the signed, httpOnly `__Host-chebot_login` cookie; `returnTo` is kept only when it is a path of
+this origin). `/auth/callback` checks the state, exchanges the code with the client secret and the
+code verifier, and verifies the ID token (RS256 against the tenant's JWKS, issuer
+`https://AUTH0_DOMAIN/`, audience `AUTH0_CLIENT_ID`, nonce, expiry); the roles are every claim named
+`roles` or `role`, or ending in `/roles` (such as `https://che.bot/roles`), of the ID token and of
+the access token when it is a JWT of the tenant. A failed sign-in comes back to `/?signin=failed`.
+`/auth/logout` clears the session and goes to the tenant's `/v2/logout`, which comes back to the
+origin. The Auth0 application must allow `<origin>/auth/callback` as a callback URL and `<origin>`
+as a logout URL, for every origin that serves the app.
+
+The session (`src/worker/session.ts`) is a token signed with `SESSION_SECRET` (HS256) in the
+`__Host-chebot_session` cookie: httpOnly, Secure, SameSite=Lax, Path=/, for 3 days from the
+sign-in, with no server-side store (on http://localhost the cookies lose the prefix and the Secure
+flag). It carries the user's id, name and roles as they were at the sign-in. A cookie that is
+tampered, expired or signed with another secret is no user. Roles are matched exactly: `Admin` is
+the admin, and until `LAUNCHED` only `Admin` and `Contrib` may ask (`admin` is neither). Because
+the identity is a cookie, every request under `/api` that is not a GET or HEAD must come from a
+page of the same origin (its `Origin`, or `Sec-Fetch-Site: same-origin`) or is refused with 403;
+`/api/pay/hook`, which carries the run's own token, is the exception.
 
 Configuration of a deployment:
 
-- Secrets: `AI_GATEWAY_API_KEY`, `JOBS_URL`, `JOBS_TOKEN`, `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`.
+- Secrets: `AI_GATEWAY_API_KEY`, `JOBS_URL`, `JOBS_TOKEN`, `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`,
+  `AUTH0_CLIENT_SECRET`, `SESSION_SECRET` (at least 32 random characters; changing it signs
+  everyone out).
 - Variables (`wrangler.jsonc`): `DAILY_CAP_USD` (the spend of a UTC day over every run),
   `LAUNCHED`, `RUN_BUDGET_USD` (empty: the protocol's default).
-- Bindings: the D1 database `chebot-web` (its id in `wrangler.jsonc`, migrations with
-  `wrangler d1 migrations apply chebot-web --remote`), the `RunObject` and `SpendMeter` classes, and
+- Account and bindings (`wrangler.jsonc`): the Cloudflare account `c1d5bf025f41490ee30de77958f9fa35`;
+  the D1 database `chebot` (binding `DB`, migrations with `wrangler d1 migrations apply chebot --remote`), the `RunObject` and `SpendMeter` classes, and
   the `ASK_LIMITER` rate limit (5 questions per user and minute).
 - The payment hook is the origin of the `pay` request plus `/api/pay/hook`: the hostname the user
   reached, which must be https for the jobs service.

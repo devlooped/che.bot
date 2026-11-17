@@ -4,7 +4,7 @@ import { Link, usePath } from "../router/index.tsx";
 import { navItems } from "../routes.tsx";
 
 export function Header() {
-  const { ready, user, auth, signIn, signOut } = useSession();
+  const { ready, user, local, signIn, signOut } = useSession();
   const path = usePath();
   const items = navItems.filter((item) => !item.show || item.show(user));
   return (
@@ -12,7 +12,7 @@ export function Header() {
       <Link to="/" className="wordmark" aria-label={t.nav.home}>
         {t.appName}
       </Link>
-      {auth?.Picker && <span className="local-tag">{t.local.badge}</span>}
+      {local && <span className="local-tag">{t.local.badge}</span>}
       <nav className="site-nav" aria-label={t.nav.menu}>
         <ul>
           {items.map((item) => (

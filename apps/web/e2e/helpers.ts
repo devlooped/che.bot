@@ -1,9 +1,8 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import { esAR as t } from "../src/app/i18n/es-AR.ts";
 import { CHART_QUESTION, SAMPLE_CSV, UPLOAD_QUESTION } from "../src/local/chart-scenario.ts";
-import { LOCAL_MODE_MARKER } from "../src/local/marker.ts";
 import { MARKERS, SCENARIO_QUESTION } from "../src/local/scenario.ts";
-import { localToken } from "../src/local/token.ts";
+import { BASE_URL } from "./base-url.ts";
 
 export { CHART_QUESTION, MARKERS, SAMPLE_CSV, SCENARIO_QUESTION, t, UPLOAD_QUESTION };
 
@@ -18,23 +17,26 @@ export interface TestUser {
 }
 
 /** A user of its own for each test (the local rate limit counts questions per user). */
-export function newUser(roles: string[] = ["beta"]): TestUser {
+export function newUser(roles: string[] = ["Contrib"]): TestUser {
   return { id: `local|e2e-${crypto.randomUUID()}`, name: "Prueba", roles };
 }
 
-/** Signs `user` in the way the local sign-in does, before the first page loads. */
-export async function signIn(page: Page, user: TestUser) {
-  await page.addInitScript(
-    ([key, value]) => {
-      if (!localStorage.getItem(key)) localStorage.setItem(key, value);
-    },
-    [`${LOCAL_MODE_MARKER}:user`, JSON.stringify(user)] as const,
-  );
+/** The Origin a browser sends with a request of the app that changes something. */
+export const fromApp = { origin: BASE_URL };
+
+/**
+ * Signs `user` in through the local sign-in: the session cookie goes to the cookie jar of
+ * `request` (`page.request` shares the page's).
+ */
+export async function signInAs(request: APIRequestContext, user: TestUser) {
+  const response = await request.post("/api/local/sign-in", { headers: fromApp, data: user });
+  if (!response.ok()) throw new Error(`the local sign-in answered ${response.status()}`);
 }
 
-export const authHeader = (user: TestUser) => ({
-  authorization: `Bearer ${localToken({ sub: user.id, roles: user.roles })}`,
-});
+/** Signs `user` in on `page`, before its first page loads. */
+export async function signIn(page: Page, user: TestUser) {
+  await signInAs(page.request, user);
+}
 
 /** Asks through the page and lands on the run page; returns the run id. */
 export async function ask(page: Page, question = SCENARIO_QUESTION): Promise<string> {
@@ -45,19 +47,30 @@ export async function ask(page: Page, question = SCENARIO_QUESTION): Promise<str
   return page.url().split("/r/")[1] ?? "";
 }
 
-/** An admin run through the API, to its end: no payment. `chart`: a chart run (see POST /api/runs). */
+/** The admin of each cookie jar that `finishedRun` signs in: one, whatever runs at once on it. */
+const admins = new WeakMap<APIRequestContext, Promise<void>>();
+
+/**
+ * An admin run through the API, to its end: no payment. `chart`: a chart run (see POST /api/runs).
+ * `request` is signed in as an admin of its own.
+ */
 export async function finishedRun(
   request: APIRequestContext,
   question = SCENARIO_QUESTION,
   chart: { csv?: string } | null = null,
 ): Promise<string> {
-  const admin = newUser(["admin"]);
+  let admin = admins.get(request);
+  if (!admin) {
+    admin = signInAs(request, newUser(["Admin"]));
+    admins.set(request, admin);
+  }
+  await admin;
   const quote = await request.post("/api/runs", {
-    headers: authHeader(admin),
+    headers: fromApp,
     data: chart ? { question, chart } : { question },
   });
   const { runId } = (await quote.json()) as { runId: string };
-  await request.post(`/api/runs/${runId}/pay`, { headers: authHeader(admin) });
+  await request.post(`/api/runs/${runId}/pay`, { headers: fromApp });
   for (let i = 0; i < 120; i++) {
     const summary = (await (await request.get(`/api/runs/${runId}`)).json()) as {
       status: string;

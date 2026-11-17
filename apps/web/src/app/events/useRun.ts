@@ -12,8 +12,8 @@ export interface RunState {
   refresh: () => void;
 }
 
-/** Events are public: read without a token, so the stream does not wait for sign-in. */
-const publicApi = createApi(async () => null);
+/** Events are public: the stream does not wait for the sign-in state. */
+const publicApi = createApi();
 
 const initial: StreamState = { view: emptyView(), seq: 0, connection: "connecting", fresh: [] };
 

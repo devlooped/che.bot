@@ -1,17 +1,24 @@
 // The Worker of the local mode (`pnpm dev`, wrangler.local.jsonc): the production Worker with the
 // outside world replaced. A scripted panel (scenario.ts) plays a full run in Spanish through the
 // real protocol and the real RunObject; the classifier, the Gateway catalog, the jobs service and
-// Auth0 are fakes. The production entry (src/worker/index.ts, wrangler.jsonc) never imports this
-// folder, so no variable of a deployed Worker can switch it on; scripts/check-build.mjs checks the
-// production build for LOCAL_MODE_MARKER.
+// Auth0 are fakes. The fake sign-in sets the same session cookie as the real one
+// (POST /api/local/sign-in), so the rest of the Worker reads it as in production. The production
+// entry (src/worker/index.ts, wrangler.jsonc) never imports this folder, so no variable of a
+// deployed Worker can switch it on; scripts/check-build.mjs checks the production build for
+// LOCAL_MODE_MARKER.
 import { FakeProvider } from "@chebot/providers";
 import { handle } from "../worker/api.ts";
 import { overrideDeps } from "../worker/deps.ts";
 import type { Env } from "../worker/env.ts";
 import { PAYMENT_WINDOW_MS, RunObject as ProductionRunObject } from "../worker/run-object.ts";
+import {
+  clearLoginCookie,
+  clearSessionCookie,
+  fromThisOrigin,
+  sessionCookie,
+} from "../worker/session.ts";
 import { LOCAL_CATALOG } from "./catalog.ts";
 import { LOCAL_RUN_CONFIG } from "./config.ts";
-import { localIdentity } from "./identity.ts";
 import { localJobs } from "./jobs.ts";
 import { LOCAL_MODE_MARKER } from "./marker.ts";
 import { scenario } from "./scenario.ts";
@@ -61,7 +68,6 @@ overrideDeps({
     },
   }),
   jobs: (env) => localJobs(env),
-  identify: localIdentity,
   runConfig: () => LOCAL_RUN_CONFIG,
   tickDelayMs: 400,
 });
@@ -96,6 +102,29 @@ function ensureSchema(db: D1Database): Promise<void> {
   return schemaReady;
 }
 
+/** POST /api/local/sign-in `{ id, name, roles }`: the session of a test user, without Auth0. */
+async function signIn(request: Request, env: Env): Promise<Response> {
+  const body = (await request.json().catch(() => null)) as {
+    id?: unknown;
+    name?: unknown;
+    roles?: unknown;
+  } | null;
+  const roles = Array.isArray(body?.roles) ? body.roles : [];
+  if (
+    typeof body?.id !== "string" ||
+    !body.id ||
+    typeof body.name !== "string" ||
+    !roles.every((r): r is string => typeof r === "string")
+  )
+    return new Response("The body is { id, name, roles }.", { status: 400 });
+  const url = new URL(request.url);
+  const user = { userId: body.id, name: body.name || body.id, roles };
+  return new Response(null, {
+    status: 204,
+    headers: { "set-cookie": await sessionCookie(url, env, user) },
+  });
+}
+
 const PAY_PATH = /^\/api\/local\/pay\/([0-9a-f-]{36})$/i;
 const EXPIRE_PATH = /^\/api\/local\/expire\/([0-9a-f-]{36})$/i;
 
@@ -104,6 +133,19 @@ export default {
     await ensureSchema(env.DB);
     const url = new URL(request.url);
     if (url.pathname === "/api/local") return Response.json({ mode: LOCAL_MODE_MARKER });
+    // There is no tenant: signing out only clears the session.
+    if (url.pathname === "/auth/logout") {
+      const headers = new Headers({ location: "/" });
+      headers.append("set-cookie", clearSessionCookie(url));
+      headers.append("set-cookie", clearLoginCookie(url));
+      return new Response(null, { status: 302, headers });
+    }
+    if (url.pathname.startsWith("/auth/"))
+      return new Response("The local mode signs in with POST /api/local/sign-in.", { status: 404 });
+    if (url.pathname.startsWith("/api/local/") && !fromThisOrigin(request))
+      return new Response("This request does not come from this site.", { status: 403 });
+    if (url.pathname === "/api/local/sign-in" && request.method === "POST")
+      return signIn(request, env);
     // Plays the user paying the QR of a run: the fake jobs service calls the run's hook.
     const pay = PAY_PATH.exec(url.pathname);
     if (pay?.[1] && request.method === "POST")

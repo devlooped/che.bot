@@ -1,12 +1,18 @@
-# Copy to .dev.vars for `pnpm dev:live` (never commit .dev.vars). In production these are secrets:
+# Copy to .dev.vars for `pnpm dev:live` (never commit .dev.vars): the real Worker, on
+# http://localhost:3000, against the real services. In production these are secrets:
 # `wrangler secret put <NAME>`.
 AI_GATEWAY_API_KEY=
 # The CheBot jobs service and its token (the payment by QR).
 JOBS_URL=https://jobs.chebot.si
 JOBS_TOKEN=
-# The Auth0 tenant (tenant.us.auth0.com) and the identifier of the API the SPA requests tokens for.
+# The Auth0 tenant (tenant.us.auth0.com) and its regular web application, whose allowed callback
+# URLs include <origin>/auth/callback and whose allowed logout URLs include <origin>.
 AUTH0_DOMAIN=
-AUTH0_AUDIENCE=
+AUTH0_CLIENT_ID=
+AUTH0_CLIENT_SECRET=
+# Signs the session cookies: at least 32 random characters, such as `openssl rand -base64 48`.
+# Changing it signs everyone out.
+SESSION_SECRET=
 # Variables of wrangler.jsonc that may be overridden locally:
 # DAILY_CAP_USD=25
 # LAUNCHED=false

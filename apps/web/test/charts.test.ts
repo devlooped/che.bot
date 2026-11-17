@@ -7,7 +7,7 @@ import { FakeProvider, resolveModels } from "@chebot/providers";
 import { describe, expect, test } from "vitest";
 import { lazyRenderer } from "../src/worker/deps.ts";
 import { runStub } from "../src/worker/run-object.ts";
-import { api, beta, eventsOf, fakes, HOOK_URL, runAlarms } from "./helpers.ts";
+import { api, contrib, eventsOf, fakes, HOOK_URL, runAlarms } from "./helpers.ts";
 
 // Charts in the Workers runtime: the render gate (Vega in interpreter mode, step 36) and a chart
 // run driven by the alarms of RunObject (steps 37 to 40).
@@ -126,14 +126,14 @@ describe("a chart run through the alarms of RunObject", () => {
     fakes({ respond: respondUserChart });
     const bad = await api("/api/runs", {
       method: "POST",
-      headers: { ...beta("csv-user"), "content-type": "application/json" },
+      headers: { ...contrib("csv-user"), "content-type": "application/json" },
       body: JSON.stringify({ question: "¿Cuánto vendió cada región?", chart: { csv: "a,b\n1" } }),
     });
     expect(bad.status).toBe(400);
     expect(await bad.json()).toMatchObject({ reason: "csv_ragged" });
     const asked = await api("/api/runs", {
       method: "POST",
-      headers: { ...beta("csv-user"), "content-type": "application/json" },
+      headers: { ...contrib("csv-user"), "content-type": "application/json" },
       body: JSON.stringify({ question: "¿Cuánto vendió cada región?", chart: { csv: SALES_CSV } }),
     });
     expect(asked.status).toBe(201);

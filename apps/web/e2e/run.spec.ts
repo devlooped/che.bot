@@ -8,7 +8,7 @@ test("sign in, ask, see the class and the price, pay, and reach a finished answe
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: t.ask.signInToAsk }).click();
-  await page.getByRole("button", { name: t.local.users.beta }).click();
+  await page.getByRole("button", { name: t.local.users.contrib }).click();
   await expect(page.getByLabel(t.ask.label)).toBeVisible();
   await page.getByLabel(t.ask.label).fill(SCENARIO_QUESTION);
   await page.getByRole("button", { name: t.ask.submit }).click();
@@ -91,7 +91,7 @@ test("a shared link opens signed out", async ({ page, request }) => {
 });
 
 test("an admin runs without paying", async ({ page }) => {
-  await signIn(page, newUser(["admin"]));
+  await signIn(page, newUser(["Admin"]));
   await ask(page);
   await expect(page.getByText(t.quote.adminNote)).toBeVisible();
   await page.getByRole("button", { name: t.quote.adminRun }).click();

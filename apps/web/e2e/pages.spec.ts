@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { authHeader, newUser, signIn, t, uniqueQuestion } from "./helpers.ts";
+import { fromApp, newUser, signIn, signInAs, t, uniqueQuestion } from "./helpers.ts";
 
 test("Mis preguntas lists a question; its link opens; deleting asks first, and the link then says it does not exist", async ({
   page,
@@ -7,7 +7,8 @@ test("Mis preguntas lists a question; its link opens; deleting asks first, and t
 }) => {
   const user = newUser();
   const question = uniqueQuestion();
-  const quote = await request.post("/api/runs", { headers: authHeader(user), data: { question } });
+  await signInAs(request, user);
+  const quote = await request.post("/api/runs", { headers: fromApp, data: { question } });
   expect(quote.status()).toBe(201);
 
   await signIn(page, user);
@@ -49,10 +50,10 @@ test("Mis preguntas asks a signed-out reader to sign in, and is not in the menu"
   await expect(page.getByRole("link", { name: t.nav.myRuns })).toHaveCount(0);
 });
 
-test("an admin changes a price and the next quote shows it", async ({ page, request }, info) => {
+test("an admin changes a price and the next quote shows it", async ({ page }, info) => {
   // The prices are shared by every test: one project changes them, the other would race it.
   test.skip(info.project.name !== "desktop", "the prices are global to the local mode");
-  const admin = newUser(["admin"]);
+  const admin = newUser(["Admin"]);
   await signIn(page, admin);
   await page.goto("/");
   await page.getByRole("link", { name: t.nav.admin }).click();
@@ -77,8 +78,8 @@ test("an admin changes a price and the next quote shows it", async ({ page, requ
     await page.getByRole("button", { name: t.ask.submit }).click();
     await expect(page.getByTestId("price")).toHaveText(t.money(7_500, "ARS"));
   } finally {
-    await request.put("/api/admin/prices", {
-      headers: authHeader(admin),
+    await page.request.put("/api/admin/prices", {
+      headers: fromApp,
       data: { prices: { simple: 5_000 } },
     });
   }
@@ -88,7 +89,7 @@ test("an admin sets the model of a role and puts it back on its default", async 
   page,
 }, info) => {
   test.skip(info.project.name !== "desktop", "the settings are global to the local mode");
-  await signIn(page, newUser(["admin"]));
+  await signIn(page, newUser(["Admin"]));
   await page.goto("/admin");
   const grok = page.getByRole("group", { name: t.admin.roles["panel.grok"] ?? "" });
   await expect(grok).toContainText(t.admin.usesDefault);
@@ -105,7 +106,7 @@ test("an admin sets the model of a role and puts it back on its default", async 
   await expect(grok.getByLabel(t.admin.family)).toHaveValue("");
 });
 
-test("someone who is not an admin does not see the admin page", async ({ page, request }) => {
+test("someone who is not an admin does not see the admin page", async ({ page }) => {
   const user = newUser();
   await signIn(page, user);
   await page.goto("/");
@@ -114,6 +115,23 @@ test("someone who is not an admin does not see the admin page", async ({ page, r
   await page.goto("/admin");
   await expect(page.getByText(t.errors.notAdmin)).toBeVisible();
   await expect(page.getByLabel(t.admin.priceLabel.simple)).toHaveCount(0);
-  const api = await request.get("/api/admin/prices", { headers: authHeader(user) });
+  const api = await page.request.get("/api/admin/prices");
   expect(api.status()).toBe(403);
+});
+
+test("Salir ends the session: the page offers to sign in again", async ({ page }) => {
+  await signIn(page, newUser());
+  await page.goto("/mis-preguntas");
+  await expect(page.getByRole("link", { name: t.nav.myRuns })).toBeVisible();
+  await page.getByRole("button", { name: t.nav.signOut }).click();
+  await page.waitForURL((url) => url.pathname === "/");
+  await expect(page.getByRole("button", { name: t.nav.signIn })).toBeVisible();
+  await expect(page.getByRole("link", { name: t.nav.myRuns })).toHaveCount(0);
+  expect(await (await page.request.get("/api/me")).json()).toBeNull();
+});
+
+test("a sign-in that failed says so in plain words, once", async ({ page }) => {
+  await page.goto("/?signin=failed");
+  await expect(page.getByRole("alert")).toHaveText(t.errors.signInFailed);
+  await expect(page).toHaveURL((url) => url.pathname === "/" && url.search === "");
 });

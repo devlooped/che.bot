@@ -43,13 +43,13 @@ describe("paying", () => {
     const pay = (headers: Record<string, string>) =>
       api(`/api/runs/${id}/pay`, { method: "POST", headers });
     expect((await pay({})).status).toBe(401);
-    expect((await pay(as(user(), ["beta"]))).status).toBe(403);
+    expect((await pay(as(user(), ["Contrib"]))).status).toBe(403);
     expect(
       (await api(`/api/runs/${crypto.randomUUID()}/pay`, { method: "POST", headers: as(owner) }))
         .status,
     ).toBe(404);
 
-    const first = await pay(as(owner, ["beta"]));
+    const first = await pay(as(owner, ["Contrib"]));
     expect(first.status).toBe(202);
     expect(await first.json()).toMatchObject({ id, status: "awaiting_payment" });
     expect(jobs.calls).toEqual([]); // 202 at once: the alarm talks to the jobs service
@@ -296,7 +296,7 @@ describe("an admin run", () => {
     const { id, stub } = await quoted(admin);
     const paid = await api(`/api/runs/${id}/pay`, {
       method: "POST",
-      headers: as(admin, ["admin"]),
+      headers: as(admin, ["Admin"]),
     });
     expect(paid.status).toBe(202);
     expect(await paid.json()).toMatchObject({ status: "running" });
