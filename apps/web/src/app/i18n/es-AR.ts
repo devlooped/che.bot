@@ -194,6 +194,13 @@ export const esAR = {
     votes: "no llegó a votar",
   },
 
+  /** The marks of who did what: a word or an emoji, then the marks (components/ModelMark.tsx). */
+  tally: {
+    by: "Por",
+    confirmed: "Confirmaron su fuente:",
+    votes: { for: "A favor:", against: "Prefieren dejarlo como está:", silent: "No votaron:" },
+  },
+
   seats: {
     title: "Los cuatro",
     seat: (name: string, status: string) => `${name}: ${status}`,
@@ -303,17 +310,11 @@ export const esAR = {
       delete: "borrar este párrafo.",
       patch: "cambiar este gráfico.",
     },
-    holders: (who: string, n: number) => `${plural(n, "Lo apoya", "Lo apoyan")} ${who}.`,
-    against: (who: string, n: number) =>
-      `${plural(n, "Prefiere", "Prefieren")} dejarlo como está ${who}.`,
-    silent: (who: string) => `${who} no votó.`,
     open: "Todavía se está votando.",
   },
 
   discussion: {
     title: "Cómo se discutió este párrafo",
-    supportedBy: (who: string, n: number) => `${plural(n, "Lo sostiene", "Lo sostienen")} ${who}.`,
-    notSupportedBy: (who: string, n: number) => `${plural(n, "No lo dice", "No lo dicen")} ${who}.`,
     before: "Antes decía:",
     noThreads: "Nadie propuso cambios a este párrafo.",
     proposal: (author: string, action: string) => `${author} propuso ${action}`,
@@ -348,7 +349,7 @@ export const esAR = {
   },
 
   panel: {
-    title: "Quién participó",
+    title: "El panel",
     utility: "Asistente",
     utilityRole: "Juntó las respuestas y escribió los resúmenes.",
     effort: (effort: string) => `esfuerzo ${effortName(effort)}`,
@@ -451,7 +452,6 @@ export const esAR = {
     valueColumn: "Valor",
     sourceColumn: "De dónde sale",
     range: (low: string, high: string) => `de ${low} a ${high}`,
-    givenBy: (who: string, n: number) => `Lo ${plural(n, "dio", "dieron")} ${who}.`,
     note: (n: number) => `Nota ${n}`,
     kinds: {
       agreed: "Coinciden",
@@ -474,8 +474,7 @@ export const esAR = {
       loneChecking: (who: string) =>
         `Este dato lo trajo solo ${who}; los demás están revisando su fuente.`,
       checking: "Los cuatro dieron cifras distintas y las están revisando con las fuentes.",
-      said: (who: string, n: number, value: string) =>
-        `${who} ${plural(n, "dijo", "dijeron")} ${value}, según`,
+      said: (value: string) => `${value}, según`,
       verdict: {
         held: "Su fuente lo confirma.",
         failed: "Los demás no encontraron ese número en esa fuente.",

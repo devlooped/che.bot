@@ -128,9 +128,69 @@ a {
   stroke-width: 1px;
 }
 
-.model-mark-hollow path {
-  fill: none;
-  stroke-width: 1.3px;
+/* A mark in a line of text: as large as an emoji, with its model's name on hover, focus or tap. */
+.tally {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.1rem 0.6rem;
+}
+
+.tally-part {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  white-space: nowrap;
+}
+
+/* A bar between the groups, "👍 ● | 👎 ★ | ❔ ◆"; a screen reader skips it. */
+.tally-part + .tally-part::before {
+  content: "|" / "";
+  margin-right: 0.4rem;
+  color: var(--rule-strong);
+}
+
+.named-mark {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  line-height: 1;
+  cursor: help;
+}
+
+/* The shapes fill three quarters of their box: 1.4em draws them as large as an emoji. */
+.named-mark .model-mark {
+  width: 1.4em;
+  height: 1.4em;
+}
+
+.named-mark::after {
+  content: attr(data-name);
+  position: absolute;
+  bottom: calc(100% + 0.3rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: var(--ink);
+  color: var(--paper-raised);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+
+.named-mark:hover::after,
+.named-mark:focus-visible::after,
+.named-mark-open::after {
+  opacity: 1;
 }
 
 .muted {
@@ -1189,12 +1249,6 @@ a.button {
   color: var(--ink-soft);
 }
 
-.row-who {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
 /* How a row ended: the words say it; the stroke of the chip only repeats them. */
 .kind-chip {
   font-weight: 650;
@@ -1682,15 +1736,7 @@ a.button {
 }
 
 .sheet-support {
-  display: flex;
-  gap: 0.6rem;
-  align-items: flex-start;
   font-size: 0.92rem;
-}
-
-.sheet-support .support {
-  margin-top: 0.3rem;
-  grid-template-columns: repeat(4, auto);
 }
 
 @media (min-width: 900px) {

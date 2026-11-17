@@ -44,6 +44,8 @@ export interface ValueView {
   source: Source | null;
   quote: string;
   support: ModelId[];
+  /** Who checked its source and said it holds. */
+  confirmedBy: ModelId[];
   verdict: "held" | "failed" | "partial" | "unchecked" | "checking";
   holds: number;
   checkers: number;
@@ -61,6 +63,8 @@ export interface RowView {
   source: Source | null;
   quote: string;
   support: ModelId[];
+  /** Who checked the source of the value drawn and said it holds. */
+  confirmedBy: ModelId[];
   /** The number of its note on the drawing and under it; null for a row without one. */
   note: number | null;
   /** The first sentence of the note. */
@@ -182,6 +186,7 @@ function valuesOf(row: ChartAnswerRow): ValueView[] {
       source: v.source,
       quote: v.quote,
       support: [...v.support],
+      confirmedBy: [...v.confirmedBy],
       verdict: verdictOf(d, v),
       holds: v.holds,
       checkers: v.checkers,
@@ -196,6 +201,7 @@ function valuesOf(row: ChartAnswerRow): ValueView[] {
     source: v.source,
     quote: v.quote,
     support: [...v.support],
+    confirmedBy: [],
     verdict: "unchecked" as const,
     holds: 0,
     checkers: 0,
@@ -261,6 +267,9 @@ function rowsOf(answer: ChartAnswer, first: Chart | null): RowView[] {
       source: row.source,
       quote: row.quote,
       support: [...row.support],
+      confirmedBy: [
+        ...(row.dispute?.values.find((v) => v.id === row.dispute?.winner)?.confirmedBy ?? []),
+      ],
       note: noteText === null ? null : ++notes,
       noteText,
       values,

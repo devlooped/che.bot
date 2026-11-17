@@ -1,8 +1,10 @@
 import { MODELS_BY_NAME, type ModelId } from "@chebot/protocol";
+import { useState } from "react";
+import { t } from "../i18n/index.ts";
 
 // Each model has a color and a shape, used together everywhere (the shape keeps them apart without
 // color): Grok a square, Claude a star, ChatGPT a circle, Gemini a diamond. The stylesheet
-// paints a filled mark in the model's fill, outlined in its ink, and a hollow one in its ink.
+// paints a mark in the model's fill, outlined in its ink: a mark is always filled.
 
 const SHAPES: Record<ModelId, string> = {
   grok: "M2.5 2.5h7v7h-7z",
@@ -14,18 +16,16 @@ const SHAPES: Record<ModelId, string> = {
 
 export function ModelMark({
   model,
-  filled = true,
   size = 12,
   className,
 }: {
   model: ModelId;
-  filled?: boolean;
   size?: number;
   className?: string;
 }) {
   return (
     <svg
-      className={`model-mark ink-${model}${filled ? "" : " model-mark-hollow"}${className ? ` ${className}` : ""}`}
+      className={`model-mark ink-${model}${className ? ` ${className}` : ""}`}
       width={size}
       height={size}
       viewBox="0 0 12 12"
@@ -37,13 +37,91 @@ export function ModelMark({
   );
 }
 
-/** The four shapes of a paragraph's support: filled for who holds it, hollow for who does not. */
+/** The marks of who holds a paragraph, in the margin; the badge beside them says how many of four. */
 export function Support({ support }: { support: readonly ModelId[] }) {
   return (
     <span className="support" aria-hidden="true">
-      {MODELS_BY_NAME.map((m) => (
-        <ModelMark key={m} model={m} filled={support.includes(m)} size={9} />
+      {MODELS_BY_NAME.filter((m) => support.includes(m)).map((m) => (
+        <ModelMark key={m} model={m} size={9} />
       ))}
     </span>
+  );
+}
+
+/**
+ * A mark in a line of text, as large as an emoji: hovering, focusing or tapping it shows the name
+ * of its model, so the shapes read on a phone too.
+ */
+export function NamedMark({ model }: { model: ModelId }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <button
+      type="button"
+      className={`named-mark${open ? " named-mark-open" : ""}`}
+      aria-label={t.models[model]}
+      data-name={t.models[model]}
+      onClick={() => setOpen((o) => !o)}
+      onBlur={() => setOpen(false)}
+    >
+      <ModelMark model={model} />
+    </button>
+  );
+}
+
+/** A group of a tally: a lead (a word or an emoji) and the marks of its models. */
+export interface TallyPart {
+  /** What tells the group apart: data-part, for the stylesheet and the tests. */
+  kind: string;
+  /** What the eye reads before the marks: "Por", "👍". */
+  lead: string;
+  /** What a screen reader reads in place of the lead, when the lead is an emoji. */
+  label?: string;
+  models: readonly ModelId[];
+}
+
+/** Who did what, as marks: "Por ■★ 👍●◆", "👍 ★ 👎 ■ ❔ ◆". An empty group is left out. */
+export function Tally({ parts }: { parts: readonly TallyPart[] }) {
+  return (
+    <span className="tally">
+      {parts
+        .filter((p) => p.models.length > 0)
+        .map((p) => (
+          <span key={p.kind} className="tally-part" data-part={p.kind}>
+            {p.label ? (
+              <>
+                <span aria-hidden="true">{p.lead}</span>
+                <span className="sr-only">{p.label}</span>
+              </>
+            ) : (
+              p.lead
+            )}
+            {MODELS_BY_NAME.filter((m) => p.models.includes(m)).map((m) => (
+              <NamedMark key={m} model={m} />
+            ))}
+          </span>
+        ))}
+    </span>
+  );
+}
+
+/** The votes on a proposal: who held it, who preferred to keep the text, who did not vote. */
+export function Votes({
+  holders,
+  keep,
+  silent,
+}: {
+  holders: readonly ModelId[];
+  keep: readonly ModelId[];
+  silent: readonly ModelId[];
+}) {
+  const v = t.tally.votes;
+  return (
+    <Tally
+      parts={[
+        { kind: "for", lead: "👍", label: v.for, models: holders },
+        { kind: "against", lead: "👎", label: v.against, models: keep },
+        { kind: "silent", lead: "❔", label: v.silent, models: silent },
+      ]}
+    />
   );
 }

@@ -18,7 +18,7 @@ export function Seats({ view, line }: { view: RunView; line: string }) {
               data-status={status}
             >
               <span className="seat-avatar">
-                <ModelMark model={model} size={18} filled={status !== "abstained"} />
+                <ModelMark model={model} size={18} />
               </span>
               <span className="seat-text">
                 <span className="seat-name">{t.models[model]}</span>

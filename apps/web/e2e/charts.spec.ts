@@ -76,7 +76,11 @@ test("ask for a chart of web data, pay, and read the finished chart with its sou
   await expect(march).toContainText(t.chart.notes.corrected("3,3", "3,7"));
   await expect(march).toContainText(t.chart.notes.settledBy);
   await expect(march.getByRole("link", { name: /INDEC/ }).first()).toBeVisible();
-  await expect(march).toContainText(t.chart.notes.said("Claude y ChatGPT", 2, "3,3"));
+  const said = march.locator(".row-note-value", { hasText: t.chart.notes.said("3,3") });
+  const by = said.locator('[data-part="by"]').getByRole("button");
+  await expect(by).toHaveCount(2);
+  await expect(by.nth(0)).toHaveAccessibleName("ChatGPT");
+  await expect(by.nth(1)).toHaveAccessibleName("Claude");
 
   // the disputed point: a range with both values and both sources
   const may = notes.filter({ hasText: t.chart.note(2) });

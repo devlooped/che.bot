@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { t } from "../i18n/index.ts";
 import type { DocumentView, ParagraphView } from "../view/derive.ts";
 import { DiscussionSheet } from "./Discussion.tsx";
-import { ModelMark, Support } from "./ModelMark.tsx";
+import { ModelMark, Support, Votes } from "./ModelMark.tsx";
 import { Notes } from "./RunDetails.tsx";
 
 /** How long a new text stays highlighted (the CSS animation of .para-new is shorter). */
@@ -30,9 +30,7 @@ function Dissent({ paragraph }: { paragraph: ParagraphView }) {
               <p className="fine">{t.dissent.open}</p>
             ) : (
               <p className="fine">
-                {t.dissent.holders(t.modelNames(d.holders), d.holders.length)}{" "}
-                {d.keep.length > 0 && t.dissent.against(t.modelNames(d.keep), d.keep.length)}{" "}
-                {silent.length > 0 && t.dissent.silent(t.modelNames(silent))}
+                <Votes holders={d.holders} keep={d.keep} silent={silent} />
               </p>
             )}
           </aside>

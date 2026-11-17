@@ -1248,6 +1248,12 @@ export function holdsOf(d: Dispute, v: DisputeValue): { holds: number; checkers:
   return { holds, checkers };
 }
 
+/** The models that did not give a value and said that its source holds. */
+export function confirmersOf(d: Dispute, v: DisputeValue): ModelId[] {
+  const checks = d.checks[v.id] ?? {};
+  return MODELS.filter((m) => !v.support.includes(m) && checks[m] === "holds");
+}
+
 /**
  * "The source holds up": the quote of the value states it (code: `quoteStates`, on the model's quote
  * or the search excerpt of the source), and a strict majority of the models that did not give the

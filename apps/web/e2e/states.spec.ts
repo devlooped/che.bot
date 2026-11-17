@@ -118,7 +118,12 @@ test("a model that did not answer reads well in its seat, the notes and the disc
   await expect(gemini).toHaveAttribute("data-status", "abstained");
   await expect(gemini).toContainText(t.abstainedLater.votes);
   await expect(page.getByTestId("notes")).toContainText(t.flags.abstained.votes("Gemini", 1));
-  await expect(page.getByTestId("dissent")).toContainText(t.dissent.silent("Gemini"));
+  await expect(
+    page
+      .getByTestId("dissent")
+      .locator('[data-part="silent"]')
+      .getByRole("button", { name: "Gemini" }),
+  ).toBeVisible();
 });
 
 test("fewer than three answers: the answer says so", async ({ page, request }) => {

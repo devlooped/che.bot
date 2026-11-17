@@ -1,5 +1,5 @@
 import { chartSpec } from "./chart.ts";
-import { type ChartRender, type Dispute, holdsOf } from "./chart-run.ts";
+import { type ChartRender, confirmersOf, type Dispute, holdsOf } from "./chart-run.ts";
 import {
   type Abstention,
   type CellValue,
@@ -165,7 +165,14 @@ export interface ChartDisputeNote {
   id: string;
   state: Dispute["state"];
   winner: string | null;
-  values: (ChartAnswerValue & { id: string; stated: boolean; holds: number; checkers: number })[];
+  values: (ChartAnswerValue & {
+    id: string;
+    stated: boolean;
+    holds: number;
+    checkers: number;
+    /** The models that checked the value's source and said it holds. */
+    confirmedBy: ModelId[];
+  })[];
 }
 
 export interface ChartAnswer {
@@ -238,6 +245,7 @@ export function selectChart(input: ChartAnswerInput, version?: number): ChartAns
               support: [...v.support],
               stated: v.stated,
               ...holdsOf(d, v),
+              confirmedBy: confirmersOf(d, v),
             })),
           }
         : null,

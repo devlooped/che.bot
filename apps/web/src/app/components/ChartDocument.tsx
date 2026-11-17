@@ -1,4 +1,4 @@
-import { MODELS, type Source } from "@chebot/protocol";
+import { MODELS, type ModelId, type Source } from "@chebot/protocol";
 import { useMemo, useRef, useState } from "react";
 import type { DrawnRow } from "../chart/embed.ts";
 import { t } from "../i18n/index.ts";
@@ -12,7 +12,7 @@ import {
 } from "../view/chart.ts";
 import { ChartCanvas } from "./ChartCanvas.tsx";
 import { LayerSheet } from "./Discussion.tsx";
-import { ModelMark, Support } from "./ModelMark.tsx";
+import { ModelMark, Tally, Votes } from "./ModelMark.tsx";
 import { Notes } from "./RunDetails.tsx";
 
 function SourceLink({ source }: { source: Source }) {
@@ -20,6 +20,18 @@ function SourceLink({ source }: { source: Source }) {
     <a href={source.url} target="_blank" rel="noopener noreferrer" className="source-title">
       {source.title || source.url}
     </a>
+  );
+}
+
+/** Who gave a value, and who checked its source and said it holds: "Por ■★ 👍●◆". */
+function GivenBy({ by, confirmedBy }: { by: readonly ModelId[]; confirmedBy: readonly ModelId[] }) {
+  return (
+    <Tally
+      parts={[
+        { kind: "by", lead: t.tally.by, models: by },
+        { kind: "confirmed", lead: "👍", label: t.tally.confirmed, models: confirmedBy },
+      ]}
+    />
   );
 }
 
@@ -55,17 +67,16 @@ function RowNote({ row }: { row: RowView }) {
       <ul className="row-note-values">
         {row.values.map((v) => (
           <li key={`${v.text}:${v.source?.id ?? ""}`} className="row-note-value">
-            <Support support={v.support} />
             <span>
-              {t.chart.notes.said(t.modelNames(v.support), v.support.length, v.text)}{" "}
-              {v.source ? <SourceLink source={v.source} /> : null}
+              {t.chart.notes.said(v.text)} {v.source ? <SourceLink source={v.source} /> : null}
               {v.quote && (
                 <>
                   {": "}
                   <q className="source-quote">{v.quote}</q>
                 </>
               )}{" "}
-              <span className={`verdict verdict-${v.verdict}`}>{verdictText(v)}</span>
+              <span className={`verdict verdict-${v.verdict}`}>{verdictText(v)}</span>{" "}
+              <GivenBy by={v.support} confirmedBy={v.confirmedBy} />
             </span>
           </li>
         ))}
@@ -120,10 +131,7 @@ function RowLines({ row }: { row: RowView }) {
           {row.quote && <q className="source-quote">{row.quote}</q>}
           <span className="row-meta">
             <span className={`kind-chip kind-chip-${row.kind}`}>{t.chart.kinds[row.kind]}</span>
-            <span className="row-who">
-              <Support support={row.support} />
-              {t.chart.givenBy(t.modelNames(row.support), row.support.length)}
-            </span>
+            <GivenBy by={row.support} confirmedBy={row.confirmedBy} />
           </span>
         </td>
       </tr>
@@ -203,9 +211,7 @@ function Layers({ chart }: { chart: ChartView }) {
                   <p className="fine">{t.dissent.open}</p>
                 ) : (
                   <p className="fine">
-                    {t.dissent.holders(t.modelNames(d.holders), d.holders.length)}{" "}
-                    {d.keep.length > 0 && t.dissent.against(t.modelNames(d.keep), d.keep.length)}{" "}
-                    {silent.length > 0 && t.dissent.silent(t.modelNames(silent))}
+                    <Votes holders={d.holders} keep={d.keep} silent={silent} />
                   </p>
                 )}
               </aside>

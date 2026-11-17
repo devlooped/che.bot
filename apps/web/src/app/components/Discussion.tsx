@@ -1,9 +1,9 @@
-import { MODELS, type Suggestion } from "@chebot/protocol";
+import type { Suggestion } from "@chebot/protocol";
 import { type ReactNode, useEffect, useRef } from "react";
 import { t } from "../i18n/index.ts";
 import { type LayerView, patchText } from "../view/chart.ts";
 import type { Discussion, ParagraphView, Position } from "../view/derive.ts";
-import { ModelMark, Support } from "./ModelMark.tsx";
+import { ModelMark, Tally } from "./ModelMark.tsx";
 
 function positionText(position: Position, alternatives: Suggestion[]): string {
   if (position.choice === null) return t.discussion.noVote;
@@ -133,18 +133,12 @@ export function DiscussionSheet({
   paragraph: ParagraphView;
   onClose: () => void;
 }) {
-  const holders = paragraph.support;
-  const others = MODELS.filter((m) => !holders.includes(m));
   return (
     <Sheet title={t.discussion.title} className="discussion-sheet" onClose={onClose}>
       <blockquote className="sheet-quote">{paragraph.text}</blockquote>
       <p className="sheet-support">
-        <Support support={holders} />
-        <span>
-          <strong>{t.answer.statusName[paragraph.status]}.</strong>{" "}
-          {holders.length > 0 && t.discussion.supportedBy(t.modelNames(holders), holders.length)}{" "}
-          {others.length > 0 && t.discussion.notSupportedBy(t.modelNames(others), others.length)}
-        </span>
+        <strong>{t.answer.statusName[paragraph.status]}.</strong>{" "}
+        <Tally parts={[{ kind: "by", lead: t.tally.by, models: paragraph.support }]} />
       </p>
       {paragraph.before && (
         <div className="sheet-before">
