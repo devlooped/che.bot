@@ -1,7 +1,8 @@
 import { MODELS, type ModelId } from "@chebot/protocol";
 
-// Each model has an ink and a shape, used together everywhere (the shape keeps them apart without
-// color): Grok a square, Claude a circle, ChatGPT a triangle, Gemini a diamond.
+// Each model has a color and a shape, used together everywhere (the shape keeps them apart without
+// color): Grok a square, Claude a circle, ChatGPT a triangle, Gemini a diamond. The stylesheet
+// paints a filled mark in the model's fill, outlined in its ink, and a hollow one in its ink.
 
 const SHAPES: Record<ModelId, string> = {
   grok: "M2.5 2.5h7v7h-7z",
@@ -23,20 +24,14 @@ export function ModelMark({
 }) {
   return (
     <svg
-      className={`model-mark ink-${model}${className ? ` ${className}` : ""}`}
+      className={`model-mark ink-${model}${filled ? "" : " model-mark-hollow"}${className ? ` ${className}` : ""}`}
       width={size}
       height={size}
       viewBox="0 0 12 12"
       aria-hidden="true"
       focusable="false"
     >
-      <path
-        d={SHAPES[model]}
-        fill={filled ? "currentColor" : "none"}
-        stroke="currentColor"
-        strokeWidth={filled ? 0 : 1.3}
-        strokeLinejoin="round"
-      />
+      <path d={SHAPES[model]} strokeLinejoin="round" />
     </svg>
   );
 }
