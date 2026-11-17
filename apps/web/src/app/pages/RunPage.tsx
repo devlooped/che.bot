@@ -164,27 +164,22 @@ export function RunPage({ params }: { params: Record<string, string> }) {
             <p className="doc-empty">{t.answer.noDocument}</p>
           )}
           {doc && (
-            <>
-              <AnswerDocument
-                doc={doc}
-                final={final}
-                animate={live}
-                notes={flagNotes(view, doc.answer)}
-              />
-              {final && <Moments view={view} />}
-              <History view={view} />
-              <Sources sources={doc.sources} />
-            </>
+            <AnswerDocument
+              doc={doc}
+              final={final}
+              animate={live}
+              notes={flagNotes(view, doc.answer)}
+            />
           )}
           {chart && (
-            <>
-              <ChartDocument chart={chart} final={final} notes={flagNotes(view, chart.answer)} />
-              {final && <Moments view={view} />}
-              <History view={view} />
-              {chart.origin === "web" && <Sources sources={chart.answer.sources} />}
-            </>
+            <ChartDocument chart={chart} final={final} notes={flagNotes(view, chart.answer)} />
           )}
+          {doc && <Sources sources={doc.sources} />}
+          {chart?.origin === "web" && <Sources sources={chart.answer.sources} />}
           {started && <Panel view={view} />}
+          {/* How the answer came to be, closed: for the reader who wants it, after what they need. */}
+          {final && (doc || chart) && <Moments view={view} />}
+          {(doc || chart) && <History view={view} />}
           {started && isAdmin(user) && <Spend runId={runId} running={view.status === "running"} />}
         </div>
       </div>

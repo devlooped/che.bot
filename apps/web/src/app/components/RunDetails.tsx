@@ -1,15 +1,13 @@
 import type { RunView, Source } from "@chebot/protocol";
 import { t } from "../i18n/index.ts";
 import { seatsOf } from "../view/derive.ts";
+import { Fold } from "./Fold.tsx";
 import { ModelMark, ModelName, WithMarks } from "./ModelMark.tsx";
 
 /** The sources the answer cites, numbered as the paragraphs cite them, with who found each. */
 export function Sources({ sources }: { sources: readonly Source[] }) {
   return (
-    <section className="sources" aria-labelledby="sources-title">
-      <h2 id="sources-title" className="section-title">
-        {t.sources.title}
-      </h2>
+    <Fold title={t.sources.title} open className="sources">
       {sources.length === 0 ? (
         <p className="muted">{t.sources.none}</p>
       ) : (
@@ -32,7 +30,7 @@ export function Sources({ sources }: { sources: readonly Source[] }) {
           ))}
         </ol>
       )}
-    </section>
+    </Fold>
   );
 }
 
@@ -41,10 +39,7 @@ export function Panel({ view }: { view: RunView }) {
   const seats = seatsOf(view);
   if (seats.length === 0) return null;
   return (
-    <section className="panel" aria-labelledby="panel-title">
-      <h2 id="panel-title" className="section-title">
-        {t.panel.title}
-      </h2>
+    <Fold title={t.panel.title} className="panel">
       <dl className="panel-list">
         {seats.map((s) => (
           <div key={s.seat} className={`panel-seat${s.seat === "utility" ? "" : ` ink-${s.seat}`}`}>
@@ -59,7 +54,7 @@ export function Panel({ view }: { view: RunView }) {
           </div>
         ))}
       </dl>
-    </section>
+    </Fold>
   );
 }
 

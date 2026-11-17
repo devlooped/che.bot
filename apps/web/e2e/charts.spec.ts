@@ -114,7 +114,7 @@ test("a voted layer opens its discussion, and the history shows an earlier versi
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
 
-  await page.getByRole("button", { name: t.chart.history.show }).click();
+  await page.locator("summary", { hasText: t.chart.history.title }).click();
   const step = page.getByTestId("history-chart");
   await expect(page.getByTestId("history-label")).toContainText(t.history.steps.merge);
   await expect(step).toHaveAttribute("data-version", "1");

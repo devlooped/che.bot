@@ -46,7 +46,7 @@ test("a finished answer, its discussion, and its history", async ({ page, reques
   await expect(page.getByTestId("stage-line")).toHaveText(DONE);
   expect(await violations(page)).toEqual([]);
 
-  await page.getByRole("button", { name: t.history.show }).click();
+  await page.locator("summary", { hasText: t.history.title }).click();
   await expect(page.getByRole("slider", { name: t.history.slider })).toBeVisible();
   await page.getByRole("button", { name: t.history.next }).click();
   expect(await violations(page)).toEqual([]);
@@ -120,7 +120,7 @@ test("a chart, its data and notes, a layer's discussion, its history, and a char
   await page.keyboard.press("Escape");
   await expect(layer).toBeFocused();
 
-  await page.getByRole("button", { name: t.chart.history.show }).click();
+  await page.locator("summary", { hasText: t.chart.history.title }).click();
   await expect(page.getByTestId("history-chart").locator("svg").first()).toBeVisible();
   await page.getByRole("button", { name: t.history.next }).click();
   expect(await violations(page)).toEqual([]);

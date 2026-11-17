@@ -1,9 +1,10 @@
 import type { RunView } from "@chebot/protocol";
-import { type CSSProperties, type ReactNode, useId, useMemo, useState } from "react";
+import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import { t } from "../i18n/index.ts";
 import { type ChartChange, chartHistoryOf, chartViewOf } from "../view/chart.ts";
 import { type HistoryParagraph, historyOf } from "../view/history.ts";
 import { ChartCanvas } from "./ChartCanvas.tsx";
+import { Fold } from "./Fold.tsx";
 import { ModelMark, WithMarks } from "./ModelMark.tsx";
 
 function Paragraph({ p }: { p: HistoryParagraph }) {
@@ -40,45 +41,29 @@ function Paragraph({ p }: { p: HistoryParagraph }) {
 }
 
 /**
- * The section of a history: a toggle, then a range that moves through the steps (touch, mouse, the
- * arrow keys) and two buttons that step one at a time, the label and what the step did, and the
- * content of the step.
+ * The section of a history, closed until the reader opens it: a range that moves through the steps
+ * (touch, mouse, the arrow keys) and two buttons that step one at a time, the label and what the
+ * step did, and the content of the step.
  */
 function Steps({
   texts,
   steps,
   children,
 }: {
-  texts: { title: string; show: string; hide: string; lede: string; slider: string };
+  texts: { title: string; lede: string; slider: string };
   steps: readonly { label: string; what: string }[];
   children: (index: number) => ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
-  const id = useId();
   if (steps.length < 2) return null;
   const at = Math.min(index, steps.length - 1);
   const step = steps[at];
   if (!step) return null;
   const position = t.history.position(at + 1, steps.length);
   return (
-    <section className="history" aria-labelledby={`${id}-title`}>
-      <div className="history-head">
-        <h2 id={`${id}-title`} className="section-title">
-          {texts.title}
-        </h2>
-        <button
-          type="button"
-          className="button button-quiet history-toggle"
-          aria-expanded={open}
-          aria-controls={`${id}-body`}
-          onClick={() => setOpen(!open)}
-        >
-          {open ? texts.hide : texts.show}
-        </button>
-      </div>
-      <div id={`${id}-body`} className="history-body" hidden={!open}>
-        {open && (
+    <Fold title={texts.title} className="history">
+      {(open) =>
+        open && (
           <>
             <p className="fine">{texts.lede}</p>
             <div className="history-controls">
@@ -121,9 +106,9 @@ function Steps({
             </div>
             {children(at)}
           </>
-        )}
-      </div>
-    </section>
+        )
+      }
+    </Fold>
   );
 }
 

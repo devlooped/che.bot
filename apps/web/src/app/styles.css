@@ -1521,12 +1521,54 @@ a.button {
   }
 }
 
-/* Run: sources and the panel ------------------------------------------------------------------- */
+/* Run: the sections after the answer, which the reader opens and closes ------------------------ */
 
-.sources,
-.panel {
+.fold {
   padding-top: 1rem;
   border-top: 1px solid var(--rule);
+}
+
+.fold-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.75rem; /* a target a finger can take */
+  margin-top: -0.5rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.fold-summary::-webkit-details-marker {
+  display: none;
+}
+
+.fold-summary::before {
+  content: "";
+  flex: none;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+.fold[open] > .fold-summary::before {
+  transform: rotate(45deg);
+}
+
+.fold-summary .section-title {
+  margin-bottom: 0;
+}
+
+.fold[open] > .fold-body {
+  margin-top: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fold-summary::before {
+    transition: none;
+  }
 }
 
 .source-list {
@@ -1915,33 +1957,9 @@ a.button {
 
 /* Run: the history of the text --------------------------------------------------------------- */
 
-.history {
-  padding-top: 1rem;
-  border-top: 1px solid var(--rule);
-}
-
-.history-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem 1rem;
-}
-
-.history-head .section-title {
-  margin-bottom: 0;
-}
-
-.history-toggle {
-  padding: 0.5rem 0.9rem;
-  min-height: 2.5rem;
-  font-size: 0.88rem;
-}
-
-.history-body:not([hidden]) {
+.history[open] > .fold-body {
   display: grid;
   gap: 0.9rem;
-  margin-top: 0.9rem;
 }
 
 .history-controls {

@@ -17,7 +17,7 @@ test("the slider shows an earlier version of the text, by pointer or by keyboard
   const merged = "Por eso la cifra de 15.400 litros exagera el impacto";
   await expect(page.getByTestId("paragraph").filter({ hasText: merged })).toHaveCount(0);
 
-  await page.getByRole("button", { name: t.history.show }).click();
+  await page.locator("summary", { hasText: t.history.title }).click();
   const slider = page.getByRole("slider", { name: t.history.slider });
   const label = page.getByTestId("history-label");
   const steps = page.getByTestId("history-paragraph");
@@ -145,5 +145,5 @@ test("the budget reached: the answer stays, with a note on what was left out", a
   await expect(page.getByTestId("notes")).toContainText(t.flags.budgetReached.discussion);
   await expect(page.getByTestId("paragraph")).toHaveCount(5);
   // No discussion happened, so the text has one version and no history to replay.
-  await expect(page.getByRole("button", { name: t.history.show })).toHaveCount(0);
+  await expect(page.locator("summary", { hasText: t.history.title })).toHaveCount(0);
 });

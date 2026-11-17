@@ -613,8 +613,6 @@ export const esAR = {
     },
     history: {
       title: "Cómo cambió el gráfico",
-      show: "Ver cómo cambió el gráfico",
-      hide: "Ocultar cómo cambió el gráfico",
       lede: "Mové la barra para ver el gráfico en cada momento: los puntos se mueven a sus valores de ese paso.",
       slider: "Momento del gráfico",
       changesTitle: "Qué cambió en este paso",
@@ -691,8 +689,6 @@ export const esAR = {
 
   history: {
     title: "Cómo cambió el texto",
-    show: "Ver cómo cambió el texto",
-    hide: "Ocultar cómo cambió el texto",
     lede: "Mové la barra para ver el texto en cada momento. Lo que entró en ese paso está subrayado y lo que salió, tachado.",
     slider: "Momento del texto",
     position: (i: number, n: number) => `Paso ${i} de ${n}`,

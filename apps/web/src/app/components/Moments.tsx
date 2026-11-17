@@ -2,12 +2,13 @@ import type { RunView } from "@chebot/protocol";
 import { useState } from "react";
 import { t } from "../i18n/index.ts";
 import { momentsByBatch } from "../view/derive.ts";
+import { Fold } from "./Fold.tsx";
 import { WithMarks } from "./ModelMark.tsx";
 
 /**
  * The moments feed: the plain one-liners of the run, a group per stage, oldest first. On a phone
  * only the latest group shows until the reader asks for the rest. While the run goes it sits beside
- * the answer; once done it is a section of the main column, titled as one.
+ * the answer; once done it is a closed section of the main column, after the sources and the panel.
  */
 export function Moments({ view }: { view: RunView }) {
   const [all, setAll] = useState(false);
@@ -16,11 +17,8 @@ export function Moments({ view }: { view: RunView }) {
   const older = groups.slice(0, -1).reduce((n, g) => n + g.texts.length, 0);
   // A run that failed before anything happened has nothing to tell here: the failure says it.
   if (groups.length === 0 && view.status === "failed") return null;
-  return (
-    <section className="moments" aria-labelledby="moments-title">
-      <h2 id="moments-title" className={done ? "section-title" : "side-title"}>
-        {done ? t.moments.titleDone : t.moments.title}
-      </h2>
+  const feed = (
+    <>
       {groups.length === 0 ? (
         <p className="muted">{t.moments.empty}</p>
       ) : (
@@ -51,6 +49,20 @@ export function Moments({ view }: { view: RunView }) {
           {all ? t.moments.showLess : t.moments.showAll(older)}
         </button>
       )}
+    </>
+  );
+  if (done)
+    return (
+      <Fold title={t.moments.titleDone} className="moments">
+        {feed}
+      </Fold>
+    );
+  return (
+    <section className="moments" aria-labelledby="moments-title">
+      <h2 id="moments-title" className="side-title">
+        {t.moments.title}
+      </h2>
+      {feed}
     </section>
   );
 }

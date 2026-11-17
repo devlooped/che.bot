@@ -36,6 +36,7 @@ test("sign in, ask, see the class and the price, pay, and reach a finished answe
   await expect(page.locator('[data-model="gemini"]')).toHaveAttribute("data-status", "abstained");
   await expect(page.getByRole("heading", { name: t.sources.title })).toBeVisible();
   await expect(page.getByRole("heading", { name: t.panel.title })).toBeVisible();
+  await page.locator("summary", { hasText: t.panel.title }).click();
   await expect(page.getByText("anthropic/claude-opus-5.5")).toBeVisible();
 });
 
