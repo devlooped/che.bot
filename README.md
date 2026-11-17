@@ -196,5 +196,8 @@ Configuration of a deployment:
 - Account and bindings (`wrangler.jsonc`): the Cloudflare account `c1d5bf025f41490ee30de77958f9fa35`;
   the D1 database `chebot` (binding `DB`, migrations with `wrangler d1 migrations apply chebot --remote`), the `RunObject` and `SpendMeter` classes, and
   the `ASK_LIMITER` rate limit (5 questions per user and minute).
+- Deployment: every push to `main` runs `.github/workflows/deploy.yml`, which checks, builds,
+  applies the D1 migrations and runs `wrangler deploy`, with the repository secret
+  `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit and D1: Edit on the account).
 - The payment hook is the origin of the `pay` request plus `/api/pay/hook`: the hostname the user
   reached, which must be https for the jobs service.
