@@ -1,5 +1,11 @@
 import type { EventOf, EventType, RunEvent } from "./events.ts";
-import { type Chart, MODEL_NAMES, type ModelId, type Suggestion } from "./model.ts";
+import {
+  type Chart,
+  type ChartLayer,
+  MODEL_NAMES,
+  type ModelId,
+  type Suggestion,
+} from "./model.ts";
 import { byModelOrder } from "./util.ts";
 
 // Moments: the plain one-liners of the glimpse. One utility call per round boundary phrases a batch
@@ -22,8 +28,23 @@ function plural(n: number, one: string, many: string): string {
   return n === 1 ? one : many;
 }
 
+/** What the templates know besides the events: a chart run reads differently from a prose run. */
+export interface MomentContext {
+  chart?: boolean;
+  /** The suggestions of the run: they tell which part of a chart an accepted change touched. */
+  suggestions?: Readonly<Record<string, Suggestion>>;
+}
+
+const CHART_PARTS: Record<ChartLayer, string> = {
+  title: "el título del gráfico",
+  encoding: "el tipo de gráfico",
+  caption: "la explicación del gráfico",
+  transform: "el cálculo del gráfico",
+  data: "los datos del gráfico",
+};
+
 /** One template per kind of event, in order of importance; the first 3 that apply are used. */
-const TEMPLATES: ((events: readonly RunEvent[]) => string | null)[] = [
+const TEMPLATES: ((events: readonly RunEvent[], ctx: MomentContext) => string | null)[] = [
   (events) => {
     const cut = of(events, "stage.changed").find((e) => e.cut !== null)?.cut;
     if (cut === "budget")
@@ -47,7 +68,7 @@ const TEMPLATES: ((events: readonly RunEvent[]) => string | null)[] = [
     const check = chart.data.rows.filter(
       (r) => r.status === "single" || r.status === "disputed",
     ).length;
-    if (chart.data.origin === "user") return "Juntamos los planes en un solo gráfico de tus datos.";
+    if (chart.data.origin === "user") return "Armamos el gráfico con los datos que subiste.";
     return check === 0
       ? `Juntamos los datos en un gráfico: ${chart.data.rows.length} ${plural(chart.data.rows.length, "dato", "datos")}, y coinciden en todos.`
       : `Juntamos los datos en un gráfico: ${chart.data.rows.length} ${plural(chart.data.rows.length, "dato", "datos")}, y ${check} ${plural(check, "queda", "quedan")} para verificar con las fuentes.`;
@@ -90,17 +111,28 @@ const TEMPLATES: ((events: readonly RunEvent[]) => string | null)[] = [
       ? "Los cuatro ya tienen su propia respuesta, cada uno por su cuenta."
       : `${n} de los cuatro tienen su propia respuesta.`;
   },
-  (events) => {
+  (events, ctx) => {
     const accepted = of(events, "thread.accepted");
     const [first] = accepted;
     if (!first) return null;
+    if (ctx.chart) {
+      const layer = ctx.suggestions?.[first.winner]?.target.layer;
+      const part = layer ? CHART_PARTS[layer] : "el gráfico";
+      return accepted.length === 1
+        ? `Se aceptó un cambio en ${part}, con el apoyo de ${first.tally.for.length} de 4.`
+        : `Se aceptaron ${accepted.length} cambios al gráfico.`;
+    }
     return accepted.length === 1
       ? `Se aceptó un cambio al texto, con el apoyo de ${first.tally.for.length} de 4.`
       : `Se aceptaron ${accepted.length} cambios al texto.`;
   },
-  (events) => {
+  (events, ctx) => {
     const n = of(events, "thread.unresolved").length;
     if (n === 0) return null;
+    if (ctx.chart)
+      return n === 1
+        ? "En un punto del gráfico no hubo acuerdo y queda como estaba."
+        : `En ${n} puntos del gráfico no hubo acuerdo y quedan como estaban.`;
     return n === 1
       ? "En un punto no hubo acuerdo y queda anotado al margen."
       : `En ${n} puntos no hubo acuerdo y quedan anotados al margen.`;
@@ -116,12 +148,12 @@ const TEMPLATES: ((events: readonly RunEvent[]) => string | null)[] = [
       ? `${names(who)} cambió de opinión después de leer los argumentos de los demás.`
       : `${names(who)} cambiaron de opinión después de leer los argumentos de los demás.`;
   },
-  (events) => {
+  (events, ctx) => {
     const opened = of(events, "suggestion.opened");
     if (opened.length === 0) return null;
     const who = new Set(opened.map((e) => e.suggestion.author));
     return opened.length === 1
-      ? `${names(who)} propuso corregir una parte del texto.`
+      ? `${names(who)} propuso corregir una parte ${ctx.chart ? "del gráfico" : "del texto"}.`
       : `Hay ${opened.length} propuestas de cambio sobre la mesa, de ${names(who)}.`;
   },
   (events) => {
@@ -155,10 +187,10 @@ function chartOf(seeded: EventOf<"document.seeded"> | undefined): Chart | null {
 }
 
 /** The template moments of a batch of events: at most 3 sentences, most important first. */
-export function templateMoments(events: readonly RunEvent[]): string[] {
+export function templateMoments(events: readonly RunEvent[], ctx: MomentContext = {}): string[] {
   const out: string[] = [];
   for (const template of TEMPLATES) {
-    const text = template(events);
+    const text = template(events, ctx);
     if (text) out.push(text);
     if (out.length === MAX_MOMENTS) break;
   }

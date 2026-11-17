@@ -322,6 +322,15 @@ describe("a scripted chart run on uploaded data", () => {
     expect(state.status).toBe("completed");
   });
 
+  test("the merge of an upload reads as the user's own data", () => {
+    expect(
+      templateMoments(
+        log.filter((e) => e.type === "document.seeded"),
+        { chart: true },
+      ),
+    ).toEqual(["Armamos el gráfico con los datos que subiste."]);
+  });
+
   test("the briefs agree by code: dimension, measures, the transform most chose", () => {
     const v1 = chartOf(state.snapshots[0] as never);
     expect(v1.brief).toEqual({

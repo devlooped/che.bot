@@ -1318,7 +1318,10 @@ function reduceMoments(run: RunState, outputs: Map<string, Output>, events: RunE
     .filter((t) => t !== "")
     .slice(0, 3);
   const origin = phrased.length > 0 ? "model" : "template";
-  const texts = phrased.length > 0 ? phrased : templateMoments(run.recent);
+  const texts =
+    phrased.length > 0
+      ? phrased
+      : templateMoments(run.recent, { chart: run.chart !== null, suggestions: run.suggestions });
   texts.forEach((text, i) => {
     run.moments.push({ batch: run.batch, text, origin });
     events.push({

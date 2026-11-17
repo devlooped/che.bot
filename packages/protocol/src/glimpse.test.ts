@@ -43,6 +43,30 @@ describe("template moments", () => {
     expect(templateMoments([])).toEqual([]);
   });
 
+  test("a chart run gets chart wordings; a prose run keeps the prose ones", () => {
+    const tally = { for: ["grok", "claude", "openai"], against: [], none: [] };
+    const events = [
+      ev({ type: "thread.accepted", thread: "t1", winner: "s1", tally }),
+      ev({ type: "thread.unresolved", thread: "t2", why: "no_majority", tally }),
+    ];
+    const suggestions = (layer: string) =>
+      ({ s1: { id: "s1", target: { block: "c", layer } } }) as never;
+    expect(templateMoments(events, { chart: true, suggestions: suggestions("title") })).toEqual([
+      "Se aceptó un cambio en el título del gráfico, con el apoyo de 3 de 4.",
+      "En un punto del gráfico no hubo acuerdo y queda como estaba.",
+    ]);
+    const part = (layer: string) =>
+      templateMoments(events.slice(0, 1), { chart: true, suggestions: suggestions(layer) })[0];
+    expect(part("encoding")).toContain("en el tipo de gráfico");
+    expect(part("caption")).toContain("en la explicación del gráfico");
+    expect(part("transform")).toContain("en el cálculo del gráfico");
+    expect(templateMoments(events.slice(0, 1), { chart: true })[0]).toContain("en el gráfico,");
+    expect(templateMoments(events)).toEqual([
+      "Se aceptó un cambio al texto, con el apoyo de 3 de 4.",
+      "En un punto no hubo acuerdo y queda anotado al margen.",
+    ]);
+  });
+
   test("the facts for the utility call name what happened, without ids", () => {
     const facts = momentFacts(
       [
