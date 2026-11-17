@@ -14,7 +14,7 @@ import { spendMeter } from "./spend-meter.ts";
 //   POST   /api/runs/:id/pay          the owner (an admin owner runs free, with no job)
 //   POST   /api/runs/:id/rerun        the owner, after a paid run failed
 //   DELETE /api/runs/:id              the owner or an admin
-//   GET    /api/runs/:id[/events|/ws|/snapshots/:v]   anyone with the link
+//   GET    /api/runs/:id[/events|/ws|/snapshots/:v]   anyone with the link (`mine` for the owner)
 //   GET    /api/me/runs               signed in
 //   GET|PUT /api/admin/models|prices  admin
 //   POST   /api/pay/hook              the jobs service, with the token of the run as Bearer
@@ -178,7 +178,10 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   if (sub === "") {
     if (method === "GET") {
       const summary = await stub.summary();
-      return summary ? json(200, summary) : error(404, "No such run.");
+      if (!summary) return error(404, "No such run.");
+      // `mine` tells the page whether to offer the owner's actions (pay, run again).
+      const mine = identity.kind === "user" && (await stub.owner()) === identity.userId;
+      return json(200, { ...summary, mine });
     }
     if (method === "DELETE") {
       const user = requireUser(identity);

@@ -3,7 +3,13 @@
   "compilerOptions": {
     "lib": ["es2023", "dom", "dom.iterable"],
     "jsx": "react-jsx",
-    "types": []
+    "types": ["vite/client"]
   },
-  "include": ["."]
+  "include": [
+    ".",
+    "../local/client.tsx",
+    "../local/token.ts",
+    "../local/marker.ts",
+    "../local/scenario.test.ts"
+  ]
 }

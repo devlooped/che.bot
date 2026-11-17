@@ -55,9 +55,29 @@ evaluation later is appended after them.
 ## The web app (`apps/web`)
 
 ```sh
-pnpm --filter @chebot/web test    # in the Workers runtime: fake models, jobs service and Auth0 keys
-pnpm --filter @chebot/web dev     # needs apps/web/.dev.vars (see .dev.vars.example)
+pnpm --filter @chebot/web dev       # the local mode: every outside service is a fake, see below
+pnpm --filter @chebot/web dev:live  # real services: apps/web/.dev.vars and .env (see the .example files)
+pnpm --filter @chebot/web test      # the Worker in the Workers runtime, then the app's own tests in Node
+pnpm --filter @chebot/web test:e2e  # Playwright against the local mode (needs a browser, see below)
+pnpm --filter @chebot/web build     # the production build, then a check that no fake reached it
 ```
+
+The local mode (`vite dev --mode fakes`, `wrangler.local.jsonc`, `src/local/`) runs the real Worker,
+`RunObject` and protocol with fakes for the rest: a scripted panel that plays one full run in
+Spanish whatever the question (four drafts, agreed, majority and contested paragraphs, two rounds of
+suggestions and votes, a change of position, an accepted change and one without agreement, a model
+that does not answer, the editor), a classifier (up to 80 characters is simple), a jobs service
+whose QR appears at once (`POST /api/local/pay/:id`, or the "Simular el pago" button, plays the
+payment and calls the hook), and a sign-in that picks a test user (beta, admin, or no access). The
+production entry never imports `src/local`, and `pnpm build` fails if anything of it is in the
+output (`scripts/check-build.mjs`).
+
+The end-to-end tests start the local mode themselves. They need Playwright's Chromium
+(`pnpm --filter @chebot/web exec playwright install chromium`) or a browser of the machine:
+`PLAYWRIGHT_CHANNEL=msedge` (or `chrome`).
+
+The browser app signs in with the Auth0 SPA SDK, configured by public build variables:
+`VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID` and `VITE_AUTH0_AUDIENCE` (see `apps/web/.env.example`).
 
 | Route                                                                | Who may call it                                                    |
 | -------------------------------------------------------------------- | ------------------------------------------------------------------ |
@@ -65,7 +85,7 @@ pnpm --filter @chebot/web dev     # needs apps/web/.dev.vars (see .dev.vars.exam
 | `POST /api/runs/:id/pay` → `202`                                     | the owner; an `admin` owner runs free, with no payment job         |
 | `POST /api/runs/:id/rerun` → `202`                                   | the owner, once, after a paid run failed                           |
 | `DELETE /api/runs/:id`                                               | the owner or an admin                                              |
-| `GET /api/runs/:id`, `/events?after=`, `/ws?after=`, `/snapshots/:v` | anyone with the link                                               |
+| `GET /api/runs/:id`, `/events?after=`, `/ws?after=`, `/snapshots/:v` | anyone with the link (`mine` in the summary: the caller owns it)   |
 | `GET /api/me/runs`                                                   | signed in                                                          |
 | `GET`, `PUT /api/admin/models`, `/api/admin/prices`                  | `admin`                                                            |
 | `POST /api/pay/hook`                                                 | the jobs service, with the run's own token as Bearer               |

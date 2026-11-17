@@ -1,0 +1,43 @@
+{
+  // The local mode (`pnpm dev`): the same bindings as wrangler.jsonc, with the entry of
+  // src/local/worker.ts, which replaces the models, the classifier, the jobs service and Auth0 with
+  // fakes. Only vite.config.ts reads this file, and only with `--mode fakes`; never deploy it.
+  // Keep the bindings in step with wrangler.jsonc.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "chebot-web-local",
+  "main": "./src/local/worker.ts",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "RUNS", "class_name": "RunObject" },
+      { "name": "SPEND", "class_name": "SpendMeter" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RunObject", "SpendMeter"] }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "chebot-web-local",
+      "database_id": "00000000-0000-0000-0000-000000000001",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "ratelimits": [
+    { "name": "ASK_LIMITER", "namespace_id": "4201", "simple": { "limit": 5, "period": 60 } }
+  ],
+  "vars": {
+    "RUN_BUDGET_USD": "",
+    // High: the local state keeps the spend of every fake run of the day.
+    "DAILY_CAP_USD": "100000",
+    "LAUNCHED": "false",
+    "AI_GATEWAY_API_KEY": "",
+    "JOBS_URL": "https://jobs.invalid",
+    "JOBS_TOKEN": "",
+    "AUTH0_DOMAIN": "local.invalid",
+    "AUTH0_AUDIENCE": "https://local.invalid"
+  }
+}

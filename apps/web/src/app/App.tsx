@@ -1,9 +1,23 @@
-// A placeholder until the interface of phase 3 (steps 27 to 35).
+import { SessionProvider } from "./auth/context.tsx";
+import { Header } from "./components/Header.tsx";
+import { NotFound } from "./pages/NotFound.tsx";
+import { match, usePath } from "./router/index.tsx";
+import { routes } from "./routes.tsx";
+
+function Page() {
+  const path = usePath();
+  for (const route of routes) {
+    const params = match(route.pattern, path);
+    if (params) return <route.page params={params} />;
+  }
+  return <NotFound />;
+}
+
 export function App() {
   return (
-    <main>
-      <h1>che.bot</h1>
-      <p>Cuatro IAs responden juntas a tu pregunta. Muy pronto.</p>
-    </main>
+    <SessionProvider>
+      <Header />
+      <Page />
+    </SessionProvider>
   );
 }

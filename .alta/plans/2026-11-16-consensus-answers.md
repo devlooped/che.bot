@@ -464,11 +464,11 @@ Verified when:
 
 ### Phase 3: the UI on the event stream
 
-- [ ] 27. Write the event client in `apps/web/src/app/`: connect, resume, the shared view reducer, the staggered playback of a batch, and the `es-AR` messages file.
-- [ ] 28. Build sign-in with Auth0 and the ask page: the question box, the class and its price, and the QR with its amount and its waiting state.
-- [ ] 29. Build the ambient layer: four avatars, status chips, the stage line.
-- [ ] 30. Build the moments feed.
-- [ ] 31. Build the document view: margin marks, the "3 de 4" badge, the thread popover with reasons and votes, dissent notes, sources, and the models of the run.
+- [x] 27. Write the event client in `apps/web/src/app/`: connect, resume, the shared view reducer, the staggered playback of a batch, and the `es-AR` messages file.
+- [x] 28. Build sign-in with Auth0 and the ask page: the question box, the class and its price, and the QR with its amount and its waiting state.
+- [x] 29. Build the ambient layer: four avatars, status chips, the stage line.
+- [x] 30. Build the moments feed.
+- [x] 31. Build the document view: margin marks, the "3 de 4" badge, the thread popover with reasons and votes, dissent notes, sources, and the models of the run.
 - [ ] 32. Build the history slider over the stored snapshots.
 - [ ] 33. Build "Mis preguntas": the list of the user's runs, the share link, and delete with confirmation.
 - [ ] 34. Build the admin page for the model of each role and the two prices.

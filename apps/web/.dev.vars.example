@@ -1,4 +1,4 @@
-# Copy to .dev.vars for `vite dev` (never commit .dev.vars). In production these are secrets:
+# Copy to .dev.vars for `pnpm dev:live` (never commit .dev.vars). In production these are secrets:
 # `wrangler secret put <NAME>`.
 AI_GATEWAY_API_KEY=
 # The CheBot jobs service and its token (the payment by QR).

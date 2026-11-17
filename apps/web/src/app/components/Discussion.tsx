@@ -1,0 +1,138 @@
+import { MODELS, type Suggestion } from "@chebot/protocol";
+import { useEffect, useRef } from "react";
+import { t } from "../i18n/index.ts";
+import type { Discussion, ParagraphView, Position } from "../view/derive.ts";
+import { ModelMark, Support } from "./ModelMark.tsx";
+
+function positionText(position: Position, alternatives: Suggestion[]): string {
+  if (position.choice === null) return t.discussion.noVote;
+  if (position.choice === "keep") return t.discussion.keep;
+  const s = alternatives.find((a) => a.id === position.choice);
+  return s ? t.discussion.holds(t.discussion.proposalOf(t.models[s.author])) : t.discussion.noVote;
+}
+
+function Outcome({ discussion }: { discussion: Discussion }) {
+  const { thread } = discussion;
+  const text =
+    thread.state === "accepted"
+      ? t.discussion.outcome.accepted(thread.tally?.for.length ?? 0)
+      : t.discussion.outcome[thread.state];
+  return <p className={`outcome outcome-${thread.state}`}>{text}</p>;
+}
+
+function Proposal({ s, added }: { s: Suggestion; added: boolean }) {
+  return (
+    <div className={`proposal ink-${s.author}`}>
+      <p className="proposal-head">
+        <ModelMark model={s.author} size={11} />
+        {added
+          ? t.discussion.addedBy(t.models[s.author])
+          : t.discussion.proposal(t.models[s.author], t.discussion.actions[s.op])}
+      </p>
+      {s.op !== "delete" && s.text && <blockquote className="proposal-text">{s.text}</blockquote>}
+      <p className="proposal-why">
+        <span className="proposal-why-label">{t.discussion.why}</span> {s.reason}
+      </p>
+      {s.coAuthors.length > 0 && (
+        <p className="fine">
+          {t.discussion.alsoProposed(t.modelNames(s.coAuthors), s.coAuthors.length)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function DiscussionBlock({ discussion, added }: { discussion: Discussion; added: boolean }) {
+  return (
+    <section className="discussion" data-testid="discussion">
+      {discussion.alternatives.map((s) => (
+        <Proposal key={s.id} s={s} added={added} />
+      ))}
+      <h4 className="positions-title">{t.discussion.positions}</h4>
+      <ul className="positions">
+        {discussion.positions.map((p) => (
+          <li key={p.model} className={`position ink-${p.model}`}>
+            <span className="position-who">
+              <ModelMark model={p.model} size={11} />
+              {t.models[p.model]}
+            </span>
+            <span className="position-what">{positionText(p, discussion.alternatives)}</span>
+            {p.changedBecause && (
+              <span className="position-changed">
+                <strong>{t.discussion.changed}:</strong> <q>{p.changedBecause}</q>
+              </span>
+            )}
+            {p.saidWhy && (
+              <span className="position-said">
+                <q>{p.saidWhy}</q>
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+      <Outcome discussion={discussion} />
+    </section>
+  );
+}
+
+/** The discussion of a paragraph, as a sheet: who holds it, the proposals, the reasons, the votes. */
+export function DiscussionSheet({
+  paragraph,
+  onClose,
+}: {
+  paragraph: ParagraphView;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+  const holders = paragraph.support;
+  const others = MODELS.filter((m) => !holders.includes(m));
+  return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: a click on the backdrop closes; Escape and the close button are the keyboard's way
+    <dialog
+      ref={ref}
+      className="sheet discussion-sheet"
+      aria-labelledby="discussion-title"
+      onClose={onClose}
+      onClick={(e) => {
+        if (e.target === ref.current) ref.current?.close();
+      }}
+    >
+      <div className="sheet-body">
+        <div className="sheet-head">
+          <h3 id="discussion-title" className="sheet-title">
+            {t.discussion.title}
+          </h3>
+          <button type="button" className="button button-text" onClick={() => ref.current?.close()}>
+            {t.common.close}
+          </button>
+        </div>
+        <blockquote className="sheet-quote">{paragraph.text}</blockquote>
+        <p className="sheet-support">
+          <Support support={holders} />
+          <span>
+            <strong>{t.answer.statusName[paragraph.status]}.</strong>{" "}
+            {holders.length > 0 && t.discussion.supportedBy(t.modelNames(holders), holders.length)}{" "}
+            {others.length > 0 && t.discussion.notSupportedBy(t.modelNames(others), others.length)}
+          </span>
+        </p>
+        {paragraph.before && (
+          <div className="sheet-before">
+            <p className="fine">{t.discussion.before}</p>
+            <blockquote className="sheet-quote sheet-quote-old">{paragraph.before}</blockquote>
+          </div>
+        )}
+        {paragraph.addedBy && <DiscussionBlock discussion={paragraph.addedBy} added />}
+        {paragraph.discussions.map((d) => (
+          <DiscussionBlock key={d.thread.id} discussion={d} added={false} />
+        ))}
+        {!paragraph.addedBy && paragraph.discussions.length === 0 && (
+          <p className="muted">{t.discussion.noThreads}</p>
+        )}
+      </div>
+    </dialog>
+  );
+}

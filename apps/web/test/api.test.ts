@@ -16,6 +16,15 @@ describe("reading a run", () => {
     const summary = (await read.json()) as Record<string, unknown>;
     expect(summary).toMatchObject({ id, status: "completed", stage: "done", version: 4 });
     expect(summary).not.toHaveProperty("owner");
+    expect(summary.mine).toBe(false);
+    const asOwner = (await (await api(`/api/runs/${id}`, { headers: as("user-1") })).json()) as {
+      mine: boolean;
+    };
+    expect(asOwner.mine).toBe(true);
+    const asOther = (await (await api(`/api/runs/${id}`, { headers: as(user()) })).json()) as {
+      mine: boolean;
+    };
+    expect(asOther.mine).toBe(false);
 
     const all = (await (await api(`/api/runs/${id}/events`)).json()) as { events: LoggedEvent[] };
     expect(all.events.map((e) => e.seq)).toEqual(all.events.map((_, i) => i + 1));
