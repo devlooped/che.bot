@@ -1,5 +1,8 @@
+import type { ChartBrief, ChartRender, Dispute, DroppedPatch, Verdict } from "./chart-run.ts";
+import type { Dataset } from "./csv.ts";
 import type {
   AbstainReason,
+  ChartOrigin,
   Claim,
   Flags,
   Mode,
@@ -43,6 +46,8 @@ export type RunEvent = { key: string; batch: number } & (
       models: ModelSnapshot;
       budgetUsd: number;
       deadlineAt: number;
+      /** A chart run: where its data comes from, and the upload (parsed by code) for user data. */
+      chart: { origin: ChartOrigin; dataset: Dataset | null } | null;
     }
   | { type: "stage.changed"; stage: Stage; from: Stage | null; cut: Cut | null }
   | {
@@ -85,7 +90,42 @@ export type RunEvent = { key: string; batch: number } & (
       why: "two_qualify" | "no_majority";
       tally: Tally;
     }
-  | { type: "snapshot.created"; snapshot: Snapshot; cause: "round" | "edit"; threads: string[] }
+  | {
+      type: "snapshot.created";
+      snapshot: Snapshot;
+      /** "render": the chart of the last version that rendered, after one that did not. */
+      cause: "round" | "edit" | "render";
+      threads: string[];
+    }
+  // chart runs
+  | { type: "brief.completed"; model: ModelId; brief: ChartBrief; sources: Source[] }
+  | {
+      type: "chart.written";
+      block: string;
+      writer: ModelId | null;
+      /** The writer's spec, or the plain chart of code when it did not come, parse or render. */
+      used: "writer" | "plain";
+      why: string | null;
+      /** What of the theme was taken out of the writer's spec. */
+      stripped: string[];
+    }
+  | ({ type: "chart.rendered" } & ChartRender)
+  | { type: "dispute.opened"; dispute: Dispute }
+  | {
+      type: "rows.checked";
+      model: ModelId;
+      round: 1 | 2 | 3;
+      checks: { row: string; value: string; verdict: Verdict; reason: string }[];
+    }
+  | {
+      type: "dispute.settled";
+      dispute: string;
+      row: string;
+      state: Exclude<Dispute["state"], "open">;
+      winner: string | null;
+      holds: Record<string, { holds: number; checkers: number; stated: boolean }>;
+    }
+  | ({ type: "patch.dropped" } & DroppedPatch)
   | { type: "moment"; text: string; origin: "model" | "template" }
   | { type: "run.completed"; version: number; flags: Flags; spentUsd: number }
   | { type: "run.failed"; reason: FailureReason; spentUsd: number }

@@ -77,6 +77,7 @@ export function drive(
       mode: input.mode,
       models: input.models ?? SNAPSHOT_MODELS,
       ...(input.config ? { config: input.config } : {}),
+      ...(input.chart ? { chart: input.chart } : {}),
     },
     T0,
   );
@@ -328,5 +329,7 @@ export const scripted: Responder = (call, state) => {
       return ok(call, {
         sentences: ["Los cuatro están trabajando.", "", "Hay avances.", "Uno más.", "Y otro."],
       });
+    default:
+      return null;
   }
 };

@@ -1,15 +1,20 @@
+import { chartSpec } from "./chart.ts";
+import { type ChartRender, type Dispute, holdsOf } from "./chart-run.ts";
 import {
   type Abstention,
+  type CellValue,
+  type Chart,
   type Flags,
   MODELS,
   type ModelId,
   type ParagraphStatus,
+  type RowStatus,
   type Snapshot,
   type Source,
   type Suggestion,
   type Thread,
 } from "./model.ts";
-import { byNumericId } from "./util.ts";
+import { byNumericId, clone } from "./util.ts";
 
 /** What the answer selector reads: both the run state and the replayed view provide it. */
 export interface AnswerInput {
@@ -122,5 +127,143 @@ export function selectAnswer(input: AnswerInput, version?: number): Answer | nul
         ? []
         : [{ model: a.seat, call: a.call, stage: a.stage, reason: a.reason }],
     ),
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Charts
+
+/** What the chart selector reads: the run state and the replayed view both provide it. */
+export interface ChartAnswerInput extends AnswerInput {
+  disputes: Readonly<Record<string, Dispute>>;
+  renders: readonly ChartRender[];
+}
+
+export interface ChartAnswerValue {
+  value: number | null;
+  source: Source | null;
+  quote: string;
+  support: ModelId[];
+}
+
+export interface ChartAnswerRow {
+  key: string;
+  status: RowStatus;
+  /** Web: { value }; user: the uploaded row. */
+  values: Record<string, CellValue>;
+  /** The source of the value drawn (web); null for an uploaded row. */
+  source: Source | null;
+  quote: string;
+  support: ModelId[];
+  /** The other values with their sources: the ends of a range when the row is unsettled. */
+  alternatives: ChartAnswerValue[];
+  /** The dispute of the row that the sources settled (or did not), with each value's checks. */
+  dispute: ChartDisputeNote | null;
+}
+
+export interface ChartDisputeNote {
+  id: string;
+  state: Dispute["state"];
+  winner: string | null;
+  values: (ChartAnswerValue & { id: string; stated: boolean; holds: number; checkers: number })[];
+}
+
+export interface ChartAnswer {
+  version: number;
+  final: boolean;
+  block: string;
+  origin: Chart["data"]["origin"];
+  brief: Chart["brief"];
+  title: string;
+  caption: string;
+  /** The full Vega-Lite spec of this version: data, layers and the app's theme (`chartSpec`). */
+  spec: Record<string, unknown>;
+  rows: ChartAnswerRow[];
+  /** Rows whose value stays in dispute (open, or unsettled and drawn as a range). */
+  disputed: ChartAnswerRow[];
+  /** Patches still open, or unresolved at the end: dissent notes on the layers. */
+  dissent: DissentNote[];
+  /** The render of this version: the call and result whose SVG the ledger keeps. */
+  render: ChartRender | null;
+  sources: Source[];
+  flags: Flags;
+  abstained: Answer["abstained"];
+}
+
+/**
+ * The chart of a chart run, at its latest version or at `version`, with its data, the source of
+ * every web row, its disputes and the open disagreements on its layers. Null before the chart
+ * exists, for an unknown version, or for a prose run.
+ */
+export function selectChart(input: ChartAnswerInput, version?: number): ChartAnswer | null {
+  const last = input.snapshots.at(-1);
+  const snapshot =
+    version === undefined ? last : input.snapshots.find((s) => s.version === version);
+  if (!snapshot || !last) return null;
+  const chart = snapshot.order.map((id) => snapshot.blocks[id]).find((b) => b?.kind === "chart");
+  if (chart?.kind !== "chart") return null;
+  const source = (id: string) => input.sources.find((s) => s.id === id) ?? null;
+  const disputes = Object.values(input.disputes).sort((a, b) => byNumericId(a.id, b.id));
+  const value = (v: {
+    values: Record<string, CellValue>;
+    source: string;
+    quote: string;
+    support: ModelId[];
+  }): ChartAnswerValue => ({
+    value: typeof v.values.value === "number" ? v.values.value : null,
+    source: source(v.source),
+    quote: v.quote,
+    support: [...v.support],
+  });
+  const rows: ChartAnswerRow[] = chart.data.rows.map((r) => {
+    const d = disputes.findLast((x) => x.block === chart.id && x.row === r.key);
+    return {
+      key: r.key,
+      status: r.status,
+      values: { ...r.values },
+      source: r.source === "upload" ? null : source(r.source),
+      quote: r.quote,
+      support: [...r.support],
+      alternatives: r.alternatives.map(value),
+      dispute: d
+        ? {
+            id: d.id,
+            state: d.state,
+            winner: d.winner,
+            values: d.values.map((v) => ({
+              id: v.id,
+              value: v.value,
+              source: source(v.source),
+              quote: v.quote,
+              support: [...v.support],
+              stated: v.stated,
+              ...holdsOf(d, v),
+            })),
+          }
+        : null,
+    };
+  });
+  const cited = new Set(
+    chart.data.rows.flatMap((r) => [r.source, ...r.alternatives.map((a) => a.source)]),
+  );
+  const prose = selectAnswer(input, snapshot.version);
+  return {
+    version: snapshot.version,
+    final: input.status === "completed" && snapshot.version === last.version,
+    block: chart.id,
+    origin: chart.data.origin,
+    brief: clone(chart.brief),
+    title: chart.title,
+    caption: chart.caption,
+    spec: chartSpec(chart),
+    rows,
+    disputed: rows.filter(
+      (r) => r.status === "disputed" || r.status === "unsettled" || r.dispute?.state === "open",
+    ),
+    dissent: prose?.dissent ?? [],
+    render: input.renders.findLast((r) => r.version === snapshot.version) ?? null,
+    sources: input.sources.filter((s) => cited.has(s.id)).sort((a, b) => byNumericId(a.id, b.id)),
+    flags: { ...input.flags },
+    abstained: prose?.abstained ?? [],
   };
 }

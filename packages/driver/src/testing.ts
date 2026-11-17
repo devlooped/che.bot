@@ -201,3 +201,5 @@ export function respond(req: GenerateRequest<unknown>): FakeOutcome {
 export function script(overrides: FakeScript["calls"] = {}): FakeScript {
   return { calls: overrides, respond };
 }
+
+export * from "./chart-testing.ts";

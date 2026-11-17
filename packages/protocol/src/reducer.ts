@@ -1,18 +1,47 @@
 import type { z } from "zod";
+import {
+  briefCalls,
+  CHART_ROUND_KIND,
+  type ChartInput,
+  type ChartRunState,
+  chartMergeCalls,
+  chartRoundCalls,
+  createChartState,
+  type DataCandidate,
+  disputesAwaitChecks,
+  gateCall,
+  hasOpenDisputes,
+  placeDataPatches,
+  type RowSettlement,
+  readChartRound,
+  reduceBriefs,
+  reduceChartMerge,
+  reduceGate,
+  reduceSeedRender,
+  reduceSpec,
+  reduceVersionRender,
+  type StepKit,
+  seedRenderCall,
+  settleDisputes,
+  specCalls,
+  versionRenderCall,
+  versionToRender,
+} from "./chart-run.ts";
 import { type CallKind, type ConfigOverrides, type RunConfig, resolveConfig } from "./config.ts";
 import type { Cut, FailureReason, RunEvent } from "./events.ts";
 import {
   type AbstainReason,
   type Abstention,
+  type CallSeat,
   type Claim,
   type Draft,
   type Flags,
+  isPanel,
   MODELS,
   type Mode,
   type ModelId,
   type ModelSnapshot,
   type RunStage,
-  type Seat,
   type Snapshot,
   type Source,
   type Suggestion,
@@ -49,7 +78,7 @@ import { clone, hash, normalizeText, seededShuffle } from "./util.ts";
 /** A model call, as data. The driver maps `seat` to a model of the run's snapshot. */
 export interface Call {
   key: string; // idempotency key, unique in the run: "draft:0:grok", "merge:0", "round:1:claude"
-  seat: Seat;
+  seat: CallSeat;
   kind: CallKind;
   system: string;
   prompt: string;
@@ -57,6 +86,13 @@ export interface Call {
   maxOutputTokens: number;
   search?: { maxResults: number };
   timeoutMs: number;
+  /** A render call (seat "renderer"): the specs the driver hands to the renderer, not to a model. */
+  render?: RenderRequest;
+}
+
+/** What the renderer is asked: each spec is compiled and rendered on its own (see `ChartRenderer`). */
+export interface RenderRequest {
+  specs: { id: string; spec: Record<string, unknown> }[];
 }
 
 export interface FoundSource {
@@ -91,7 +127,13 @@ export type Phase =
   | "moments"
   | "edit"
   | "edit_check"
-  | "finish";
+  | "finish"
+  // chart runs
+  | "spec"
+  | "seed"
+  | "gate"
+  | "render"
+  | "settle";
 
 /**
  * What to do next. `calls` may be empty (a stage skipped by the budget, the end of the run): the
@@ -115,6 +157,8 @@ export type CallsStep = Extract<Step, { kind: "calls" }>;
 export type Next =
   | { phase: "draft" }
   | { phase: "merge" }
+  | { phase: "spec" }
+  | { phase: "seed" }
   | { phase: "round"; round: 1 | 2 | 3 }
   | { phase: "close" }
   | { phase: "edit_check" }
@@ -122,7 +166,7 @@ export type Next =
 
 export interface CallRecord {
   key: string;
-  seat: Seat;
+  seat: CallSeat;
   kind: CallKind;
   stage: RunStage;
   status: "ok" | "abstained";
@@ -176,12 +220,17 @@ export interface RunState {
   rejected: string[];
   counters: { suggestion: number; thread: number; paragraph: number; source: number };
   dropped: DroppedSuggestion[];
-  /** Round results waiting for the duplicate check of the utility model. */
+  /**
+   * Round results waiting for the render gate (`gate`, chart runs) and then for the duplicate check
+   * of the utility model.
+   */
   pending: {
     round: 1 | 2;
     candidates: Candidate[];
     pairs: DuplicatePair[];
     summary: RoundSummary;
+    gate?: boolean;
+    data?: DataCandidate[];
   } | null;
   rounds: RoundSummary[];
   edit: { editor: ModelId; rewrites: Rewrite[]; kept: string[] } | null;
@@ -191,6 +240,8 @@ export interface RunState {
   moments: { batch: number; text: string; origin: "model" | "template" }[];
   flags: Flags;
   abstentions: Abstention[];
+  /** A chart run (phase 4): its briefs, disputes and renders; null for a prose run. */
+  chart: ChartRunState | null;
 }
 
 export interface CreateRunInput {
@@ -199,6 +250,8 @@ export interface CreateRunInput {
   mode: Mode;
   models: ModelSnapshot;
   config?: ConfigOverrides;
+  /** Present: a chart run, on the uploaded dataset or on data from the web. */
+  chart?: ChartInput | null;
 }
 
 /** A new run, at the drafting stage, and its `run.started` event. */
@@ -218,6 +271,9 @@ export function createRun(
     models: input.models,
     budgetUsd: config.budgetUsd,
     deadlineAt,
+    chart: input.chart
+      ? { origin: input.chart.dataset ? "user" : "web", dataset: input.chart.dataset }
+      : null,
   };
   const state: RunState = {
     v: 1,
@@ -263,6 +319,7 @@ export function createRun(
       quorumLost: false,
     },
     abstentions: [],
+    chart: createChartState(input.chart),
   };
   return { state, events: [started] };
 }
@@ -277,20 +334,51 @@ export function createRun(
 export function nextStep(state: RunState, now: number): Step {
   if (state.status !== "running") return { kind: "done" };
   const s = stepAt(state, now);
-  // No call outlives the deadline of the run: the merge, which no check skips, gets what is left.
+  // No model call outlives the deadline of the run: the merge, which no check skips, gets what is
+  // left. A render is code, bounded by its own timeout: the last version is rendered after it.
   const left = Math.max(0, state.deadlineAt - now);
-  for (const c of s.calls) c.timeoutMs = Math.min(c.timeoutMs, left);
+  for (const c of s.calls) if (c.kind !== "render") c.timeoutMs = Math.min(c.timeoutMs, left);
   return s;
 }
 
+const kit: StepKit = { call: (...args) => call(...args) };
+
 function stepAt(state: RunState, now: number): CallsStep {
+  if (state.pending?.gate) return gateStep(state);
   if (state.pending) return dedupeStep(state, now);
+  const unrendered = versionToRender(state);
+  if (unrendered)
+    return step(
+      state,
+      state.stage ?? "merging",
+      "render",
+      [versionRenderCall(state, kit, unrendered)],
+      null,
+    );
   if (state.momentsDue) return momentsStep(state, now);
   const next = state.next;
   switch (next.phase) {
     case "draft":
       return draftStep(state);
+    case "spec":
+      return step(
+        state,
+        "merging",
+        "spec",
+        specCalls(state, kit, fits(state, { chart_spec: 1 })),
+        null,
+      );
+    case "seed":
+      return step(state, "merging", "seed", [seedRenderCall(state, kit)], null);
     case "merge":
+      if (state.chart)
+        return step(
+          state,
+          "merging",
+          "merge",
+          fits(state, { chart_merge: 1 }) ? chartMergeCalls(state, kit) : [],
+          null,
+        );
       return step(
         state,
         "merging",
@@ -330,22 +418,31 @@ function step(
 function call(
   state: RunState,
   key: string,
-  seat: Seat,
+  seat: CallSeat,
   kind: CallKind,
   prompt: { system: string; prompt: string },
   search?: { maxResults: number },
 ): Call {
   const t = state.config.callTimeoutMs;
   const timeoutMs =
-    kind === "draft"
+    kind === "draft" || kind === "brief_web"
       ? t.draft
-      : kind === "merge"
+      : kind === "merge" || kind === "chart_merge"
         ? t.merge
-        : kind === "round1" || kind === "round2" || kind === "round3"
+        : kind === "round1" ||
+            kind === "round2" ||
+            kind === "round3" ||
+            kind === "brief_user" ||
+            kind === "chart_spec" ||
+            kind === "chart_round1" ||
+            kind === "chart_round2" ||
+            kind === "chart_round3"
           ? t.round
           : kind === "editor"
             ? t.editor
-            : t.utility;
+            : kind === "render"
+              ? t.render
+              : t.utility;
   return {
     key,
     seat,
@@ -373,6 +470,11 @@ function inTime(state: RunState, now: number, timeoutMs: number): boolean {
 }
 
 function draftStep(state: RunState): CallsStep {
+  if (state.chart) {
+    const kind = state.chart.origin === "web" ? "brief_web" : "brief_user";
+    if (!fits(state, { [kind]: MODELS.length })) return finishStep(state, "budget");
+    return step(state, "drafting", "draft", briefCalls(state, kit), null);
+  }
   if (!fits(state, { draft: MODELS.length })) return finishStep(state, "budget");
   const maxResults = state.config.searchResultsPerDraft;
   const prompt = draftPrompt({ question: state.question, maxResults });
@@ -412,10 +514,15 @@ function draftLabel(runId: string, model: ModelId): string {
 const ROUND_KIND = { 1: "round1", 2: "round2", 3: "round3" } as const;
 
 function roundStep(state: RunState, round: 1 | 2 | 3, now: number): CallsStep {
-  const kind = ROUND_KIND[round];
+  const kind = state.chart ? CHART_ROUND_KIND[round] : ROUND_KIND[round];
   if (!inTime(state, now, state.config.callTimeoutMs.round))
     return closeStep(state, "deadline", now);
   if (!fits(state, { [kind]: MODELS.length })) return closeStep(state, "budget", now);
+  if (state.chart) {
+    const threads = (voter: ModelId) =>
+      votableThreads(state, round).map((id) => threadView(state, id, voter));
+    return step(state, `round${round}`, "round", chartRoundCalls(state, round, kit, threads), null);
+  }
   const calls = MODELS.map((m) =>
     call(state, `round:${round}:${m}`, m, kind, roundPromptFor(state, m, round)),
   );
@@ -494,7 +601,8 @@ function threadView(state: RunState, threadId: string, voter: ModelId): ThreadVi
           id,
           by: [s.author, ...s.coAuthors].map((m) => labels[m] ?? m).join(" and "),
           op: s.op,
-          text: s.text,
+          text:
+            s.op === "patch" ? `${s.target.layer} ${s.target.path || '""'} = ${s.text}` : s.text,
           reason: s.reason,
         },
       ];
@@ -584,6 +692,9 @@ function momentsStep(state: RunState, now: number): CallsStep {
  * room for it, else done (the accepted changes are applied either way).
  */
 function closeStep(state: RunState, cut: Cut | null, now: number): CallsStep {
+  // A chart run has no editor pass: its last threads and disputes are settled, the last version
+  // rendered, then the run ends.
+  if (state.chart) return step(state, state.stage ?? "done", "settle", [], cut);
   const preview = clone(state);
   resolveAndApply(preview, { final: true, round: 4 }, []);
   const accepted = Object.values(preview.threads).some((t) => t.state === "accepted");
@@ -621,6 +732,18 @@ function editCheckStep(state: RunState, now: number): CallsStep {
       ? [call(state, "edit-check:0", "utility", "editor_check", editorCheckPrompt({ rewrites }))]
       : [];
   return step(state, "editing", "edit_check", calls, null);
+}
+
+function gateStep(state: RunState): CallsStep {
+  const pending = state.pending;
+  if (!pending) throw new Error("no pending round");
+  return step(
+    state,
+    state.stage ?? "round1",
+    "gate",
+    [gateCall(state, kit, pending.round, pending.candidates)],
+    null,
+  );
 }
 
 function finishStep(state: RunState, cut: Cut | null): CallsStep {
@@ -676,7 +799,7 @@ export function beginStep(state: RunState, s: Step): RunEvent[] {
     });
   }
   for (const c of s.calls) {
-    if (c.seat === "utility") continue;
+    if (!isPanel(c.seat)) continue;
     events.push({
       key: `model.status:${c.key}:thinking`,
       batch: s.batch,
@@ -741,6 +864,25 @@ export function reduce(
     case "finish":
       reduceFinish(run, s, events);
       break;
+    case "spec":
+      reduceSpec(run, outputs);
+      break;
+    case "seed":
+      reduceSeedRender(run, outputs, events);
+      break;
+    case "gate":
+      reduceGateStep(run, outputs, events);
+      break;
+    case "render":
+      reduceVersionRender(run, outputs, events);
+      break;
+    case "settle": {
+      const before = events.length;
+      resolveAndApply(run, { final: true, round: 4 }, events);
+      run.momentsDue = events.length > before;
+      run.next = { phase: "finish" };
+      break;
+    }
   }
   if (s.phase !== "moments") run.recent.push(...events);
   if (run.status !== "running") {
@@ -799,9 +941,9 @@ function recordResults(
       latencyMs: r.latencyMs,
       usage: r.status === "ok" ? r.usage : null,
     };
-    if (reason !== null)
+    if (reason !== null && c.seat !== "renderer")
       run.abstentions.push({ call: c.key, seat: c.seat, stage: s.stage, reason });
-    if (c.seat !== "utility") {
+    if (isPanel(c.seat)) {
       const status = reason === null ? "done" : "abstained";
       events.push({
         key: `model.status:${c.key}:${status}`,
@@ -825,6 +967,12 @@ function valid(kind: CallKind, output: unknown): boolean {
 }
 
 function reduceDrafts(run: RunState, outputs: Map<string, Output>, events: RunEvent[]) {
+  if (run.chart) {
+    if (!reduceBriefs(run, outputs, events)) return fail(run, "no_drafts", events);
+    run.flags.fewDrafts = run.chart.briefs.length < run.config.quorum;
+    run.next = { phase: "merge" };
+    return;
+  }
   // Sources and the URLs of claims are matched by their normalized form (see normalizeUrl).
   const urls = new Map<string, string>();
   for (const s of run.sources) {
@@ -894,6 +1042,7 @@ function reduceDrafts(run: RunState, outputs: Map<string, Output>, events: RunEv
 }
 
 function reduceMerge(run: RunState, outputs: Map<string, Output>, events: RunEvent[]) {
+  if (run.chart) return reduceChartMerge(run, outputs, events);
   const out = outputs.get("merge:0");
   const seed = seedDocument({
     drafts: run.drafts,
@@ -931,6 +1080,7 @@ function reduceRound(
   const visible = new Set(votableThreads(run, round));
   const summary: RoundSummary = { round, answered: [], newSuggestions: 0, changedPositions: 0 };
   const candidates: Candidate[] = [];
+  const data: DataCandidate[] = [];
   const snapshot = latest(run);
   const knownSources = new Set(run.sources.map((s) => s.id));
   for (const model of MODELS) {
@@ -949,7 +1099,16 @@ function reduceRound(
       events.push(...cast.events);
       summary.changedPositions += cast.changedPositions;
     }
-    if (round < 3 && output.suggestions) {
+    if (run.chart) {
+      const read = readChartRound(run, {
+        model,
+        round,
+        output: out.output as Partial<OutputOf<"chart_round2">>,
+        events,
+      });
+      candidates.push(...read.candidates);
+      data.push(...read.data);
+    } else if (round < 3 && output.suggestions) {
       const checked = checkSuggestions({
         model,
         round: round as 1 | 2,
@@ -963,12 +1122,48 @@ function reduceRound(
     }
   }
   if (round === 3) return completeRound(run, summary, events);
+  if (run.chart) {
+    const pending = { round: round as 1 | 2, candidates, pairs: [], summary, data };
+    if (candidates.some((c) => c.op === "patch" && c.layer !== "caption"))
+      run.pending = { ...pending, gate: true };
+    else afterGate(run, pending, candidates, events);
+    return;
+  }
   const pairs = duplicatePairs(run, candidates);
   if (pairsToAsk(pairs).length > 0) {
     run.pending = { round: round as 1 | 2, candidates, pairs, summary };
     return;
   }
   place(run, round as 1 | 2, candidates, pairs, {}, summary, events);
+}
+
+function reduceGateStep(run: RunState, outputs: Map<string, Output>, events: RunEvent[]) {
+  const pending = run.pending;
+  if (!pending) return;
+  run.pending = null;
+  const kept = reduceGate(run, pending.round, pending.candidates, outputs, events);
+  afterGate(run, pending, kept, events);
+}
+
+/**
+ * A chart round after its render gate: the data patches open disputes, and the patches that
+ * rendered are placed. Patches are duplicates only when code says so (the same path and value), so
+ * no duplicate check of the utility model is needed.
+ */
+function afterGate(
+  run: RunState,
+  pending: NonNullable<RunState["pending"]>,
+  candidates: Candidate[],
+  events: RunEvent[],
+) {
+  pending.summary.newSuggestions += placeDataPatches(
+    run,
+    pending.round,
+    pending.data ?? [],
+    events,
+  );
+  const pairs = duplicatePairs(run, candidates);
+  place(run, pending.round, candidates, pairs, {}, pending.summary, events);
 }
 
 function reduceDedupe(run: RunState, outputs: Map<string, Output>, events: RunEvent[]) {
@@ -1021,11 +1216,14 @@ function completeRound(run: RunState, summary: RoundSummary, events: RunEvent[])
   run.rounds.push(summary);
   const quorumLost = summary.answered.length < run.config.quorum;
   if (quorumLost) run.flags.quorumLost = true;
-  const noThreads = Object.keys(run.threads).length === 0;
-  const noProgress = round >= 2 && summary.newSuggestions === 0 && summary.changedPositions === 0;
+  // A chart run goes on while a dispute waits for the checks of the next round.
+  const awaiting = disputesAwaitChecks(run, round);
+  const noThreads = Object.keys(run.threads).length === 0 && !awaiting;
+  const noProgress =
+    round >= 2 && summary.newSuggestions === 0 && summary.changedPositions === 0 && !awaiting;
   const last = round === 3 || quorumLost || noThreads || noProgress;
   resolveAndApply(run, { final: last, round }, events);
-  const open = Object.values(run.threads).some((t) => t.state === "open");
+  const open = Object.values(run.threads).some((t) => t.state === "open") || hasOpenDisputes(run);
   run.next = last || !open ? { phase: "close" } : { phase: "round", round: (round + 1) as 2 | 3 };
   run.momentsDue = true;
 }
@@ -1037,10 +1235,11 @@ function resolveAndApply(
 ) {
   const resolved = resolveThreads(run, { ...input, batch: run.batch });
   events.push(...resolved.events);
-  if (resolved.accepted.length === 0) return;
+  const settled: RowSettlement[] = settleDisputes(run, input, events);
+  if (resolved.accepted.length === 0 && settled.length === 0) return;
   const current = latest(run);
   const changes = changesOf(run, resolved.accepted, run.snapshots, current);
-  const applied = apply(current, changes, run.counters.paragraph);
+  const applied = apply(current, changes, run.counters.paragraph, settled);
   run.snapshots.push(applied.snapshot);
   run.counters.paragraph = applied.nextParagraph;
   events.push({
@@ -1056,7 +1255,7 @@ function resolveAndApply(
 function reduceEdit(run: RunState, s: CallsStep, outputs: Map<string, Output>, events: RunEvent[]) {
   resolveAndApply(run, { final: true, round: 4 }, events);
   const c = s.calls[0];
-  if (!c || c.seat === "utility") throw new Error("an edit step calls one panel model");
+  if (!c || !isPanel(c.seat)) throw new Error("an edit step calls one panel model");
   const current = latest(run);
   const rewrites: Rewrite[] = [];
   const out = outputs.get(c.key)?.output as OutputOf<"editor"> | undefined;

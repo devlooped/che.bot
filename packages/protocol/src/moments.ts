@@ -1,5 +1,5 @@
 import type { EventOf, EventType, RunEvent } from "./events.ts";
-import { MODEL_NAMES, type ModelId, type Suggestion } from "./model.ts";
+import { type Chart, MODEL_NAMES, type ModelId, type Suggestion } from "./model.ts";
 import { byModelOrder } from "./util.ts";
 
 // Moments: the plain one-liners of the glimpse. One utility call per round boundary phrases a batch
@@ -42,8 +42,39 @@ const TEMPLATES: ((events: readonly RunEvent[]) => string | null)[] = [
       : `${names(who)} no llegaron a contestar esta vez y sigue el resto.`;
   },
   (events) => {
+    const chart = chartOf(of(events, "document.seeded")[0]);
+    if (!chart) return null;
+    const check = chart.data.rows.filter(
+      (r) => r.status === "single" || r.status === "disputed",
+    ).length;
+    if (chart.data.origin === "user") return "Juntamos los planes en un solo gráfico de tus datos.";
+    return check === 0
+      ? `Juntamos los datos en un gráfico: ${chart.data.rows.length} ${plural(chart.data.rows.length, "dato", "datos")}, y coinciden en todos.`
+      : `Juntamos los datos en un gráfico: ${chart.data.rows.length} ${plural(chart.data.rows.length, "dato", "datos")}, y ${check} ${plural(check, "queda", "quedan")} para verificar con las fuentes.`;
+  },
+  (events) => {
+    const settled = of(events, "dispute.settled");
+    const held = settled.filter((e) => e.state === "held").length;
+    const range = settled.filter((e) => e.state === "unsettled").length;
+    if (held + range === 0) return null;
+    const parts = [
+      held
+        ? `${held} ${plural(held, "dato quedó confirmado", "datos quedaron confirmados")} por su fuente`
+        : "",
+      range ? `en ${range} las fuentes no coinciden y se muestra el rango` : "",
+    ].filter(Boolean);
+    return `${parts.join("; ")}.`.replace(/^./, (c) => c.toUpperCase());
+  },
+  (events) => {
+    const n = of(events, "brief.completed").length;
+    if (n === 0) return null;
+    return n === 4
+      ? "Los cuatro ya juntaron sus datos, cada uno por su cuenta."
+      : `${n} de los cuatro juntaron sus datos.`;
+  },
+  (events) => {
     const seeded = of(events, "document.seeded")[0];
-    if (!seeded) return null;
+    if (!seeded || chartOf(seeded)) return null;
     const statuses = Object.values(seeded.snapshot.blocks).map((b) =>
       b.kind === "paragraph" ? b.status : "agreed",
     );
@@ -117,6 +148,12 @@ const TEMPLATES: ((events: readonly RunEvent[]) => string | null)[] = [
     of(events, "run.completed").length > 0 ? "Listo: la respuesta está terminada." : null,
 ];
 
+function chartOf(seeded: EventOf<"document.seeded"> | undefined): Chart | null {
+  if (!seeded) return null;
+  const block = Object.values(seeded.snapshot.blocks).find((b) => b.kind === "chart");
+  return block?.kind === "chart" ? block : null;
+}
+
 /** The template moments of a batch of events: at most 3 sentences, most important first. */
 export function templateMoments(events: readonly RunEvent[]): string[] {
   const out: string[] = [];
@@ -149,7 +186,36 @@ export function momentFacts(
           `${name(e.model)} finished its own answer, alone, with ${e.claims.length} key points.`,
         );
         break;
+      case "brief.completed":
+        facts.push(
+          `${name(e.model)} prepared the data of the chart alone${e.brief.rows.length ? `, ${e.brief.rows.length} values each with its source` : ""}.`,
+        );
+        break;
+      case "dispute.settled":
+        facts.push(
+          e.state === "held"
+            ? `The sources settled the value of ${e.row}: one value's source holds up.`
+            : e.state === "unsettled"
+              ? `The sources of ${e.row} disagree: the chart shows the range of values.`
+              : e.state === "unverified"
+                ? `The only source of ${e.row} did not hold up when checked: the value is marked.`
+                : `Nobody checked ${e.row}.`,
+        );
+        break;
+      case "patch.dropped":
+        if (e.why === "render_failed")
+          facts.push(
+            `A change to the chart by ${name(e.model)} was dropped: the chart did not draw with it.`,
+          );
+        break;
       case "document.seeded": {
+        const chart = chartOf(e);
+        if (chart) {
+          facts.push(
+            `The data was merged into one chart with ${chart.data.rows.length} rows${chart.data.origin === "web" ? `, ${chart.data.rows.filter((r) => r.status === "single" || r.status === "disputed").length} of them to check against their sources` : ""}.`,
+          );
+          break;
+        }
         const statuses = Object.values(e.snapshot.blocks).map((b) =>
           b.kind === "paragraph" ? b.status : "agreed",
         );

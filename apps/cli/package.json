@@ -8,6 +8,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@chebot/charts": "workspace:*",
     "@chebot/driver": "workspace:*",
     "@chebot/protocol": "workspace:*",
     "@chebot/providers": "workspace:*",

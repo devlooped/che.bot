@@ -1,10 +1,11 @@
 import {
+  type CallSeat,
+  isPanel,
   MODEL_NAMES,
   MODELS,
   type ModelId,
   type ModelSnapshot,
   type RunState,
-  type Seat,
 } from "@chebot/protocol";
 import { type Check, criteria, type Share } from "./criteria.ts";
 import {
@@ -696,8 +697,8 @@ function slot<K extends string, V>(map: Partial<Record<K, V>>, key: K, init: () 
   return created;
 }
 
-function seatName(seat: Seat): string {
-  return seat === "utility" ? "utility" : MODEL_NAMES[seat];
+function seatName(seat: CallSeat): string {
+  return isPanel(seat) ? MODEL_NAMES[seat] : seat;
 }
 
 // ---------------------------------------------------------------------------------------------

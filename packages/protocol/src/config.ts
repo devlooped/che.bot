@@ -8,7 +8,17 @@ export type CallKind =
   | "dedupe"
   | "editor"
   | "editor_check"
-  | "moments";
+  | "moments"
+  // chart runs
+  | "brief_web"
+  | "brief_user"
+  | "chart_merge"
+  | "chart_spec"
+  | "chart_round1"
+  | "chart_round2"
+  | "chart_round3"
+  /** The render gate: executed by the renderer, not a model (see `RenderRequest`). */
+  | "render";
 
 export type EditorPolicy = "closest" | "rotation";
 
@@ -19,7 +29,14 @@ export type EditorPolicy = "closest" | "rotation";
 export interface RunConfig {
   /** The budget of the question in USD: a stage starts only if spent + its worst case fits. */
   budgetUsd: number;
-  callTimeoutMs: { draft: number; merge: number; round: number; editor: number; utility: number };
+  callTimeoutMs: {
+    draft: number;
+    merge: number;
+    round: number;
+    editor: number;
+    utility: number;
+    render: number;
+  };
   deadlineMs: { quick: number; thorough: number };
   searchResultsPerDraft: number;
   /** Worst-case cost of one call of each kind, used by the budget check before a stage. */
@@ -40,7 +57,15 @@ export interface RunConfig {
 export const DEFAULT_CONFIG: RunConfig = {
   budgetUsd: 3,
   // The editor took 10-17 s in phase 1; 35 s leaves it room before a thorough deadline more often.
-  callTimeoutMs: { draft: 90_000, merge: 60_000, round: 45_000, editor: 35_000, utility: 20_000 },
+  // A render of a few specs took 10-60 ms in the Workers runtime (step 36); 15 s bounds a hang.
+  callTimeoutMs: {
+    draft: 90_000,
+    merge: 60_000,
+    round: 45_000,
+    editor: 35_000,
+    utility: 20_000,
+    render: 15_000,
+  },
   deadlineMs: { quick: 120_000, thorough: 240_000 },
   searchResultsPerDraft: 10,
   worstCaseUsd: {
@@ -53,6 +78,14 @@ export const DEFAULT_CONFIG: RunConfig = {
     editor: 0.15,
     editor_check: 0.02,
     moments: 0.005,
+    brief_web: 0.25,
+    brief_user: 0.1,
+    chart_merge: 0.06,
+    chart_spec: 0.15,
+    chart_round1: 0.1,
+    chart_round2: 0.1,
+    chart_round3: 0.06,
+    render: 0,
   },
   // Reasoning models spend part of these on reasoning. Measured in phase 1: a draft up to 3,200
   // output tokens, a merge of 4 long drafts 5,000, a round 2,400 (Grok at low effort); the
@@ -67,6 +100,14 @@ export const DEFAULT_CONFIG: RunConfig = {
     editor: 6000,
     editor_check: 2000,
     moments: 800,
+    brief_web: 8000,
+    brief_user: 3000,
+    chart_merge: 6000,
+    chart_spec: 4000,
+    chart_round1: 4000,
+    chart_round2: 4000,
+    chart_round3: 2500,
+    render: 0,
   },
   caps: { round1: 3, round2: 2 },
   quorum: 3,

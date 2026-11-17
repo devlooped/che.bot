@@ -1,5 +1,6 @@
 import type { CallLedger, LedgerEntry } from "@chebot/driver";
 import type {
+  ChartInput,
   LoggedEvent,
   ModelSnapshot,
   QuestionClass,
@@ -37,7 +38,8 @@ const SCHEMA = [
      budget_usd REAL,
      deadline_at INTEGER,
      attempt INTEGER NOT NULL DEFAULT 0,
-     state TEXT
+     state TEXT,
+     chart TEXT
    )`,
   `CREATE TABLE IF NOT EXISTS events (
      seq INTEGER PRIMARY KEY,
@@ -107,6 +109,8 @@ export interface RunRecord {
   attempt: number;
   /** The protocol state of the current attempt. */
   state: RunState | null;
+  /** A chart run: its upload (parsed when it was asked) or none (web data); null for prose. */
+  chart: ChartInput | null;
 }
 
 interface RunRow extends Record<string, SqlStorageValue> {
@@ -134,10 +138,12 @@ interface RunRow extends Record<string, SqlStorageValue> {
   deadline_at: number | null;
   attempt: number;
   state: string | null;
+  /** Absent (undefined) in the rows of objects created before charts. */
+  chart: string | null;
 }
 
 /** The columns of the run row that `updateRun` may set. */
-export type RunUpdate = Partial<Omit<RunRow, "id" | "owner" | "question" | "created_at">>;
+export type RunUpdate = Partial<Omit<RunRow, "id" | "owner" | "question" | "created_at" | "chart">>;
 
 /**
  * The keys of an attempt: the first keeps the keys of the protocol, a free rerun prefixes its
@@ -201,6 +207,7 @@ export class RunStore {
       deadlineAt: row.deadline_at,
       attempt: row.attempt,
       state: row.state ? (JSON.parse(row.state) as RunState) : null,
+      chart: row.chart ? (JSON.parse(row.chart) as ChartInput) : null,
     };
   }
 
@@ -213,10 +220,11 @@ export class RunStore {
     amount: number;
     currency: string;
     createdAt: number;
+    chart?: ChartInput | null;
   }): void {
     this.sql.exec(
-      `INSERT INTO run (id, owner, question, class, probability, amount, currency, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'quoted', ?)`,
+      `INSERT INTO run (id, owner, question, class, probability, amount, currency, status, created_at, chart)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'quoted', ?, ?)`,
       run.id,
       run.owner,
       run.question,
@@ -225,6 +233,7 @@ export class RunStore {
       run.amount,
       run.currency,
       run.createdAt,
+      run.chart ? JSON.stringify(run.chart) : null,
     );
   }
 

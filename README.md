@@ -16,6 +16,8 @@ The full plan: [.alta/plans/2026-11-16-consensus-answers.md](.alta/plans/2026-11
 
 - `packages/protocol`: types, schemas, reducer, prompts. No I/O.
 - `packages/providers`: model providers, roles, families, catalog.
+- `packages/driver`: the loop that makes the calls of a step through a ledger (CLI and `RunObject`).
+- `packages/charts`: the render gate of chart runs: Vega-Lite to SVG in Vega's interpreter mode.
 - `apps/cli`: headless runner and evaluation (Node).
 - `apps/web`: the Worker (API, `RunObject` per question, `SpendMeter`), D1 migrations, and the React app (phase 3).
 - `eval/`: the question set (`questions.jsonl`) and the evaluation reports (`results/`).
@@ -37,6 +39,13 @@ pnpm lint
 # One question through the full process: the class sets only the price; --mode quick stops
 # after the merge. Logs go to .runs/.
 pnpm cli ask "¿Cuánto mide el Aconcagua?" --max-usd 1
+
+# A chart run: the four models find the data on the web, each value with its citation, or chart
+# the rows of a CSV (--csv implies --chart). Writes chart.vl.json (the Vega-Lite spec, data and
+# theme included), rows.json (the rows with their sources and disputes) and chart-v<N>.svg (every
+# version) next to the logs, and prints the brief, the rows, the disputes and the cost.
+pnpm cli ask "¿Cuál fue la inflación mensual de Argentina en 2026?" --chart --max-usd 1.5
+pnpm cli ask "¿Cuánto facturó cada producto por trimestre?" --csv ventas.csv
 
 # The evaluation of phase 1. --max-usd caps the spend of the whole evaluation, earlier
 # invocations included; every call is kept under eval/results/raw/, so a rerun pays nothing twice
@@ -95,16 +104,29 @@ practices).
 The browser app signs in with the Auth0 SPA SDK, configured by public build variables:
 `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID` and `VITE_AUTH0_AUDIENCE` (see `apps/web/.env.example`).
 
-| Route                                                                | Who may call it                                                    |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `POST /api/runs {question}` → `201 {runId, class, amount, currency}` | signed in; the `admin` or `beta` role until `LAUNCHED` is `"true"` |
-| `POST /api/runs/:id/pay` → `202`                                     | the owner; an `admin` owner runs free, with no payment job         |
-| `POST /api/runs/:id/rerun` → `202`                                   | the owner, once, after a paid run failed                           |
-| `DELETE /api/runs/:id`                                               | the owner or an admin                                              |
-| `GET /api/runs/:id`, `/events?after=`, `/ws?after=`, `/snapshots/:v` | anyone with the link (`mine` in the summary: the caller owns it)   |
-| `GET /api/me/runs`                                                   | signed in                                                          |
-| `GET`, `PUT /api/admin/models`, `/api/admin/prices`                  | `admin`                                                            |
-| `POST /api/pay/hook`                                                 | the jobs service, with the run's own token as Bearer               |
+| Route                                                                        | Who may call it                                                    |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `POST /api/runs {question, chart?}` → `201 {runId, class, amount, currency}` | signed in; the `admin` or `beta` role until `LAUNCHED` is `"true"` |
+| `POST /api/runs/:id/pay` → `202`                                             | the owner; an `admin` owner runs free, with no payment job         |
+| `POST /api/runs/:id/rerun` → `202`                                           | the owner, once, after a paid run failed                           |
+| `DELETE /api/runs/:id`                                                       | the owner or an admin                                              |
+| `GET /api/runs/:id`, `/events?after=`, `/ws?after=`, `/snapshots/:v`         | anyone with the link (`mine` in the summary: the caller owns it)   |
+| `GET /api/runs/:id/charts/:v.svg`                                            | anyone with the link: the render of version `v` of a chart run     |
+| `GET /api/me/runs`                                                           | signed in                                                          |
+| `GET`, `PUT /api/admin/models`, `/api/admin/prices`                          | `admin`                                                            |
+| `POST /api/pay/hook`                                                         | the jobs service, with the run's own token as Bearer               |
+
+A chart run is asked with `chart` in the body: `{ "chart": {} }` for data from the web, or
+`{ "chart": { "csv": "<the text of the file>" } }` for an upload, parsed when it is asked (at most
+64 KB, 500 rows and 12 columns; a bad file answers 400 before anything is paid). The summary of a
+run says `chart: "web" | "user" | null`.
+
+The render gate of chart runs runs inside `RunObject`. Step 36 measured it in the Workers runtime:
+Vega in interpreter mode renders a chart in 35 ms the first time and 7 ms after (without the
+interpreter Vega fails there with "Code generation from strings disallowed"); its packages add
+851 KiB minified (296 KiB gzip), whose evaluation takes 40-110 ms of the 1 s startup limit. The
+production build puts them in a chunk of their own that `RunObject` imports on its first render, so
+a Worker that only answers the API never evaluates it; the whole upload is 2,545 KiB (631 KiB gzip).
 
 Sign-in is an Auth0 access token (`Authorization: Bearer`), verified with the tenant's JWKS
 (RS256, issuer `https://AUTH0_DOMAIN/`, audience `AUTH0_AUDIENCE`); the roles are read from any

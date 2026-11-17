@@ -1,0 +1,19 @@
+{
+  "name": "@chebot/charts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@chebot/protocol": "workspace:*",
+    "vega": "^6.4.0",
+    "vega-interpreter": "^2.3.2",
+    "vega-lite": "^6.5.0"
+  }
+}

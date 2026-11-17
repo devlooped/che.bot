@@ -5,6 +5,7 @@ import {
   chooseEditor,
   clone,
   DEFAULT_CONFIG,
+  isPanel,
   type ModelId,
   type ModelSnapshot,
   type RunState,
@@ -115,7 +116,7 @@ export async function runQuestion(q: Question, key: string, ctx: RunContext): Pr
     CLOCK_START,
     (state, step, at) => {
       const editor = step.calls[0]?.seat;
-      if (step.phase === "edit" && editor && editor !== "utility" && !before.value)
+      if (step.phase === "edit" && editor && isPanel(editor) && !before.value)
         before.value = { state: clone(state), at, editor };
     },
   );

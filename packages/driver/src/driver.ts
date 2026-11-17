@@ -3,6 +3,7 @@ import {
   beginStep,
   type Call,
   type CallResult,
+  type CallSeat,
   type CallsStep,
   type CreateRunInput,
   createRun,
@@ -10,6 +11,8 @@ import {
   MODELS,
   type ModelSnapshot,
   nextStep,
+  type OutputOf,
+  type RenderRequest,
   type RunState,
   reduce,
   type Seat,
@@ -21,10 +24,23 @@ import { type ModelProvider, type ModelRef, ProviderError, type Usage } from "@c
 // part every runtime shares: the CLI loops over it with `drive`, the Durable Object runs one step
 // per alarm.
 
+/**
+ * The render gate of chart runs: Vega-Lite compiled and rendered to SVG (in Vega's interpreter
+ * mode, which the Workers runtime needs). The driver hands it the calls of kind "render" instead of
+ * a model, with the same ledger, timeout and events, so the reducer stays pure. A spec that does
+ * not compile or render is a failed result, not an error.
+ */
+export interface ChartRenderer {
+  render(req: RenderRequest & { key: string; signal: AbortSignal }): Promise<OutputOf<"render">>;
+}
+
+/** The model of the ledger entries of render calls. */
+export const RENDERER_MODEL: ModelRef = { id: "renderer", effort: null };
+
 /** A finished call, as the ledger keeps it. */
 export interface LedgerEntry {
   result: CallResult;
-  seat: Seat;
+  seat: CallSeat;
   model: ModelRef;
   /** The message of the provider error, for an abstention. */
   error: string | null;
@@ -77,7 +93,7 @@ export function memoryLedger(): CallLedger & {
 /** One line of the call log. */
 export interface CallLogEntry {
   key: string;
-  seat: Seat;
+  seat: CallSeat;
   kind: Call["kind"];
   stage: string;
   model: string;
@@ -92,6 +108,8 @@ export interface CallLogEntry {
 
 export interface CallOptions {
   provider: ModelProvider;
+  /** Executes the render calls of chart runs; without it, a render call abstains. */
+  renderer?: ChartRenderer;
   ledger: CallLedger;
   /** The clock: the latency of an abstention. */
   now: () => number;
@@ -128,7 +146,8 @@ export function roleOf(seat: Seat): string {
   return seat === "utility" ? "utility" : `panel.${seat}`;
 }
 
-export function modelFor(models: ModelSnapshot, seat: Seat): ModelRef {
+export function modelFor(models: ModelSnapshot, seat: CallSeat): ModelRef {
+  if (seat === "renderer") return RENDERER_MODEL;
   const model = models[roleOf(seat)];
   if (!model) throw new Error(`The model snapshot of the run has no ${roleOf(seat)}.`);
   return model;
@@ -176,6 +195,7 @@ export async function drive(
       provider: options.provider,
       ledger,
       now,
+      ...(options.renderer ? { renderer: options.renderer } : {}),
       ...(options.onCall ? { onCall: options.onCall } : {}),
     });
     for (const entry of results) seen.set(entry.result.key, entry);
@@ -243,31 +263,10 @@ async function callOnce(state: RunState, call: Call, options: CallOptions): Prom
     entry = abstain("timeout", `${call.key} was cut short by a restart and the deadline passed.`);
   } else {
     try {
-      const out = await options.provider.generate({
-        callKey: call.key,
-        model,
-        system: call.system,
-        prompt: call.prompt,
-        schema: call.schema,
-        maxOutputTokens: call.maxOutputTokens,
-        ...(call.search ? { search: call.search } : {}),
-        signal: AbortSignal.timeout(call.timeoutMs),
-      });
-      entry = {
-        result: {
-          status: "ok",
-          key: call.key,
-          output: out.output,
-          sources: out.sources,
-          usage: out.usage,
-          costUsd: out.costUsd,
-          latencyMs: out.latencyMs,
-        },
-        seat: call.seat,
-        model,
-        error: null,
-        usage: null,
-      };
+      entry =
+        call.kind === "render"
+          ? await renderOnce(call, options, model, started)
+          : await generateOnce(call, options, model);
     } catch (error) {
       const failure = ProviderError.isInstance(error) ? error : null;
       entry = abstain(
@@ -282,6 +281,87 @@ async function callOnce(state: RunState, call: Call, options: CallOptions): Prom
   return entry;
 }
 
+async function generateOnce(
+  call: Call,
+  options: CallOptions,
+  model: ModelRef,
+): Promise<LedgerEntry> {
+  const out = await options.provider.generate({
+    callKey: call.key,
+    model,
+    system: call.system,
+    prompt: call.prompt,
+    schema: call.schema,
+    maxOutputTokens: call.maxOutputTokens,
+    ...(call.search ? { search: call.search } : {}),
+    signal: AbortSignal.timeout(call.timeoutMs),
+  });
+  return {
+    result: {
+      status: "ok",
+      key: call.key,
+      output: out.output,
+      sources: out.sources,
+      usage: out.usage,
+      costUsd: out.costUsd,
+      latencyMs: out.latencyMs,
+    },
+    seat: call.seat,
+    model,
+    error: null,
+    usage: null,
+  };
+}
+
+/** A render call: the renderer, under the call's timeout. */
+async function renderOnce(
+  call: Call,
+  options: CallOptions,
+  model: ModelRef,
+  started: number,
+): Promise<LedgerEntry> {
+  if (!options.renderer || !call.render) throw new Error(`${call.key}: no renderer.`);
+  const rendered = await withTimeout(
+    options.renderer.render({
+      key: call.key,
+      specs: call.render.specs,
+      signal: AbortSignal.timeout(call.timeoutMs),
+    }),
+    call.timeoutMs,
+    call.key,
+  );
+  return {
+    result: {
+      status: "ok",
+      key: call.key,
+      output: rendered,
+      sources: [],
+      usage: { inputTokens: 0, outputTokens: 0 },
+      costUsd: 0,
+      latencyMs: options.now() - started,
+    },
+    seat: call.seat,
+    model,
+    error: null,
+    usage: null,
+  };
+}
+
+/** Rejects with a timeout ProviderError when `promise` takes longer than `ms`. */
+function withTimeout<T>(promise: Promise<T>, ms: number, key: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(new ProviderError({ kind: "timeout", callKey: key, message: `${key} timed out.` })),
+      ms,
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
+}
+
 /** The call records of the run, with the error and tokens of the abstentions this drive saw. */
 function callLog(state: RunState, seen: ReadonlyMap<string, LedgerEntry>): CallLogEntry[] {
   return Object.values(state.calls).map((c) => ({
@@ -289,7 +369,7 @@ function callLog(state: RunState, seen: ReadonlyMap<string, LedgerEntry>): CallL
     seat: c.seat,
     kind: c.kind,
     stage: c.stage,
-    model: state.models[roleOf(c.seat)]?.id ?? "",
+    model: modelFor(state.models, c.seat).id,
     status: c.status,
     reason: c.reason,
     error: seen.get(c.key)?.error ?? null,

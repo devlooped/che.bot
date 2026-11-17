@@ -1,9 +1,9 @@
-import { resolveConfig } from "@chebot/protocol";
+import { CSV_LIMITS, resolveConfig } from "@chebot/protocol";
 import { readModels, updateModels, updatePrices } from "./admin.ts";
 import { deps } from "./deps.ts";
 import type { Env } from "./env.ts";
 import { type Identity, isAdmin, mayAsk, type User } from "./identity.ts";
-import { questionOf, quoteQuestion } from "./quote.ts";
+import { chartOf, questionOf, quoteQuestion } from "./quote.ts";
 import { runStub } from "./run-object.ts";
 import { listRuns, readPrices } from "./settings.ts";
 import { spendMeter } from "./spend-meter.ts";
@@ -15,6 +15,7 @@ import { spendMeter } from "./spend-meter.ts";
 //   POST   /api/runs/:id/rerun        the owner, after a paid run failed
 //   DELETE /api/runs/:id              the owner or an admin
 //   GET    /api/runs/:id[/events|/ws|/snapshots/:v]   anyone with the link (`mine` for the owner)
+//   GET    /api/runs/:id/charts/:v.svg  the render of version v of a chart run, anyone with the link
 //   GET    /api/me/runs               signed in
 //   GET|PUT /api/admin/models|prices  admin
 //   POST   /api/pay/hook              the jobs service, with the token of the run as Bearer
@@ -34,12 +35,15 @@ const error = (status: number, message: string, extra: Record<string, unknown> =
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const UUID_ONLY = new RegExp(`^${UUID}$`, "i");
 const RUN_PATH = new RegExp(
-  `^/api/runs/(${UUID})(/events|/ws|/pay|/rerun|/snapshots/(\\d+))?$`,
+  `^/api/runs/(${UUID})(/events|/ws|/pay|/rerun|/snapshots/(\\d+)|/charts/(\\d+)\\.svg)?$`,
   "i",
 );
 
-/** The largest JSON body read, in bytes: a question is at most 2,000 characters. */
-const MAX_BODY_BYTES = 32_768;
+/**
+ * The largest JSON body read, in bytes: a question is at most 2,000 characters, and the CSV of a
+ * chart at most CSV_LIMITS.maxBytes, which JSON escaping may double.
+ */
+const MAX_BODY_BYTES = 2 * CSV_LIMITS.maxBytes + 32_768;
 
 /** A user, or 401. */
 function requireUser(identity: Identity): User | Response {
@@ -87,13 +91,15 @@ async function ask(request: Request, env: Env, identity: Identity): Promise<Resp
   if (read instanceof Response) return read;
   const parsed = questionOf(read.body);
   if ("error" in parsed) return error(400, parsed.error);
+  const chart = chartOf(read.body);
+  if ("error" in chart) return error(400, chart.error);
   const meter = spendMeter(env);
   const budget = resolveConfig(deps.runConfig(env)).budgetUsd;
   if (!(await meter.status(budget)).open)
     return error(503, "The daily limit was reached. Try again tomorrow.", {
       reason: "daily_cap",
     });
-  const quote = await quoteQuestion(env, user.userId, parsed.question);
+  const quote = await quoteQuestion(env, user.userId, parsed.question, chart.chart);
   if (quote.costUsd > 0)
     await meter.settle(`${quote.runId}:classify`, quote.costUsd).catch((e: unknown) => {
       console.warn("The cost of a classification could not be recorded.", e);
@@ -243,6 +249,19 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       return error(426, "Expected a WebSocket upgrade.");
     if (afterOf(url) === null) return error(400, "after is a sequence number.");
     return stub.fetch(request);
+  }
+
+  if (match[4] !== undefined) {
+    const svg = await stub.chartSvg(Number(match[4]));
+    if (svg === null) return error(404, "No such chart.");
+    return new Response(svg, {
+      headers: {
+        "content-type": "image/svg+xml; charset=utf-8",
+        // the SVG is the renderer's, with the models' texts escaped; it runs nothing either way
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
+        "x-content-type-options": "nosniff",
+      },
+    });
   }
 
   const version = Number(match[3]);

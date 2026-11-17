@@ -1,4 +1,4 @@
-import type { QuestionClass } from "@chebot/protocol";
+import { type ChartInput, CsvParseError, parseCsv, type QuestionClass } from "@chebot/protocol";
 import { deps } from "./deps.ts";
 import type { Env } from "./env.ts";
 import { runStub } from "./run-object.ts";
@@ -30,6 +30,27 @@ export function questionOf(body: unknown): { question: string } | { error: strin
 }
 
 /**
+ * The chart of a request body: absent for a prose run; `{ chart: {} }` asks for a chart of data
+ * from the web, `{ chart: { csv } }` for a chart of the uploaded CSV, parsed here by code (its
+ * limits are `CSV_LIMITS`), so that a bad file is refused before anything is paid.
+ */
+export function chartOf(body: unknown): { chart: ChartInput | null } | { error: string } {
+  const chart = (body as { chart?: unknown } | null)?.chart;
+  if (chart === undefined || chart === null || chart === false) return { chart: null };
+  if (chart === true) return { chart: { dataset: null } };
+  if (typeof chart !== "object" || Array.isArray(chart)) return { error: "chart is an object." };
+  const csv = (chart as { csv?: unknown }).csv;
+  if (csv === undefined || csv === null) return { chart: { dataset: null } };
+  if (typeof csv !== "string") return { error: "chart.csv is the text of a CSV file." };
+  try {
+    return { chart: { dataset: parseCsv(csv) } };
+  } catch (error) {
+    if (error instanceof CsvParseError) return { error: error.message };
+    throw error;
+  }
+}
+
+/**
  * Classifies the question with the classifier of the current settings; a failed classification,
  * or a choice under 0.7 (`classify` applies the rule), counts as complex. Resolving every role
  * also checks that a run of these settings could start before anyone pays for it.
@@ -58,6 +79,7 @@ export async function quoteQuestion(
   env: Env,
   owner: string,
   question: string,
+  chart: ChartInput | null = null,
 ): Promise<Quote & { costUsd: number }> {
   const classification = await classifyQuestion(env, question);
   const price = await priceOf(env.DB, classification.class);
@@ -70,6 +92,7 @@ export async function quoteQuestion(
     probability: classification.probability,
     amount: price.amount,
     currency: price.currency,
+    chart,
   });
   return {
     runId: summary.id,

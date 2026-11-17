@@ -1,3 +1,4 @@
+import type { ChartRenderer } from "@chebot/driver";
 import type { ConfigOverrides } from "@chebot/protocol";
 import {
   type CatalogModel,
@@ -37,6 +38,8 @@ export interface Deps {
   identify: IdentityResolver;
   /** The run configuration: the protocol's defaults, with the budget of RUN_BUDGET_USD. */
   runConfig(env: Env): ConfigOverrides;
+  /** The render gate of chart runs (see `lazyRenderer`). */
+  renderer(env: Env): ChartRenderer;
   /** The wait between two alarm ticks of a run; 0 in production. */
   tickDelayMs: number;
   /** The name of the one SpendMeter of the app; each test gets its own. */
@@ -53,6 +56,21 @@ export function budgetOverride(env: Pick<Env, "RUN_BUDGET_USD">): ConfigOverride
   return { budgetUsd };
 }
 
+let charts: Promise<typeof import("@chebot/charts")> | null = null;
+
+/**
+ * The render gate of chart runs, run inside RunObject: Vega in interpreter mode (@chebot/charts).
+ * Its module (about 850 KiB minified) is imported on the first render call, so a Worker that only
+ * answers the API never evaluates it; step 36 measured its evaluation at 40-110 ms and a first
+ * render at 35 ms in the Workers runtime, far inside the 1 s startup limit (packages/charts/src/render.ts).
+ */
+export const lazyRenderer: ChartRenderer = {
+  render: async (req) => {
+    charts ??= import("@chebot/charts");
+    return (await charts).renderSpecs(req);
+  },
+};
+
 const defaults: Deps = {
   provider: (env) => createGatewayProvider({ apiKey: env.AI_GATEWAY_API_KEY }),
   catalog: () => gatewayCatalog(),
@@ -61,6 +79,7 @@ const defaults: Deps = {
   jwks: (env) => auth0Jwks(env),
   identify: (request, env) => auth0Identity(request, env, deps.jwks(env)),
   runConfig: budgetOverride,
+  renderer: () => lazyRenderer,
   tickDelayMs: 0,
   spendMeterName: "global",
 };

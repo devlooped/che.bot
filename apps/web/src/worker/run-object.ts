@@ -2,12 +2,15 @@ import { DurableObject } from "cloudflare:workers";
 import { checkSnapshot, runCalls } from "@chebot/driver";
 import {
   beginStep,
+  type ChartInput,
+  type ChartOrigin,
   createRun,
   expiredEvent,
   type FailureReason,
   failRun,
   type LoggedEvent,
   nextStep,
+  type OutputOf,
   paymentConfirmedEvent,
   paymentRequestedEvent,
   type QuestionClass,
@@ -62,6 +65,8 @@ export interface QuoteInput {
   probability: number | null;
   amount: number;
   currency: string;
+  /** A chart run: the upload parsed by code (`parseCsv`), or none for data from the web. */
+  chart?: ChartInput | null;
 }
 
 export interface PayInput {
@@ -92,6 +97,8 @@ export interface RunSummary {
   attempt: number;
   createdAt: number;
   failure: FailureReason | null;
+  /** A chart run: where its data comes from; null for a prose run. */
+  chart: ChartOrigin | null;
 }
 
 export type RerunResult =
@@ -266,7 +273,14 @@ export class RunObject extends DurableObject<Env> {
         if (!run || !this.ready(run)) return false;
         const now = Date.now();
         const created = createRun(
-          { id: run.id, question: run.question, mode: "thorough", models, config },
+          {
+            id: run.id,
+            question: run.question,
+            mode: "thorough",
+            models,
+            config,
+            chart: run.chart,
+          },
           now,
         );
         this.store.append(created.events, now);
@@ -402,6 +416,7 @@ export class RunObject extends DurableObject<Env> {
             ...deps.runConfig(this.env),
             ...(run.budgetUsd !== null ? { budgetUsd: run.budgetUsd } : {}),
           },
+          chart: run.chart,
         },
         now,
       );
@@ -486,6 +501,7 @@ export class RunObject extends DurableObject<Env> {
     this.broadcast();
     const entries = await runCalls(state, step, {
       provider: deps.provider(this.env),
+      renderer: deps.renderer(this.env),
       ledger: this.store.ledger(prefix),
       now: Date.now,
     });
@@ -606,6 +622,20 @@ export class RunObject extends DurableObject<Env> {
   }
 
   /**
+   * The SVG of a version of the chart of a chart run: the render the run made of it (the render
+   * gate keeps it in the call ledger). Null when there is no such version or it did not render.
+   */
+  async chartSvg(version: number): Promise<string | null> {
+    const run = this.store.run();
+    const render = run?.state?.chart?.renders.findLast((r) => r.version === version && r.ok);
+    if (!run || !render) return null;
+    const entry = await this.store.ledger(attemptPrefix(run.attempt)).get(render.call);
+    if (entry?.result.status !== "ok") return null;
+    const results = (entry.result.output as OutputOf<"render">).results;
+    return results.find((r) => r.id === render.result && r.status === "ok")?.svg ?? null;
+  }
+
+  /**
    * Deletes the run: its row in the list, then everything the object stores. False when there is
    * none. On the way out, a job still waiting for payment is cancelled and a reservation is
    * settled with what was spent, both best effort.
@@ -664,6 +694,7 @@ export class RunObject extends DurableObject<Env> {
       attempt: run.attempt,
       createdAt: run.createdAt,
       failure: run.state?.failure ?? null,
+      chart: run.chart ? (run.chart.dataset ? "user" : "web") : null,
     };
   }
 

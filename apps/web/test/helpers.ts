@@ -168,9 +168,19 @@ export class FakeClassifier implements Classifier {
  * fire by themselves (the test runs each tick).
  */
 export function fakes(
-  options: { calls?: FakeScript["calls"]; config?: ConfigOverrides; catalog?: CatalogModel[] } = {},
+  options: {
+    calls?: FakeScript["calls"];
+    config?: ConfigOverrides;
+    catalog?: CatalogModel[];
+    /** Another script than the prose run's, such as a chart run's. */
+    respond?: FakeScript["respond"];
+  } = {},
 ) {
-  const provider = new FakeProvider(script(options.calls));
+  const provider = new FakeProvider(
+    options.respond
+      ? { calls: options.calls ?? {}, respond: options.respond }
+      : script(options.calls),
+  );
   const catalog = options.catalog ?? CATALOG;
   const jobs = new FakeJobs();
   const classifier = new FakeClassifier();

@@ -1,6 +1,9 @@
+import type { ChartBrief, ChartRender, Dispute, DroppedPatch } from "./chart-run.ts";
+import type { Dataset } from "./csv.ts";
 import type { EventOf, RunEvent } from "./events.ts";
 import type {
   Abstention,
+  ChartOrigin,
   Claim,
   Draft,
   Flags,
@@ -48,6 +51,14 @@ export interface RunView {
   abstentions: Abstention[];
   spentUsd: number | null;
   lastBatch: number;
+  /** A chart run: where its data comes from and the upload; null for a prose run. */
+  chart: { origin: ChartOrigin; dataset: Dataset | null } | null;
+  briefs: ChartBrief[];
+  /** Who wrote the spec, and whether the writer's spec or the plain one of code was used. */
+  written: Omit<EventOf<"chart.written">, "key" | "batch" | "type"> | null;
+  disputes: Record<string, Dispute>;
+  renders: ChartRender[];
+  droppedPatches: DroppedPatch[];
 }
 
 /**
@@ -57,7 +68,7 @@ export interface RunView {
  */
 export interface VersionCause {
   version: number;
-  cause: "merge" | "round" | "edit";
+  cause: "merge" | "round" | "edit" | "render";
   threads: string[];
   round: number | null;
 }
@@ -96,6 +107,12 @@ export function emptyView(): RunView {
     abstentions: [],
     spentUsd: null,
     lastBatch: 0,
+    chart: null,
+    briefs: [],
+    written: null,
+    disputes: {},
+    renders: [],
+    droppedPatches: [],
   };
 }
 
@@ -157,6 +174,7 @@ function applyEvent(view: RunView, e: RunEvent) {
       view.mode = e.mode;
       view.models = e.models;
       view.status = "running";
+      view.chart = e.chart ? clone(e.chart) : null;
       break;
     }
     case "stage.changed":
@@ -266,5 +284,59 @@ function applyEvent(view: RunView, e: RunEvent) {
       view.status = "failed";
       view.spentUsd = e.spentUsd;
       break;
+    case "brief.completed":
+      view.briefs.push(clone(e.brief));
+      view.sources.push(...e.sources);
+      break;
+    case "chart.written":
+      view.written = {
+        block: e.block,
+        writer: e.writer,
+        used: e.used,
+        why: e.why,
+        stripped: [...e.stripped],
+      };
+      break;
+    case "chart.rendered":
+      view.renders.push({
+        version: e.version,
+        block: e.block,
+        call: e.call,
+        result: e.result,
+        ok: e.ok,
+        error: e.error,
+      });
+      break;
+    case "dispute.opened":
+      view.disputes[e.dispute.id] = clone(e.dispute);
+      break;
+    case "rows.checked":
+      for (const c of e.checks) {
+        const d = Object.values(view.disputes).find((x) => x.state === "open" && x.row === c.row);
+        if (!d) continue;
+        const checks = d.checks[c.value] ?? {};
+        checks[e.model] = c.verdict;
+        d.checks[c.value] = checks;
+      }
+      break;
+    case "dispute.settled": {
+      const d = view.disputes[e.dispute];
+      if (!d) break;
+      d.state = e.state;
+      d.winner = e.winner;
+      break;
+    }
+    case "patch.dropped": {
+      view.droppedPatches.push({
+        round: e.round,
+        model: e.model,
+        index: e.index,
+        layer: e.layer,
+        path: e.path,
+        why: e.why,
+        detail: e.detail,
+      });
+      break;
+    }
   }
 }

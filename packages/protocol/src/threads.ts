@@ -1,5 +1,9 @@
+import { patchChart, readValue } from "./chart.ts";
+import { type RowSettlement, settleRows } from "./chart-run.ts";
 import type { RunEvent } from "./events.ts";
 import {
+  type Chart,
+  type ChartLayer,
   MODELS,
   type ModelId,
   type Paragraph,
@@ -40,19 +44,22 @@ export function emptyBook(): Book {
   };
 }
 
-export type ChangeOp = "replace" | "insert_after" | "delete";
+export type ChangeOp = "replace" | "insert_after" | "delete" | "patch";
 
 /**
  * The lock of a suggestion: one open thread per lock. A replacement or a deletion locks the
  * paragraph ("p3"); an insertion locks the place after the paragraph for its author ("p3+grok"),
- * so two insertions after the same paragraph are separate threads.
+ * so two insertions after the same paragraph are separate threads; a patch locks the layer of its
+ * chart ("c1/encoding"), whatever its path in the layer.
  */
-export function lockKey(block: string, op: ChangeOp, author: ModelId): string {
+export function lockKey(block: string, op: ChangeOp, author: ModelId, layer?: ChartLayer): string {
+  if (op === "patch") return `${block}/${layer ?? ""}`;
   return op === "insert_after" ? `${block}+${author}` : block;
 }
 
-/** Suggestions that could be the same change: insertions after a block, or changes of it. */
-function dedupeGroup(block: string, op: ChangeOp | Suggestion["op"]): string {
+/** Suggestions that could be the same change: insertions after a block, changes of it, or patches of a layer. */
+function dedupeGroup(block: string, op: ChangeOp | Suggestion["op"], layer?: ChartLayer): string {
+  if (op === "patch") return `${block}|patch|${layer ?? ""}`;
   return `${block}|${op === "insert_after" ? "insert" : "change"}`;
 }
 
@@ -61,6 +68,11 @@ export interface Candidate {
   model: ModelId;
   block: string;
   op: ChangeOp;
+  /** A patch: the layer of the chart and the path in it; `text` is the JSON of the checked value. */
+  layer?: ChartLayer;
+  path?: string;
+  /** A patch: its position in the model's output. */
+  index?: number;
   kind: SuggestionKind;
   text: string;
   reason: string;
@@ -158,8 +170,9 @@ export function checkSuggestions(input: {
 
 /**
  * A pair of suggestions that may be the same change. `decided` is set when code can tell (same
- * operation and same normalized text, two deletions, or a deletion against a replacement); the
- * others go to the utility model in one call per round.
+ * operation and same normalized text, two deletions, or a deletion against a replacement; patches
+ * always: the same only with the same path and value); the others go to the utility model in one
+ * call per round.
  */
 export interface DuplicatePair {
   id: string;
@@ -179,18 +192,32 @@ export function duplicatePairs(book: Book, candidates: readonly Candidate[]): Du
     .filter((s) => book.threads[s.thread]?.state === "open" || book.rejected.includes(s.id))
     .sort((a, b) => byNumericId(a.id, b.id));
   candidates.forEach((c, i) => {
-    const group = dedupeGroup(c.block, c.op);
-    const add = (other: DuplicatePair["other"], op: Suggestion["op"], text: string) => {
+    const group = dedupeGroup(c.block, c.op, c.layer);
+    const add = (
+      other: DuplicatePair["other"],
+      op: Suggestion["op"],
+      text: string,
+      path?: string,
+    ) => {
       const decided =
-        op !== c.op ? "different" : op === "delete" || sameText(text, c.text) ? "same" : null;
+        op !== c.op
+          ? "different"
+          : op === "patch"
+            ? (path ?? "") === (c.path ?? "") && samePatch(text, c.text)
+              ? "same"
+              : "different"
+            : op === "delete" || sameText(text, c.text)
+              ? "same"
+              : null;
       pairs.push({ id: `d${pairs.length + 1}`, candidate: i, other, decided });
     };
     for (const s of existing) {
-      if (dedupeGroup(s.target.block, s.op) === group) add({ suggestion: s.id }, s.op, s.text);
+      if (dedupeGroup(s.target.block, s.op, s.target.layer) === group)
+        add({ suggestion: s.id }, s.op, s.text, s.target.path);
     }
     candidates.slice(0, i).forEach((o, j) => {
-      if (dedupeGroup(o.block, o.op) === group && o.model !== c.model) {
-        add({ candidate: j }, o.op, o.text);
+      if (dedupeGroup(o.block, o.op, o.layer) === group && o.model !== c.model) {
+        add({ candidate: j }, o.op, o.text, o.path);
       }
     });
   });
@@ -199,6 +226,14 @@ export function duplicatePairs(book: Book, candidates: readonly Candidate[]): Du
 
 function sameText(a: string, b: string): boolean {
   return normalizeText(a) === normalizeText(b);
+}
+
+/** Two patch values are the same JSON (texts compared as the code compares text). */
+function samePatch(a: string, b: string): boolean {
+  const x = readValue(a);
+  const y = readValue(b);
+  if (typeof x === "string" && typeof y === "string") return sameText(x, y);
+  return JSON.stringify(x) === JSON.stringify(y);
 }
 
 export function pairsToAsk(pairs: readonly DuplicatePair[]): DuplicatePair[] {
@@ -293,7 +328,7 @@ export function placeCandidates(
       continue;
     }
 
-    const lock = lockKey(c.block, c.op, c.model);
+    const lock = lockKey(c.block, c.op, c.model, c.layer);
     let thread = Object.values(book.threads).find((t) => t.state === "open" && t.lockKey === lock);
     if (thread) {
       const mine = thread.alternatives.some((id) => {
@@ -325,7 +360,7 @@ export function placeCandidates(
       coAuthors: [],
       round,
       baseVersion: input.baseVersion,
-      target: { block: c.block },
+      target: c.layer ? { block: c.block, layer: c.layer, path: c.path ?? "" } : { block: c.block },
       op: c.op,
       kind: c.kind,
       text: c.text,
@@ -520,9 +555,11 @@ export interface Change {
   op: ChangeOp;
   block: string; // the target, or the anchor of an insertion ("" inserts at the start)
   author: ModelId;
-  text: string;
+  text: string; // a patch: the JSON of its value
   sources: string[];
   support: ModelId[]; // the models that held the winner
+  layer?: ChartLayer;
+  path?: string;
 }
 
 export function statusFromSupport(support: readonly ModelId[], conflict: boolean): ParagraphStatus {
@@ -538,12 +575,14 @@ export function statusFromSupport(support: readonly ModelId[], conflict: boolean
  * matter: the pass walks the paragraphs in document order, replaces or deletes each targeted one,
  * then places the insertions anchored on it in the fixed model order of their authors (ties by
  * thread id). New paragraphs get the next IDs in the order they are placed. A replacement or
- * deletion of a paragraph that no longer exists is skipped and reported.
+ * deletion of a paragraph that no longer exists is skipped and reported. A chart takes its
+ * patches in the order of their threads (one per layer at most) and then the settled rows, by key.
  */
 export function apply(
   snapshot: Snapshot,
   changes: readonly Change[],
   nextParagraph: number,
+  settlements: readonly RowSettlement[] = [],
 ): {
   snapshot: Snapshot;
   nextParagraph: number;
@@ -553,9 +592,13 @@ export function apply(
   const sorted = [...changes].sort((a, b) => byNumericId(a.thread, b.thread));
   const edits = new Map<string, Change>();
   const inserts = new Map<string, Change[]>();
+  const patches = new Map<string, Change[]>();
   const skipped: string[] = [];
   for (const c of sorted) {
-    if (c.op === "insert_after") {
+    if (c.op === "patch") {
+      if (snapshot.blocks[c.block]?.kind !== "chart") skipped.push(c.thread);
+      else patches.set(c.block, [...(patches.get(c.block) ?? []), c]);
+    } else if (c.op === "insert_after") {
       const list = inserts.get(c.block) ?? [];
       list.push(c);
       inserts.set(c.block, list);
@@ -592,6 +635,15 @@ export function apply(
     const edit = edits.get(id);
     if (edit?.op === "delete") {
       // deleted: its insertions still land where it was
+    } else if (block.kind === "chart") {
+      order.push(id);
+      let chart: Chart = block;
+      for (const p of patches.get(id) ?? [])
+        chart = patchChart(chart, p.layer as ChartLayer, p.path ?? "", readValue(p.text));
+      blocks[id] = settleRows(
+        chart,
+        settlements.filter((s) => s.block === id),
+      );
     } else if (edit?.op === "replace" && block.kind === "paragraph") {
       order.push(id);
       blocks[id] = paragraph(
@@ -672,7 +724,21 @@ export function changesOf(
   for (const id of threadIds) {
     const thread = book.threads[id];
     const s = thread?.winner ? book.suggestions[thread.winner] : undefined;
-    if (!thread || !s || s.op === "patch") continue;
+    if (!thread || !s) continue;
+    if (s.op === "patch") {
+      changes.push({
+        thread: id,
+        op: "patch",
+        block: s.target.block,
+        layer: s.target.layer as ChartLayer,
+        path: s.target.path ?? "",
+        author: s.author,
+        text: s.text,
+        sources: s.sources,
+        support: thread.tally?.for ?? [s.author],
+      });
+      continue;
+    }
     changes.push({
       thread: id,
       op: s.op,

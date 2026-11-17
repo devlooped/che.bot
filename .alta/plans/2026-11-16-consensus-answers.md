@@ -484,18 +484,18 @@ Verified when:
 
 Starts when prose works end to end.
 
-- [ ] 36. Spike: compile a Vega-Lite spec and render it to SVG in interpreter mode inside the Workers runtime; measure the bundle and the startup time; decide whether the check runs in `RunObject` or in a separate Worker.
-- [ ] 37. Add the `Chart` block: layers, lock keys per layer and per row, the `patch` operation on a path, and the theme stripped from suggestions.
-- [ ] 38. Add the chart path to the reducer: chart briefs as drafts, agreement on the brief and the dataset, one model writes the spec, rounds on transform, encoding and caption.
-- [ ] 39. Add the data rules: an uploaded CSV whose transform the orchestrator computes; web rows that need a citation; a conflict kept as two values with their sources.
-- [ ] 40. Add the render gate: every patch is compiled and rendered before it reaches a vote.
+- [x] 36. Spike: compile a Vega-Lite spec and render it to SVG in interpreter mode inside the Workers runtime; measure the bundle and the startup time; decide whether the check runs in `RunObject` or in a separate Worker.
+- [x] 37. Add the `Chart` block: layers, lock keys per layer and per row, the `patch` operation on a path, and the theme stripped from suggestions.
+- [x] 38. Add the chart path to the reducer: chart briefs as drafts, agreement on the brief and the dataset, one model writes the spec, rounds on transform, encoding and caption.
+- [x] 39. Add the data rules: an uploaded CSV whose transform the orchestrator computes; web rows that need a citation; a conflict kept as two values with their sources.
+- [x] 40. Add the render gate: every patch is compiled and rendered before it reaches a vote.
 - [ ] 41. Build the chart view: `vega-embed`, animation between snapshots, a note with the source on a corrected point, a range on a point whose value is disputed.
 - [ ] 42. Optional: the last round votes on the rendered image (PNG rendering and image input in `ModelProvider`).
 
 Verified when:
 
-- [ ] Tests show that no value in a chart from user data was produced by a model: every number equals the orchestrator's computation over the uploaded rows.
-- [ ] A patch that fails to compile or render never appears in a vote, and a patch that touches the theme is stripped.
+- [x] Tests show that no value in a chart from user data was produced by a model: every number equals the orchestrator's computation over the uploaded rows.
+- [x] A patch that fails to compile or render never appears in a vote, and a patch that touches the theme is stripped.
 - [ ] Ten chart questions run end to end, and each web-sourced row opens its citation.
 
 ## Findings and deviations during execution
@@ -521,6 +521,12 @@ Verified when:
 - **Sign-in (step 18).** The Worker verifies an Auth0 access token (RS256, issuer, audience) and reads the roles from any roles claim, as the existing app does. It compares the roles `admin` and `beta`; the tenant of the existing app has `Admin` and `Contrib` and no `beta`, so the roles must be created or the names changed. A request with an invalid token answers 401 on every route, the public ones included.
 - **Payment (step 21).** The hook URL is the origin of the `pay` request, so a deployment needs no setting for it. A payment is recorded before anything that can fail; a run that cannot start yet starts on a later alarm. A job that was paid but whose hook was lost starts the run at the end of the 15 minutes. An admin run has no job and no payment, and so no free rerun.
 - **Guardrails (step 24).** The daily cap (`DAILY_CAP_USD`, default 25) is checked when asking and again at `pay`, never after a QR was shown, so a user who paid always runs; the day is the UTC day. The rate limit is 5 questions per minute per user, the question at most 2,000 characters, and `LAUNCHED` opens asking to every signed-in user.
+- **Phase 4 before step 26.** The charts were started while step 26 waits for the user's accounts: prose works end to end in the local mode and live through the CLI, and the user named charts as where cross-checking data and sources matters most.
+- **Vega in a Worker (step 36).** Vega-Lite renders to SVG in interpreter mode in the Workers runtime (35 ms the first time, then 7 ms); without the interpreter it fails on code generation. The renderer adds 296 KiB gzipped and loads in about 0.1 s, so the render check runs inside `RunObject`, loaded lazily. It lives in `packages/charts`.
+- **A chart run (steps 37 to 40).** A run is a chart run when it is asked for one (`chart` in the run input, `--chart` in the CLI), with an uploaded CSV or with data from the web. The document is the chart alone: its caption is the short explanation. There is no editor pass. Render checks are calls the driver runs with the renderer, so the reducer stays pure.
+- **Rows settled by source (step 39).** A web value holds up when its quote or the search excerpt of its source states the number, and a majority of the models that did not give it and checked it agree. One value that holds up wins; a lone value that does not is kept and marked unverified; otherwise the row stays a range. A value from a single model is always checked. Web charts have one dimension and one measure.
+- **Uploaded data (step 39).** A CSV is at most 64 KB, 500 rows and 12 columns. The models see the columns, their types and statistics, not the rows; a spec or a patch that carries values is refused.
+- **Live chart runs (step 38).** Three questions cost US$0.11 to 0.48 and took 82 to 176 s. Known gaps: a caption accepted in round 1 can lag the rows settled at that round's boundary, and Grok timed out in round 2 in 3 of 5 runs.
 - **Line endings.** A `.gitattributes` keeps LF in every checkout, because Biome rejects the CRLF files that `core.autocrlf` produces on Windows.
 
 ## Results of the evaluation (step 15, run on 2026-11-16)
