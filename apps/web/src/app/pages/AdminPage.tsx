@@ -1,4 +1,4 @@
-import type { ModelId, QuestionClass } from "@chebot/protocol";
+import { MODELS_BY_NAME, type ModelId, type QuestionClass } from "@chebot/protocol";
 import { type FormEvent, useEffect, useState } from "react";
 import { type AdminModels, ApiError, type ModelChoice, type Price } from "../api.ts";
 import { useSession } from "../auth/context.tsx";
@@ -28,6 +28,12 @@ const effortName = (effort: string | null) =>
 
 const panelModel = (role: string) =>
   role.startsWith("panel.") ? (role.slice("panel.".length) as ModelId) : null;
+
+/** Where a role is listed: the panel seats alphabetically by name, then the other roles as they come. */
+const listed = (role: string) => {
+  const seat = panelModel(role);
+  return seat ? MODELS_BY_NAME.indexOf(seat) : MODELS_BY_NAME.length;
+};
 
 /** The refusals of a 400, by field, in plain words; null for any other error. */
 function fieldsOf(error: unknown): Record<string, string> | null {
@@ -79,12 +85,14 @@ function Models({ initial }: { initial: AdminModels }) {
     }
   }
 
+  const roles = models.roles.toSorted((a, b) => listed(a.role) - listed(b.role));
+
   return (
     <form className="admin-form" onSubmit={save} noValidate aria-labelledby="models-title">
       <h2 id="models-title" className="section-title">
         {t.admin.modelsTitle}
       </h2>
-      {models.roles.map((r) => {
+      {roles.map((r) => {
         const want = form[r.role] ?? { family: "", effort: "" };
         const families = models.families.filter((f) => f.kind === r.kind);
         const chosen = families.find((f) => f.family === (want.family || r.default.family));

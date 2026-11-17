@@ -1,5 +1,5 @@
 /* che.bot: a clean reading text, with the four models as four inks in its margin.
-   Each model has a color and a shape (Grok a square, Claude a circle, ChatGPT a triangle, Gemini a
+   Each model has a color and a shape (Grok a square, Claude a star, ChatGPT a circle, Gemini a
    diamond); color is never the only cue. A color has two tones of one hue: the fill (marks,
    avatars, tints, underlines) and a darker ink for text and thin strokes, at 4.5:1 or more on the
    paper and on the tints. Interface chrome has tokens of its own, never a model's. Mobile first. */

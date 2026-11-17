@@ -1,4 +1,4 @@
-import { CSV_LIMITS, CsvParseError, MODELS, parseCsv } from "@chebot/protocol";
+import { CSV_LIMITS, CsvParseError, MODELS_BY_NAME, parseCsv } from "@chebot/protocol";
 import { type ChangeEvent, type FormEvent, useState } from "react";
 import { ApiError, type ChartRequest, MAX_QUESTION_CHARS } from "../api.ts";
 import { useSession } from "../auth/context.tsx";
@@ -93,7 +93,7 @@ export function AskPage() {
     <main className="page ask">
       <section className="hero">
         <ul className="hero-seats" aria-hidden="true">
-          {MODELS.map((m) => (
+          {MODELS_BY_NAME.map((m) => (
             <li key={m} className={`ink-${m}`}>
               <ModelMark model={m} size={14} />
               {t.models[m]}

@@ -228,3 +228,8 @@ export const MODEL_NAMES: Record<ModelId, string> = {
   openai: "ChatGPT",
   gemini: "Gemini",
 };
+
+/** The four models in the order the interface lists them: alphabetical by display name. */
+export const MODELS_BY_NAME: readonly ModelId[] = [...MODELS].sort((a, b) =>
+  MODEL_NAMES[a].localeCompare(MODEL_NAMES[b]),
+);

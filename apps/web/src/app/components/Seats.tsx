@@ -1,4 +1,4 @@
-import { MODELS, type RunView } from "@chebot/protocol";
+import { MODELS_BY_NAME, type RunView } from "@chebot/protocol";
 import { t } from "../i18n/index.ts";
 import { seatChip, seatStatus } from "../view/derive.ts";
 import { ModelMark } from "./ModelMark.tsx";
@@ -8,7 +8,7 @@ export function Seats({ view, line }: { view: RunView; line: string }) {
   return (
     <section className="seats" aria-label={t.seats.title}>
       <ul className="seat-list">
-        {MODELS.map((model) => {
+        {MODELS_BY_NAME.map((model) => {
           const status = seatStatus(view, model);
           return (
             <li

@@ -2,6 +2,7 @@ import {
   type Answer,
   type DissentNote,
   MODELS,
+  MODELS_BY_NAME,
   type ModelId,
   type RunView,
   type Source,
@@ -195,7 +196,7 @@ export function seatsOf(
 ): { seat: ModelId | "utility"; id: string; effort: string | null }[] {
   if (!view.models) return [];
   const out: { seat: ModelId | "utility"; id: string; effort: string | null }[] = [];
-  for (const seat of [...MODELS, "utility" as const]) {
+  for (const seat of [...MODELS_BY_NAME, "utility" as const]) {
     const model = view.models[seat === "utility" ? "utility" : `panel.${seat}`];
     if (model) out.push({ seat, id: model.id, effort: model.effort });
   }
