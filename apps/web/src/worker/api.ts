@@ -92,7 +92,8 @@ async function ask(request: Request, env: Env, identity: Identity): Promise<Resp
   const parsed = questionOf(read.body);
   if ("error" in parsed) return error(400, parsed.error);
   const chart = chartOf(read.body);
-  if ("error" in chart) return error(400, chart.error);
+  if ("error" in chart)
+    return error(400, chart.error, chart.reason ? { reason: chart.reason } : {});
   const meter = spendMeter(env);
   const budget = resolveConfig(deps.runConfig(env)).budgetUsd;
   if (!(await meter.status(budget)).open)

@@ -5,9 +5,11 @@
 // a changed position, an accepted change and one left without agreement, a model that does not
 // answer in the last round, the editor's pass, and moments phrased by the utility model.
 //
-// A marker in the question plays the states around that run (see MARKERS).
+// A marker in the question plays the states around that run (see MARKERS). A run asked for a chart
+// plays the scripted chart run of chart-scenario.ts instead.
 import type { ModelId } from "@chebot/protocol";
 import type { FakeOutcome, FakeScript, FoundSource, GenerateRequest } from "@chebot/providers";
+import { respondChart } from "./chart-scenario.ts";
 
 /**
  * Markers that, written anywhere in a question, change how the scripted run goes:
@@ -287,6 +289,9 @@ const DELAY: Record<string, number | Record<ModelId, number>> = {
   round: { grok: 1100, claude: 1500, openai: 1300, gemini: 1700 },
   dedupe: 400,
   edit: 1200,
+  brief: { grok: 1800, claude: 2600, openai: 2200, gemini: 3200 },
+  "chart-merge": 1200,
+  spec: 1500,
   "edit-check": 500,
   moments: 300,
 };
@@ -334,6 +339,8 @@ export function respond(req: GenerateRequest<unknown>): FakeOutcome {
     }) satisfies FakeOutcome;
 
   const marked = (marker: string) => req.prompt.includes(marker);
+  const chart = respondChart(req, out);
+  if (chart) return chart;
 
   switch (kind) {
     case "draft": {

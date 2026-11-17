@@ -2,6 +2,7 @@
 // language is a second file with the same shape (`Messages`); components read the texts through
 // `t` (./index.ts) and hold none of their own. Event types, ids and code stay in English.
 import type { ModelId } from "@chebot/protocol";
+import type { ChartLocale } from "../chart/spec.ts";
 
 const ars = new Intl.NumberFormat("es-AR", {
   style: "currency",
@@ -77,6 +78,21 @@ export const esAR = {
     generic: "Algo salió mal. Probá de nuevo en un rato.",
     runNotFound: "No encontramos esta pregunta. Puede que la hayan borrado.",
     signInFailed: "No pudimos hacerte entrar. Probá de nuevo.",
+    noFile: "Elegí el archivo con tus datos.",
+    /** Why a CSV file is refused, by the code of the refusal (CsvError of the protocol). */
+    file: {
+      too_large: "El archivo pesa más de 64 KB. Sacale filas o columnas que no hagan falta.",
+      too_many_rows: "El archivo tiene más de 500 filas. Dejá solo las que necesita el gráfico.",
+      too_many_columns:
+        "El archivo tiene más de 12 columnas. Dejá solo las que necesita el gráfico.",
+      ragged:
+        "Algunas filas tienen más o menos columnas que la primera. Revisá que todas tengan las mismas.",
+      unterminated_quote: "Hay unas comillas que se abren y no se cierran. Revisá el archivo.",
+      empty: "El archivo está vacío.",
+      no_rows: "El archivo tiene la fila de los nombres y ninguna fila de datos.",
+      unreadable:
+        "No pudimos leer el archivo. Tiene que ser un CSV: texto con columnas separadas por comas o por punto y coma.",
+    } as Record<string, string>,
   },
 
   ask: {
@@ -91,6 +107,26 @@ export const esAR = {
     publicNote: "Cualquiera que tenga el link de la respuesta la va a poder leer.",
     signInToAsk: "Entrá para preguntar",
     signInLede: "Para preguntar necesitás una cuenta. Leer respuestas compartidas no.",
+    chart: {
+      toggle: "Quiero un gráfico",
+      toggleHint:
+        "Los cuatro arman un gráfico juntos. Cada número va con su fuente, y si no coinciden lo resuelven con las fuentes, no votando.",
+      dataLegend: "¿De dónde salen los datos?",
+      web: "Que los busquen en internet",
+      webHint: "Cada número va con el link de donde sale y las palabras que lo dicen.",
+      file: "De mi tabla (un archivo CSV)",
+      fileHint:
+        "Los números salen solo de tu tabla: los cuatro acuerdan cómo graficarla, pero no escriben ningún número.",
+      fileLabel: "Tu archivo",
+      choose: "Elegir el archivo",
+      noneChosen: "Todavía no elegiste ninguno.",
+      fileLimits:
+        "Hasta 64 KB, 500 filas y 12 columnas. La primera fila lleva los nombres de las columnas, separadas por comas o por punto y coma.",
+      fileReady: (name: string, rows: number, columns: number) =>
+        `${name}: ${rows} ${plural(rows, "fila", "filas")} y ${columns} ${plural(columns, "columna", "columnas")}.`,
+      reading: "Leyendo el archivo…",
+      samePrice: "El precio es el mismo que el de una respuesta en texto.",
+    },
     howTitle: "Cómo funciona",
     how: [
       "Escribís tu pregunta y ves cuánto cuesta.",
@@ -113,6 +149,10 @@ export const esAR = {
     adminRun: "Empezar sin pagar",
     adminNote: "Tenés permiso de administración: esta pregunta no se cobra.",
     notPaidYet: "Esta pregunta todavía no se pagó, así que no tiene respuesta.",
+    chart: {
+      web: "Pediste la respuesta como gráfico, con datos de internet.",
+      user: "Pediste la respuesta como gráfico de tu tabla.",
+    },
   },
 
   payment: {
@@ -176,6 +216,45 @@ export const esAR = {
         ? `Listo. Los cuatro coinciden en ${agreed} de ${total} ${plural(total, "parte", "partes")}; ${dissent} ${plural(dissent, "punto quedó", "puntos quedaron")} sin acuerdo.`
         : `Listo. Los cuatro coinciden en ${agreed} de ${total} ${plural(total, "parte", "partes")}.`,
     failed: "No pudimos armar una respuesta esta vez.",
+    chart: {
+      drafting: {
+        web: "Cada uno busca los datos por su cuenta, con la fuente de cada número…",
+        user: "Cada uno piensa por su cuenta cómo graficar tu tabla…",
+      },
+      merging: "Juntando los datos en un solo gráfico…",
+      round1: (open: number) =>
+        open > 0
+          ? `Revisando el gráfico y las fuentes… ${open} ${plural(open, "punto", "puntos")} en discusión`
+          : "Revisando el gráfico y las fuentes…",
+      round2: (open: number) =>
+        open > 0
+          ? `Votando los cambios al gráfico… ${open} ${plural(open, "punto", "puntos")} en discusión`
+          : "Votando los cambios al gráfico…",
+      done: (c: {
+        rows: number;
+        agreed: number;
+        settled: number;
+        ranges: number;
+        lone: number;
+      }) => {
+        const parts = [
+          c.agreed > 0 ? `coinciden en ${c.agreed}` : "",
+          c.settled > 0
+            ? `${c.settled} ${plural(c.settled, "lo resolvió su fuente", "los resolvieron sus fuentes")}`
+            : "",
+          c.ranges > 0 ? `${c.ranges} ${plural(c.ranges, "quedó", "quedaron")} sin acuerdo` : "",
+          c.lone > 0 ? `${c.lone} sin confirmar` : "",
+        ].filter(Boolean);
+        const rows = `${c.rows} ${plural(c.rows, "dato", "datos")}`;
+        return parts.length > 0
+          ? `Listo. De ${rows}, ${list(parts)}.`
+          : `Listo. El gráfico tiene ${rows}.`;
+      },
+      doneUser: (dissent: number) =>
+        dissent > 0
+          ? `Listo. El gráfico está calculado con tu tabla; ${dissent} ${plural(dissent, "punto quedó", "puntos quedaron")} sin acuerdo.`
+          : "Listo. El gráfico está calculado con tu tabla.",
+    },
   },
 
   connection: {
@@ -313,6 +392,261 @@ export const esAR = {
     askAgain: "Podés hacer la pregunta de nuevo.",
     reader: "Quien hizo la pregunta puede volver a intentarlo.",
     secondAttempt: "Segundo intento, sin cargo.",
+  },
+
+  chart: {
+    /** The label of the drawing: the table under it is its text. */
+    label: (title: string) =>
+      `Gráfico: ${title}. Los datos y sus fuentes están en la tabla de abajo.`,
+    untitled: "Gráfico sin título",
+    drawing: "Dibujando el gráfico…",
+    failed:
+      "No pudimos dibujar el gráfico en este navegador. Los datos están en la tabla de abajo.",
+    legend:
+      "Un número sobre un punto lleva a su nota, abajo del gráfico. Una línea vertical roja con dos topes es un rango: las dos cifras que no se pudieron resolver.",
+    dataTitle: "Los datos del gráfico",
+    dataLede: "Cada número con su fuente y las palabras de la fuente que lo dicen.",
+    valueColumn: "Valor",
+    sourceColumn: "De dónde sale",
+    range: (low: string, high: string) => `de ${low} a ${high}`,
+    givenBy: (who: string, n: number) => `Lo ${plural(n, "dio", "dieron")} ${who}.`,
+    note: (n: number) => `Nota ${n}`,
+    kinds: {
+      agreed: "Coinciden",
+      confirmed: "Confirmado con su fuente",
+      corrected: "Corregido con su fuente",
+      range: "Sin acuerdo",
+      lone: "Sin confirmar",
+      checking: "En revisión",
+      upload: "De tu tabla",
+    },
+    notes: {
+      corrected: (was: string, now: string) => `Se corrigió: decía ${was} y ahora dice ${now}.`,
+      settled: (now: string) => `Los cuatro dieron cifras distintas y quedó ${now}.`,
+      settledBy: "Lo resolvió la fuente:",
+      range: (low: string, high: string) =>
+        `Los cuatro no coincidieron y ninguna fuente lo resolvió, así que el gráfico muestra las dos cifras: ${low} y ${high}.`,
+      loneUnverified: (who: string) =>
+        `Este dato lo trajo solo ${who} y ninguna fuente lo confirmó: los demás revisaron la fuente y no dice ese número.`,
+      loneUnchecked: (who: string) => `Este dato lo trajo solo ${who} y nadie más lo pudo revisar.`,
+      loneChecking: (who: string) =>
+        `Este dato lo trajo solo ${who}; los demás están revisando su fuente.`,
+      checking: "Los cuatro dieron cifras distintas y las están revisando con las fuentes.",
+      said: (who: string, n: number, value: string) =>
+        `${who} ${plural(n, "dijo", "dijeron")} ${value}, según`,
+      verdict: {
+        held: "Su fuente lo confirma.",
+        failed: "Los demás no encontraron ese número en esa fuente.",
+        partial: (holds: number, checkers: number) =>
+          `${holds} de ${checkers} lo ${plural(holds, "encontró", "encontraron")} en la fuente; no alcanzó.`,
+        unchecked: "Nadie más lo revisó.",
+        checking: "Se está revisando.",
+      },
+    },
+    user: {
+      fromTable:
+        "Cada número de este gráfico sale de tu tabla: lo calculó che.bot, y ninguna de las IA escribió un número.",
+      calculation: (text: string) => `El cálculo que acordaron: ${text}.`,
+      table: (rows: number, columns: number) =>
+        `Tu tabla tiene ${rows} ${plural(rows, "fila", "filas")} y ${columns} ${plural(columns, "columna", "columnas")}.`,
+      drawnTitle: "Lo que muestra el gráfico",
+      drawnLede: "Los números que dibuja el gráfico, calculados con tu tabla.",
+      showUpload: (n: number) => `Ver tu tabla (${n} ${plural(n, "fila", "filas")})`,
+    },
+    calc: {
+      none: "las filas de tu tabla tal como están, sin cálculos",
+      ops: {
+        sum: "la suma",
+        mean: "el promedio",
+        average: "el promedio",
+        median: "la mediana",
+        min: "el mínimo",
+        max: "el máximo",
+        count: "la cantidad de filas",
+        valid: "la cantidad de valores",
+        distinct: "la cantidad de valores distintos",
+      } as Record<string, string>,
+      otherOp: "un resumen",
+      aggregate: (summary: string, field: string | null, by: string) =>
+        `${summary}${field ? ` de «${field}»` : ""}${by ? ` por ${by}` : ""}`,
+      filter: "deja afuera algunas filas con una condición",
+      calculate: (as: string) => `calcula «${as}» a partir de otras columnas`,
+      timeUnit: (field: string, unit: string) => `agrupa las fechas de «${field}» por ${unit}`,
+      units: {
+        year: "año",
+        yearquarter: "trimestre",
+        quarter: "trimestre",
+        yearmonth: "mes",
+        month: "mes",
+        yearweek: "semana",
+        week: "semana",
+        yearmonthdate: "día",
+        date: "día",
+        day: "día de la semana",
+      } as Record<string, string>,
+      otherUnit: "período",
+      bin: (field: string) => `agrupa «${field}» en rangos`,
+      cumulative: (field: string) => `acumula «${field}» fila tras fila`,
+      window: (as: string) => `calcula «${as}» con las filas vecinas`,
+      joinaggregate: (summary: string, field: string) =>
+        `agrega a cada fila ${summary} de «${field}»`,
+      fold: (fields: string) => `pone ${fields} en una sola columna`,
+      pivot: (field: string) => `convierte los valores de «${field}» en columnas`,
+      stack: (field: string) => `apila «${field}»`,
+      trend: (y: string, x: string) => `calcula una tendencia de «${y}» según «${x}»`,
+      other: "otro cálculo",
+      quoted: (field: string) => `«${field}»`,
+      sequence: (steps: readonly string[]) => steps.join("; después, "),
+    },
+    layers: {
+      title: "Lo que se votó del gráfico",
+      lede: "Tocá cada parte para ver quién propuso qué, por qué, y quién apoyó cada propuesta.",
+      names: {
+        encoding: "El tipo de gráfico",
+        title: "El título",
+        caption: "La explicación",
+        transform: "El cálculo",
+        data: "Los datos",
+      },
+      sheetTitle: {
+        encoding: "Cómo se discutió el tipo de gráfico",
+        title: "Cómo se discutió el título",
+        caption: "Cómo se discutió la explicación",
+        transform: "Cómo se discutió el cálculo",
+        data: "Cómo se discutieron los datos",
+      },
+      open: "Ver la discusión",
+      outcome: {
+        accepted: (n: number) => `se cambió, con el apoyo de ${n} de 4`,
+        rejected: "quedó como estaba",
+        unresolved: "sin acuerdo",
+        open: "se está votando",
+      },
+      now: "Ahora:",
+      empty: "(vacío)",
+    },
+    kind: (mark: string) => `Gráfico ${mark}.`,
+    axis: (which: string, title: string) => `${which}: ${title}.`,
+    axes: { x: "Eje horizontal", y: "Eje vertical" } as Record<string, string>,
+    marks: {
+      bar: "de barras",
+      line: "de líneas",
+      area: "de área",
+      point: "de puntos",
+      circle: "de puntos",
+      square: "de puntos",
+      arc: "de torta",
+      rect: "de cuadrícula",
+      tick: "de marcas",
+      rule: "de líneas rectas",
+      text: "de textos",
+      boxplot: "de cajas",
+      errorbar: "con márgenes de error",
+      errorband: "con márgenes de error",
+      trail: "de líneas",
+    } as Record<string, string>,
+    otherMark: "de otro tipo",
+    /** What a proposal changes, in plain words: the action, and the new text when there is one. */
+    patch: {
+      title: "cambiar el título por:",
+      caption: "cambiar la explicación por:",
+      mark: (kind: string) => `dibujarlo como gráfico ${kind}.`,
+      axisTitle: (axis: string) => `cambiar el nombre del ${axis} por:`,
+      channel: (part: string) => `cambiar ${part}.`,
+      encoding: "cambiar cómo se dibuja el gráfico.",
+      transform: "cambiar el cálculo:",
+      data: (key: string) => `cambiar el dato de ${key} por:`,
+      axisNames: { x: "eje horizontal", y: "eje vertical" } as Record<string, string>,
+      parts: {
+        x: "el eje horizontal",
+        y: "el eje vertical",
+        color: "los colores",
+        xOffset: "la separación de las barras",
+        size: "el tamaño de las marcas",
+        shape: "la forma de las marcas",
+        opacity: "la transparencia",
+        tooltip: "lo que aparece al pasar el dedo",
+        text: "los textos",
+        theta: "las porciones",
+      } as Record<string, string>,
+      otherPart: "una parte del dibujo",
+    },
+    history: {
+      title: "Cómo cambió el gráfico",
+      show: "Ver cómo cambió el gráfico",
+      hide: "Ocultar cómo cambió el gráfico",
+      lede: "Mové la barra para ver el gráfico en cada momento: los puntos se mueven a sus valores de ese paso.",
+      slider: "Momento del gráfico",
+      changesTitle: "Qué cambió en este paso",
+      steps: {
+        sources: "Después de revisar las fuentes",
+        render: "La última versión que se pudo dibujar",
+      },
+      what: {
+        merge: (n: number) =>
+          n === 4
+            ? "Los datos de los cuatro, juntos en un solo gráfico."
+            : `Los datos de los ${n} que contestaron, juntos en un solo gráfico.`,
+        sources: (n: number) => `Las fuentes resolvieron ${n} ${plural(n, "dato", "datos")}.`,
+        both: (n: number, who: string, changes: number) =>
+          `Las fuentes resolvieron ${n} ${plural(n, "dato", "datos")} y ${plural(changes, "entró el cambio que propuso", "entraron los cambios que propusieron")} ${who}.`,
+        render: "Un cambio no se pudo dibujar, así que volvió la última versión que sí.",
+        none: "En este paso no cambió nada que se vea.",
+      },
+      row: {
+        added: (label: string, value: string) => `${label}: se agregó, ${value}.`,
+        removed: (label: string) => `${label}: salió del gráfico.`,
+        corrected: (label: string, was: string, now: string) =>
+          `${label}: pasó de ${was} a ${now}, como dice su fuente.`,
+        confirmed: (label: string, value: string) => `${label}: su fuente confirmó ${value}.`,
+        range: (label: string, low: string, high: string) =>
+          `${label}: sin acuerdo, ahora muestra las dos cifras, ${low} y ${high}.`,
+        lone: (label: string) => `${label}: nadie pudo confirmarlo con su fuente.`,
+        changed: (label: string, was: string, now: string) => `${label}: pasó de ${was} a ${now}.`,
+      },
+      layerBy: (name: string, who: string) => `${name}, que propuso ${who}:`,
+      layer: (name: string) => `${name}:`,
+    },
+    /** How the drawing writes numbers and dates (d3's format and time format locales). */
+    locale: {
+      number: { decimal: ",", thousands: ".", grouping: [3], currency: ["$ ", ""] },
+      time: {
+        dateTime: "%A, %e de %B de %Y, %X",
+        date: "%d/%m/%Y",
+        time: "%H:%M:%S",
+        periods: ["a. m.", "p. m."],
+        days: ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"],
+        shortDays: ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"],
+        months: [
+          "enero",
+          "febrero",
+          "marzo",
+          "abril",
+          "mayo",
+          "junio",
+          "julio",
+          "agosto",
+          "septiembre",
+          "octubre",
+          "noviembre",
+          "diciembre",
+        ],
+        shortMonths: [
+          "ene",
+          "feb",
+          "mar",
+          "abr",
+          "may",
+          "jun",
+          "jul",
+          "ago",
+          "sept",
+          "oct",
+          "nov",
+          "dic",
+        ],
+      },
+    } as ChartLocale,
   },
 
   history: {

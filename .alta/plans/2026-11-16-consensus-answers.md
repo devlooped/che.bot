@@ -489,14 +489,14 @@ Starts when prose works end to end.
 - [x] 38. Add the chart path to the reducer: chart briefs as drafts, agreement on the brief and the dataset, one model writes the spec, rounds on transform, encoding and caption.
 - [x] 39. Add the data rules: an uploaded CSV whose transform the orchestrator computes; web rows that need a citation; a conflict kept as two values with their sources.
 - [x] 40. Add the render gate: every patch is compiled and rendered before it reaches a vote.
-- [ ] 41. Build the chart view: `vega-embed`, animation between snapshots, a note with the source on a corrected point, a range on a point whose value is disputed.
+- [x] 41. Build the chart view: `vega-embed`, animation between snapshots, a note with the source on a corrected point, a range on a point whose value is disputed.
 - [ ] 42. Optional: the last round votes on the rendered image (PNG rendering and image input in `ModelProvider`).
 
 Verified when:
 
 - [x] Tests show that no value in a chart from user data was produced by a model: every number equals the orchestrator's computation over the uploaded rows.
 - [x] A patch that fails to compile or render never appears in a vote, and a patch that touches the theme is stripped.
-- [ ] Ten chart questions run end to end, and each web-sourced row opens its citation.
+- [x] Ten chart questions run end to end, and each web-sourced row opens its citation.
 
 ## Findings and deviations during execution
 
@@ -527,6 +527,9 @@ Verified when:
 - **Rows settled by source (step 39).** A web value holds up when its quote or the search excerpt of its source states the number, and a majority of the models that did not give it and checked it agree. One value that holds up wins; a lone value that does not is kept and marked unverified; otherwise the row stays a range. A value from a single model is always checked. Web charts have one dimension and one measure.
 - **Uploaded data (step 39).** A CSV is at most 64 KB, 500 rows and 12 columns. The models see the columns, their types and statistics, not the rows; a spec or a patch that carries values is refused.
 - **Live chart runs (step 38).** Three questions cost US$0.11 to 0.48 and took 82 to 176 s. Known gaps: a caption accepted in round 1 can lag the rows settled at that round's boundary, and Grok timed out in round 2 in 3 of 5 runs.
+- **The chart view (step 41).** A chart run shows the chart with its title and caption, and under it the table of the data: each value with its source, the quote that states it, how it ended (agreed, corrected by its source, without agreement, not confirmed) and which models gave it. A corrected point and a disputed range carry a numbered note. The voted parts open their discussion like a paragraph. Between versions the marks move instead of being redrawn. The chart's legend and tooltips are off; the table carries that information.
+- **Ten chart questions (phase 4).** Ten chart questions ran live through the CLI on 2026-11-17: all completed, for US$3.82 in total and 64 to 166 s each. Every web row carries a source and the source links answer. That each row opens its citation in the page is tested in the browser with the scripted runs, because the deployed app waits for step 26. Rows often end as a range when sources differ slightly (data of different years).
+- **Step 42** (votes on the rendered image) is optional and was not built.
 - **Line endings.** A `.gitattributes` keeps LF in every checkout, because Biome rejects the CRLF files that `core.autocrlf` produces on Windows.
 
 ## Results of the evaluation (step 15, run on 2026-11-16)

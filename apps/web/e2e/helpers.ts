@@ -1,10 +1,11 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import { esAR as t } from "../src/app/i18n/es-AR.ts";
+import { CHART_QUESTION, SAMPLE_CSV, UPLOAD_QUESTION } from "../src/local/chart-scenario.ts";
 import { LOCAL_MODE_MARKER } from "../src/local/marker.ts";
 import { MARKERS, SCENARIO_QUESTION } from "../src/local/scenario.ts";
 import { localToken } from "../src/local/token.ts";
 
-export { MARKERS, SCENARIO_QUESTION, t };
+export { CHART_QUESTION, MARKERS, SAMPLE_CSV, SCENARIO_QUESTION, t, UPLOAD_QUESTION };
 
 /** The scripted question, made unique (a run of the local mode keys some fakes by the question). */
 export const uniqueQuestion = (marker = "") =>
@@ -44,15 +45,16 @@ export async function ask(page: Page, question = SCENARIO_QUESTION): Promise<str
   return page.url().split("/r/")[1] ?? "";
 }
 
-/** An admin run through the API, to its end: no payment. */
+/** An admin run through the API, to its end: no payment. `chart`: a chart run (see POST /api/runs). */
 export async function finishedRun(
   request: APIRequestContext,
   question = SCENARIO_QUESTION,
+  chart: { csv?: string } | null = null,
 ): Promise<string> {
   const admin = newUser(["admin"]);
   const quote = await request.post("/api/runs", {
     headers: authHeader(admin),
-    data: { question },
+    data: chart ? { question, chart } : { question },
   });
   const { runId } = (await quote.json()) as { runId: string };
   await request.post(`/api/runs/${runId}/pay`, { headers: authHeader(admin) });

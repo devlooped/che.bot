@@ -1,6 +1,7 @@
 import { MODELS, type Suggestion } from "@chebot/protocol";
-import { useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { t } from "../i18n/index.ts";
+import { type LayerView, patchText } from "../view/chart.ts";
 import type { Discussion, ParagraphView, Position } from "../view/derive.ts";
 import { ModelMark, Support } from "./ModelMark.tsx";
 
@@ -21,15 +22,21 @@ function Outcome({ discussion }: { discussion: Discussion }) {
 }
 
 function Proposal({ s, added }: { s: Suggestion; added: boolean }) {
+  // A proposal on a layer of a chart says what it changes in plain words, never its code.
+  const patch = s.op === "patch" ? patchText(s) : null;
+  const text = patch ? patch.proposed : s.op !== "delete" ? s.text : null;
   return (
     <div className={`proposal ink-${s.author}`}>
       <p className="proposal-head">
         <ModelMark model={s.author} size={11} />
         {added
           ? t.discussion.addedBy(t.models[s.author])
-          : t.discussion.proposal(t.models[s.author], t.discussion.actions[s.op])}
+          : t.discussion.proposal(
+              t.models[s.author],
+              patch ? patch.action : t.discussion.actions[s.op],
+            )}
       </p>
-      {s.op !== "delete" && s.text && <blockquote className="proposal-text">{s.text}</blockquote>}
+      {text && <blockquote className="proposal-text">{text}</blockquote>}
       <p className="proposal-why">
         <span className="proposal-why-label">{t.discussion.why}</span> {s.reason}
       </p>
@@ -75,26 +82,28 @@ function DiscussionBlock({ discussion, added }: { discussion: Discussion; added:
   );
 }
 
-/** The discussion of a paragraph, as a sheet: who holds it, the proposals, the reasons, the votes. */
-export function DiscussionSheet({
-  paragraph,
+/** A sheet over the page: a modal dialog that closes with Escape, its button or the backdrop. */
+function Sheet({
+  title,
+  className,
   onClose,
+  children,
 }: {
-  paragraph: ParagraphView;
+  title: string;
+  className: string;
   onClose: () => void;
+  children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
     if (dialog && !dialog.open) dialog.showModal();
   }, []);
-  const holders = paragraph.support;
-  const others = MODELS.filter((m) => !holders.includes(m));
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: a click on the backdrop closes; Escape and the close button are the keyboard's way
     <dialog
       ref={ref}
-      className="sheet discussion-sheet"
+      className={`sheet ${className}`}
       aria-labelledby="discussion-title"
       onClose={onClose}
       onClick={(e) => {
@@ -104,35 +113,75 @@ export function DiscussionSheet({
       <div className="sheet-body">
         <div className="sheet-head">
           <h3 id="discussion-title" className="sheet-title">
-            {t.discussion.title}
+            {title}
           </h3>
           <button type="button" className="button button-text" onClick={() => ref.current?.close()}>
             {t.common.close}
           </button>
         </div>
-        <blockquote className="sheet-quote">{paragraph.text}</blockquote>
-        <p className="sheet-support">
-          <Support support={holders} />
-          <span>
-            <strong>{t.answer.statusName[paragraph.status]}.</strong>{" "}
-            {holders.length > 0 && t.discussion.supportedBy(t.modelNames(holders), holders.length)}{" "}
-            {others.length > 0 && t.discussion.notSupportedBy(t.modelNames(others), others.length)}
-          </span>
-        </p>
-        {paragraph.before && (
-          <div className="sheet-before">
-            <p className="fine">{t.discussion.before}</p>
-            <blockquote className="sheet-quote sheet-quote-old">{paragraph.before}</blockquote>
-          </div>
-        )}
-        {paragraph.addedBy && <DiscussionBlock discussion={paragraph.addedBy} added />}
-        {paragraph.discussions.map((d) => (
-          <DiscussionBlock key={d.thread.id} discussion={d} added={false} />
-        ))}
-        {!paragraph.addedBy && paragraph.discussions.length === 0 && (
-          <p className="muted">{t.discussion.noThreads}</p>
-        )}
+        {children}
       </div>
     </dialog>
+  );
+}
+
+/** The discussion of a paragraph, as a sheet: who holds it, the proposals, the reasons, the votes. */
+export function DiscussionSheet({
+  paragraph,
+  onClose,
+}: {
+  paragraph: ParagraphView;
+  onClose: () => void;
+}) {
+  const holders = paragraph.support;
+  const others = MODELS.filter((m) => !holders.includes(m));
+  return (
+    <Sheet title={t.discussion.title} className="discussion-sheet" onClose={onClose}>
+      <blockquote className="sheet-quote">{paragraph.text}</blockquote>
+      <p className="sheet-support">
+        <Support support={holders} />
+        <span>
+          <strong>{t.answer.statusName[paragraph.status]}.</strong>{" "}
+          {holders.length > 0 && t.discussion.supportedBy(t.modelNames(holders), holders.length)}{" "}
+          {others.length > 0 && t.discussion.notSupportedBy(t.modelNames(others), others.length)}
+        </span>
+      </p>
+      {paragraph.before && (
+        <div className="sheet-before">
+          <p className="fine">{t.discussion.before}</p>
+          <blockquote className="sheet-quote sheet-quote-old">{paragraph.before}</blockquote>
+        </div>
+      )}
+      {paragraph.addedBy && <DiscussionBlock discussion={paragraph.addedBy} added />}
+      {paragraph.discussions.map((d) => (
+        <DiscussionBlock key={d.thread.id} discussion={d} added={false} />
+      ))}
+      {!paragraph.addedBy && paragraph.discussions.length === 0 && (
+        <p className="muted">{t.discussion.noThreads}</p>
+      )}
+    </Sheet>
+  );
+}
+
+/** The discussion of a layer of a chart (its kind, title, explanation or calculation), as a sheet. */
+export function LayerSheet({ layer, onClose }: { layer: LayerView; onClose: () => void }) {
+  return (
+    <Sheet
+      title={t.chart.layers.sheetTitle[layer.layer]}
+      className="discussion-sheet"
+      onClose={onClose}
+    >
+      <p className="fine">{t.chart.layers.now}</p>
+      <blockquote className="sheet-quote">{layer.value}</blockquote>
+      {layer.before && (
+        <div className="sheet-before">
+          <p className="fine">{t.discussion.before}</p>
+          <blockquote className="sheet-quote sheet-quote-old">{layer.before}</blockquote>
+        </div>
+      )}
+      {layer.discussions.map((d) => (
+        <DiscussionBlock key={d.thread.id} discussion={d} added={false} />
+      ))}
+    </Sheet>
   );
 }

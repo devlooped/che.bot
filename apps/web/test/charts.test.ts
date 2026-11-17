@@ -130,6 +130,7 @@ describe("a chart run through the alarms of RunObject", () => {
       body: JSON.stringify({ question: "¿Cuánto vendió cada región?", chart: { csv: "a,b\n1" } }),
     });
     expect(bad.status).toBe(400);
+    expect(await bad.json()).toMatchObject({ reason: "csv_ragged" });
     const asked = await api("/api/runs", {
       method: "POST",
       headers: { ...beta("csv-user"), "content-type": "application/json" },

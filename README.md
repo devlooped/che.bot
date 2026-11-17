@@ -81,6 +81,12 @@ payment and calls the hook), a Gateway catalog with a few more families for the 
 sign-in that picks a test user (beta, admin, or no access). The production entry never imports
 `src/local`, and `pnpm build` fails if anything of it is in the output (`scripts/check-build.mjs`).
 
+A run asked for a chart ("Quiero un gráfico" on the ask page) plays the scripted chart run of
+`src/local/chart-scenario.ts` instead, through the real renderer: with data from the web, the monthly
+inflation of the first half of 2025, whatever the question; with an upload, any CSV (the briefs read
+its columns: three sum the first number column by the first text column, one averages it).
+`SAMPLE_CSV` in that file is an upload to try.
+
 The states around the happy path are played the same way, to see and test them:
 
 | To see                                   | Do                                                                                                                      |
@@ -90,8 +96,16 @@ The states around the happy path are played the same way, to see and test them:
 | The budget reached before the discussion | Ask with `[presupuesto]`: the drafts spend nearly all of it                                                             |
 | An expired payment                       | "Simular que venció el QR" under the QR (`POST /api/local/expire/:id`)                                                  |
 | A model that does not answer             | Every run: Gemini misses the last round of votes                                                                        |
+| A chart: agreed rows                     | "Quiero un gráfico", data from the web: January, February and April                                                     |
+| A point corrected by its source          | The same chart: March, drawn at 3,3 (two models) and settled at 3,7 by the statistics office                            |
+| A point drawn as a range                 | The same chart: May, 1,5 and 1,9, neither source held up                                                                |
+| A value of one model, not confirmed      | The same chart: June, Gemini's alone                                                                                    |
+| Voted layers, and one without agreement  | The same chart: the title and the explanation accepted, bars instead of the line two against two                        |
+| An earlier version of a chart            | "Ver cómo cambió el gráfico" on a finished chart: three versions                                                        |
+| A chart of the user's table              | "Quiero un gráfico", "De mi tabla", and a CSV file; a file beyond the limits is refused before asking                   |
 
-The pages: `/` asks, `/r/:id` follows a run and replays how its text formed, `/mis-preguntas` lists
+The pages: `/` asks (for a text, or for a chart of data from the web or of a CSV), `/r/:id` follows
+a run and replays how its text or its chart formed, `/mis-preguntas` lists
 the user's questions (copy a link, delete one), and `/admin` sets the model of each role and the two
 prices (admins only; the menu hides it from others).
 
@@ -118,8 +132,9 @@ The browser app signs in with the Auth0 SPA SDK, configured by public build vari
 
 A chart run is asked with `chart` in the body: `{ "chart": {} }` for data from the web, or
 `{ "chart": { "csv": "<the text of the file>" } }` for an upload, parsed when it is asked (at most
-64 KB, 500 rows and 12 columns; a bad file answers 400 before anything is paid). The summary of a
-run says `chart: "web" | "user" | null`.
+64 KB, 500 rows and 12 columns; a bad file answers 400 before anything is paid, with `reason`
+`csv_<code>`, such as `csv_too_many_rows`, which the page words for the user). The summary of a run
+says `chart: "web" | "user" | null`.
 
 The render gate of chart runs runs inside `RunObject`. Step 36 measured it in the Workers runtime:
 Vega in interpreter mode renders a chart in 35 ms the first time and 7 ms after (without the
@@ -127,6 +142,22 @@ interpreter Vega fails there with "Code generation from strings disallowed"); it
 851 KiB minified (296 KiB gzip), whose evaluation takes 40-110 ms of the 1 s startup limit. The
 production build puts them in a chunk of their own that `RunObject` imports on its first render, so
 a Worker that only answers the API never evaluates it; the whole upload is 2,545 KiB (631 KiB gzip).
+
+The page of a chart run (step 41) draws the chart with `vega-embed` (no interpreter: the browser may
+compile expressions), loaded with a dynamic import by `ChartCanvas`, so a text answer never downloads
+it: the browser chunk of the chart is 854 KB minified (294 KB gzip), beside 429 KB (132 KB gzip)
+for the rest of the app. The spec of the page (`src/app/chart/spec.ts`) is the chart's layers and
+fixed theme, with the title out of the drawing (it is a heading), a named data
+set, and for web data the range of an unsettled row with both its ends and the number of the note of
+every corrected, disputed or unconfirmed point. A new version with the same layers moves the marks:
+the data set is tweened frame by frame (`src/app/chart/embed.ts`); a version whose kind, axes or
+calculation changed is drawn again, faded in; with reduced motion every change is immediate. Under
+the chart, the table is its text: every web row with its value, its source and the words that state
+it, and a note on each corrected point (what it was, what it is, the source that settled it, who
+said what), on each range (both values and their sources) and on each value no source confirmed; a
+chart of an upload says that every number comes from the table, and the calculation the models
+agreed on in plain words. The layers the models voted on (the kind of chart, the title, the
+explanation, the calculation) open their discussions like the paragraphs of a text.
 
 Sign-in is an Auth0 access token (`Authorization: Bearer`), verified with the tenant's JWKS
 (RS256, issuer `https://AUTH0_DOMAIN/`, audience `AUTH0_AUDIENCE`); the roles are read from any

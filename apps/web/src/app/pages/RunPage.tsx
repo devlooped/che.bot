@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSession } from "../auth/context.tsx";
 import { isAdmin } from "../auth/types.ts";
 import { AnswerDocument } from "../components/AnswerDocument.tsx";
+import { ChartDocument } from "../components/ChartDocument.tsx";
 import { Checkout } from "../components/Checkout.tsx";
 import { CopyLink } from "../components/CopyLink.tsx";
 import { Failure } from "../components/Failure.tsx";
@@ -13,6 +14,7 @@ import { useRun } from "../events/useRun.ts";
 import { t } from "../i18n/index.ts";
 import { Link, navigate } from "../router/index.tsx";
 import { runPath } from "../routes.tsx";
+import { chartViewOf } from "../view/chart.ts";
 import { documentOf, flagNotes, stageLine } from "../view/derive.ts";
 import { errorText } from "../view/errors.ts";
 
@@ -30,7 +32,9 @@ export function RunPage({ params }: { params: Record<string, string> }) {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const { view, connection } = stream;
-  const doc = useMemo(() => documentOf(view), [view]);
+  // A chart run answers with its chart (step 41); any other, with the text.
+  const chart = useMemo(() => (view.chart ? chartViewOf(view) : null), [view]);
+  const doc = useMemo(() => (view.chart ? null : documentOf(view)), [view]);
   // The summary says why a run failed and whether it may run again: read it again when it ends.
   useEffect(() => {
     if (view.status === "failed" || view.status === "expired") refresh();
@@ -65,12 +69,16 @@ export function RunPage({ params }: { params: Record<string, string> }) {
     }
   }
 
-  /** The same question as a new one: a new quote, on its own page. */
+  /**
+   * The same question as a new one: a new quote, on its own page. A chart of web data is asked for
+   * again; a chart of the user's table needs the file again, so the ask page takes it.
+   */
   async function askAgain() {
+    if (summary?.chart === "user") return navigate("/");
     setBusy(true);
     setActionError(null);
     try {
-      const quote = await api.ask(question);
+      const quote = await api.ask(question, summary?.chart === "web" ? {} : null);
       navigate(runPath(quote.runId));
     } catch (err) {
       setActionError(errorText(err));
@@ -154,7 +162,7 @@ export function RunPage({ params }: { params: Record<string, string> }) {
               onAskAgain={askAgain}
             />
           )}
-          {started && !doc && view.status !== "failed" && (
+          {started && !doc && !chart && view.status !== "failed" && (
             <p className="doc-empty">{t.answer.noDocument}</p>
           )}
           {doc && (
@@ -167,6 +175,13 @@ export function RunPage({ params }: { params: Record<string, string> }) {
               />
               <History view={view} />
               <Sources sources={doc.sources} />
+            </>
+          )}
+          {chart && (
+            <>
+              <ChartDocument chart={chart} final={final} notes={flagNotes(view, chart.answer)} />
+              <History view={view} />
+              {chart.origin === "web" && <Sources sources={chart.answer.sources} />}
             </>
           )}
           {started && <Panel view={view} />}

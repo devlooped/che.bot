@@ -5,12 +5,14 @@ import {
   type ModelId,
   type RunView,
   type Source,
-  type Suggestion,
   selectAnswer,
   type Thread,
-  type Vote,
 } from "@chebot/protocol";
 import { t } from "../i18n/index.ts";
+import { chartCounts, chartOpenPoints } from "./chart.ts";
+import { type Discussion, discussionOf } from "./discussion.ts";
+
+export type { Discussion, Position } from "./discussion.ts";
 
 // What the run page shows, computed from the replayed view (the shared reducer's output) and
 // `selectAnswer`. No text here except through `t`.
@@ -46,6 +48,7 @@ export function openPoints(view: RunView): number {
 export function stageLine(view: RunView, waitingPayment = false): string {
   if (view.status === "expired") return t.stage.expired;
   if (view.status === "failed") return t.stage.failed;
+  if (view.chart) return chartStageLine(view);
   if (view.status === "completed") {
     const answer = selectAnswer(view);
     const paragraphs = answer?.paragraphs ?? [];
@@ -74,45 +77,27 @@ export function stageLine(view: RunView, waitingPayment = false): string {
   }
 }
 
-/** One model's place in a discussion: what it holds at the end, and the votes it gave. */
-export interface Position {
-  model: ModelId;
-  /** A suggestion id, "keep", or null when it never took a position. */
-  choice: string | null;
-  votes: Vote[];
-  /** The reason of its last change of position, if it changed. */
-  changedBecause: string | null;
-  /** The reason it gave for its position without changing it, if any. */
-  saidWhy: string | null;
-}
-
-export interface Discussion {
-  thread: Thread;
-  alternatives: Suggestion[];
-  positions: Position[];
-}
-
-export function discussionOf(view: RunView, thread: Thread): Discussion {
-  const held = view.positions[thread.id] ?? {};
-  return {
-    thread,
-    alternatives: thread.alternatives.flatMap((id) => {
-      const s = view.suggestions[id];
-      return s ? [s] : [];
-    }),
-    positions: MODELS.map((model) => {
-      const votes = view.votes.filter((v) => v.thread === thread.id && v.voter === model);
-      const changed = votes.findLast((v) => v.changed && v.reason);
-      const said = votes.findLast((v) => !v.changed && v.reason);
-      return {
-        model,
-        choice: held[model] ?? null,
-        votes,
-        changedBecause: changed?.reason ?? null,
-        saidWhy: changed ? null : (said?.reason ?? null),
-      };
-    }),
-  };
+/** The stage line of a chart run, once it started. */
+function chartStageLine(view: RunView): string {
+  const c = t.stage.chart;
+  if (view.status === "completed") {
+    const counts = chartCounts(view);
+    return counts.origin === "user" ? c.doneUser(counts.dissent) : c.done(counts);
+  }
+  switch (view.stage) {
+    case "drafting":
+      return c.drafting[view.chart?.origin ?? "web"];
+    case "merging":
+      return c.merging;
+    case "round1":
+      return c.round1(chartOpenPoints(view));
+    case "round2":
+      return c.round2(chartOpenPoints(view));
+    case "round3":
+      return t.stage.round3(chartOpenPoints(view));
+    default:
+      return t.stage.starting;
+  }
 }
 
 export interface ParagraphView {
@@ -230,7 +215,7 @@ function missedStep(stage: string): MissedStep {
  * limit and what it left out (the discussion, or only the last pass), the models that missed a
  * step.
  */
-export function flagNotes(view: RunView, answer: Answer): string[] {
+export function flagNotes(view: RunView, answer: Pick<Answer, "flags" | "abstained">): string[] {
   const notes: string[] = [];
   const f = answer.flags;
   // Without a discussion there is no proposal and no version after the merge.

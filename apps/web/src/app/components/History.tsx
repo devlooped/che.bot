@@ -1,7 +1,9 @@
 import type { RunView } from "@chebot/protocol";
-import { type CSSProperties, useId, useMemo, useState } from "react";
+import { type CSSProperties, type ReactNode, useId, useMemo, useState } from "react";
 import { t } from "../i18n/index.ts";
+import { type ChartChange, chartHistoryOf, chartViewOf } from "../view/chart.ts";
 import { type HistoryParagraph, historyOf } from "../view/history.ts";
+import { ChartCanvas } from "./ChartCanvas.tsx";
 import { ModelMark } from "./ModelMark.tsx";
 
 function Paragraph({ p }: { p: HistoryParagraph }) {
@@ -38,12 +40,19 @@ function Paragraph({ p }: { p: HistoryParagraph }) {
 }
 
 /**
- * The history slider (step 32): the text at each step of the run, from the merged answers to the
- * final wording, with what each step changed marked in the ink of the model that proposed it. A
- * range moves through the steps (touch, mouse, the arrow keys); two buttons step one at a time.
+ * The section of a history: a toggle, then a range that moves through the steps (touch, mouse, the
+ * arrow keys) and two buttons that step one at a time, the label and what the step did, and the
+ * content of the step.
  */
-export function History({ view }: { view: RunView }) {
-  const steps = useMemo(() => historyOf(view), [view]);
+function Steps({
+  texts,
+  steps,
+  children,
+}: {
+  texts: { title: string; show: string; hide: string; lede: string; slider: string };
+  steps: readonly { label: string; what: string }[];
+  children: (index: number) => ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
   const id = useId();
@@ -56,7 +65,7 @@ export function History({ view }: { view: RunView }) {
     <section className="history" aria-labelledby={`${id}-title`}>
       <div className="history-head">
         <h2 id={`${id}-title`} className="section-title">
-          {t.history.title}
+          {texts.title}
         </h2>
         <button
           type="button"
@@ -65,13 +74,13 @@ export function History({ view }: { view: RunView }) {
           aria-controls={`${id}-body`}
           onClick={() => setOpen(!open)}
         >
-          {open ? t.history.hide : t.history.show}
+          {open ? texts.hide : texts.show}
         </button>
       </div>
       <div id={`${id}-body`} className="history-body" hidden={!open}>
         {open && (
           <>
-            <p className="fine">{t.history.lede}</p>
+            <p className="fine">{texts.lede}</p>
             <div className="history-controls">
               <button
                 type="button"
@@ -88,7 +97,7 @@ export function History({ view }: { view: RunView }) {
                 max={steps.length - 1}
                 step={1}
                 value={at}
-                aria-label={t.history.slider}
+                aria-label={texts.slider}
                 aria-valuetext={`${step.label}. ${position}`}
                 onChange={(e) => setIndex(Number(e.target.value))}
                 style={{ "--fill": `${(at / (steps.length - 1)) * 100}%` } as CSSProperties}
@@ -108,14 +117,99 @@ export function History({ view }: { view: RunView }) {
               </p>
               <p className="history-what">{step.what}</p>
             </div>
-            <div className="history-doc">
-              {step.paragraphs.map((p) => (
-                <Paragraph key={p.id} p={p} />
-              ))}
-            </div>
+            {children(at)}
           </>
         )}
       </div>
     </section>
+  );
+}
+
+function Change({ change }: { change: ChartChange }) {
+  if (change.kind === "row") return <li className="hist-change">{change.text}</li>;
+  const ink = change.by ? ` ink-${change.by}` : "";
+  return (
+    <li className={`hist-change hist-changed${ink}`}>
+      <span className="hist-change-what">
+        {change.by && <ModelMark model={change.by} size={10} />}
+        {change.by
+          ? t.chart.history.layerBy(change.name, t.models[change.by])
+          : t.chart.history.layer(change.name)}
+      </span>{" "}
+      <span className="hist-text">
+        <del>
+          <span className="sr-only">{t.history.removed} </span>
+          {change.before}
+        </del>{" "}
+        <ins>
+          <span className="sr-only">{t.history.added} </span>
+          {change.after}
+        </ins>
+      </span>
+    </li>
+  );
+}
+
+/** The chart at one step of the history, and what changed in that step. */
+function ChartStep({
+  view,
+  version,
+  changes,
+}: {
+  view: RunView;
+  version: number;
+  changes: readonly ChartChange[];
+}) {
+  const chart = useMemo(() => chartViewOf(view, version), [view, version]);
+  if (!chart) return null;
+  return (
+    <div className="history-chart" data-testid="history-chart" data-version={version}>
+      <p className="history-chart-title">{chart.title}</p>
+      <ChartCanvas spec={chart.spec} data={chart.data} label={chart.label} />
+      {chart.caption && <p className="chart-caption">{chart.caption}</p>}
+      {changes.length > 0 && (
+        <>
+          <h3 className="chart-subtitle">{t.chart.history.changesTitle}</h3>
+          <ul className="hist-changes" data-testid="history-changes">
+            {changes.map((c) => (
+              <Change key={c.kind === "row" ? c.text : c.name} change={c} />
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The history slider (steps 32 and 41). A text answer: the text at each step of the run, from the
+ * merged answers to the final wording, with what each step changed marked in the ink of the model
+ * that proposed it. A chart: the chart at each step, whose marks move to the values of that step,
+ * with the rows the sources settled and the layers the votes changed.
+ */
+export function History({ view }: { view: RunView }) {
+  const prose = useMemo(() => (view.chart ? [] : historyOf(view)), [view]);
+  const chart = useMemo(() => (view.chart ? chartHistoryOf(view) : []), [view]);
+  if (view.chart)
+    return (
+      <Steps texts={t.chart.history} steps={chart}>
+        {(at) => {
+          const step = chart[at];
+          return step ? (
+            <ChartStep view={view} version={step.version} changes={step.changes} />
+          ) : null;
+        }}
+      </Steps>
+    );
+  return (
+    <Steps texts={t.history} steps={prose}>
+      {(at) => (
+        <div className="history-doc">
+          {prose[at]?.paragraphs.map((p) => (
+            <Paragraph key={p.id} p={p} />
+          ))}
+        </div>
+      )}
+    </Steps>
   );
 }

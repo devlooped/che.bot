@@ -1,6 +1,17 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import { authHeader, DONE, finishedRun, newUser, signIn, t, uniqueQuestion } from "./helpers.ts";
+import {
+  authHeader,
+  CHART_QUESTION,
+  DONE,
+  finishedRun,
+  newUser,
+  SAMPLE_CSV,
+  signIn,
+  t,
+  UPLOAD_QUESTION,
+  uniqueQuestion,
+} from "./helpers.ts";
 
 // An automated accessibility check (axe) of the main pages and states, at both widths: WCAG 2.1
 // A and AA, and axe's best practices (landmarks, heading order). Motion is reduced so that no
@@ -85,5 +96,51 @@ test("Mis preguntas, its confirmation, and the admin page", async ({ page, reque
 
   await page.goto("/admin");
   await expect(page.getByRole("heading", { name: t.admin.modelsTitle })).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+});
+
+test("a chart, its data and notes, a layer's discussion, its history, and a chart of a table", async ({
+  page,
+  request,
+}) => {
+  const [web, user] = await Promise.all([
+    finishedRun(request, CHART_QUESTION, {}),
+    finishedRun(request, UPLOAD_QUESTION, { csv: SAMPLE_CSV }),
+  ]);
+  await page.goto(`/r/${web}`);
+  await expect(page.getByTestId("stage-line")).toHaveText(DONE);
+  await expect(page.getByTestId("chart").locator("svg").first()).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+
+  const layer = page.getByTestId("layer").first();
+  await layer.focus();
+  await page.keyboard.press("Enter");
+  const sheet = page.getByRole("dialog");
+  await expect(sheet.getByRole("button", { name: t.common.close })).toBeFocused();
+  expect(await violations(page)).toEqual([]);
+  await page.keyboard.press("Escape");
+  await expect(layer).toBeFocused();
+
+  await page.getByRole("button", { name: t.chart.history.show }).click();
+  await expect(page.getByTestId("history-chart").locator("svg").first()).toBeVisible();
+  await page.getByRole("button", { name: t.history.next }).click();
+  expect(await violations(page)).toEqual([]);
+
+  await page.goto(`/r/${user}`);
+  await expect(page.getByTestId("drawn-row").first()).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+});
+
+test("asking for a chart, with a file refused", async ({ page }) => {
+  await signIn(page, newUser());
+  await page.goto("/");
+  await page.getByLabel(t.ask.chart.toggle).check();
+  await page.getByLabel(t.ask.chart.file).check();
+  await page.getByLabel(t.ask.chart.fileLabel).setInputFiles({
+    name: "vacio.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("a,b\n"),
+  });
+  await expect(page.getByTestId("file-error")).toBeVisible();
   expect(await violations(page)).toEqual([]);
 });

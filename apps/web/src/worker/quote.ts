@@ -1,4 +1,10 @@
-import { type ChartInput, CsvParseError, parseCsv, type QuestionClass } from "@chebot/protocol";
+import {
+  type ChartInput,
+  type CsvError,
+  CsvParseError,
+  parseCsv,
+  type QuestionClass,
+} from "@chebot/protocol";
 import { deps } from "./deps.ts";
 import type { Env } from "./env.ts";
 import { runStub } from "./run-object.ts";
@@ -32,9 +38,12 @@ export function questionOf(body: unknown): { question: string } | { error: strin
 /**
  * The chart of a request body: absent for a prose run; `{ chart: {} }` asks for a chart of data
  * from the web, `{ chart: { csv } }` for a chart of the uploaded CSV, parsed here by code (its
- * limits are `CSV_LIMITS`), so that a bad file is refused before anything is paid.
+ * limits are `CSV_LIMITS`), so that a bad file is refused before anything is paid. A refused file
+ * says why in `reason` ("csv_" and the `CsvError`), which the browser words for the user.
  */
-export function chartOf(body: unknown): { chart: ChartInput | null } | { error: string } {
+export function chartOf(
+  body: unknown,
+): { chart: ChartInput | null } | { error: string; reason?: `csv_${CsvError}` } {
   const chart = (body as { chart?: unknown } | null)?.chart;
   if (chart === undefined || chart === null || chart === false) return { chart: null };
   if (chart === true) return { chart: { dataset: null } };
@@ -45,7 +54,8 @@ export function chartOf(body: unknown): { chart: ChartInput | null } | { error: 
   try {
     return { chart: { dataset: parseCsv(csv) } };
   } catch (error) {
-    if (error instanceof CsvParseError) return { error: error.message };
+    if (error instanceof CsvParseError)
+      return { error: error.message, reason: `csv_${error.code}` };
     throw error;
   }
 }
