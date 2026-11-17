@@ -114,7 +114,9 @@ The end-to-end tests start the local mode themselves. They need Playwright's Chr
 (`pnpm --filter @chebot/web exec playwright install chromium`) or a browser of the machine:
 `PLAYWRIGHT_CHANNEL=msedge` (or `chrome`). They run at a phone width and a desktop width, and
 `e2e/a11y.spec.ts` checks the main pages and states with axe (WCAG 2.1 A and AA, and its best
-practices).
+practices). The server of the tests keeps its own state (prices, models, runs) in
+`apps/web/.wrangler/e2e-state`, emptied at each start, so a run begins from the default prices and
+models and never touches the state of `pnpm --filter @chebot/web dev` (`.wrangler/state`).
 
 `dev:live` runs the real Worker against the real services on http://localhost:3000, whose
 `/auth/callback` the Auth0 application allows. Its `apps/web/.dev.vars` (see `.dev.vars.example`)
