@@ -40,7 +40,8 @@ const SCHEMA = [
      deadline_at INTEGER,
      attempt INTEGER NOT NULL DEFAULT 0,
      state TEXT,
-     chart TEXT
+     chart TEXT,
+     classify TEXT
    )`,
   `CREATE TABLE IF NOT EXISTS events (
      seq INTEGER PRIMARY KEY,
@@ -65,6 +66,14 @@ const SCHEMA = [
      seq INTEGER NOT NULL
    )`,
 ];
+
+/** The classification of the question, made before the run: what it cost. */
+export interface ClassifyCost {
+  model: string;
+  costUsd: number;
+  inputTokens: number;
+  outputTokens: number;
+}
 
 /** Where a run is: before payment, running, or ended. */
 export type RunStatus =
@@ -112,6 +121,8 @@ export interface RunRecord {
   state: RunState | null;
   /** A chart run: its upload (parsed when it was asked) or none (web data); null for prose. */
   chart: ChartInput | null;
+  /** What the classification cost; null when it was not recorded. */
+  classify: ClassifyCost | null;
 }
 
 interface RunRow extends Record<string, SqlStorageValue> {
@@ -141,10 +152,14 @@ interface RunRow extends Record<string, SqlStorageValue> {
   state: string | null;
   /** Absent (undefined) in the rows of objects created before charts. */
   chart: string | null;
+  /** Absent (undefined) in the rows of objects created before the spend was shown. */
+  classify: string | null;
 }
 
 /** The columns of the run row that `updateRun` may set. */
-export type RunUpdate = Partial<Omit<RunRow, "id" | "owner" | "question" | "created_at" | "chart">>;
+export type RunUpdate = Partial<
+  Omit<RunRow, "id" | "owner" | "question" | "created_at" | "chart" | "classify">
+>;
 
 /**
  * The keys of an attempt: the first keeps the keys of the protocol, a free rerun prefixes its
@@ -209,6 +224,7 @@ export class RunStore {
       attempt: row.attempt,
       state: row.state ? (JSON.parse(row.state) as RunState) : null,
       chart: row.chart ? (JSON.parse(row.chart) as ChartInput) : null,
+      classify: row.classify ? (JSON.parse(row.classify) as ClassifyCost) : null,
     };
   }
 
@@ -222,10 +238,11 @@ export class RunStore {
     currency: string;
     createdAt: number;
     chart?: ChartInput | null;
+    classify?: ClassifyCost | null;
   }): void {
     this.sql.exec(
-      `INSERT INTO run (id, owner, question, class, probability, amount, currency, status, created_at, chart)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'quoted', ?, ?)`,
+      `INSERT INTO run (id, owner, question, class, probability, amount, currency, status, created_at, chart, classify)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'quoted', ?, ?, ?)`,
       run.id,
       run.owner,
       run.question,
@@ -235,6 +252,7 @@ export class RunStore {
       run.currency,
       run.createdAt,
       run.chart ? JSON.stringify(run.chart) : null,
+      run.classify ? JSON.stringify(run.classify) : null,
     );
   }
 
@@ -374,6 +392,17 @@ export class RunStore {
         );
       },
     };
+  }
+
+  /** Every call of the ledger, of every attempt, with its entry once it finished. */
+  spendCalls(): { key: string; entry: LedgerEntry | null }[] {
+    return this.sql
+      .exec<{ key: string; entry: string | null }>("SELECT key, entry FROM calls ORDER BY key")
+      .toArray()
+      .map((row) => ({
+        key: row.key,
+        entry: row.entry ? (JSON.parse(row.entry) as LedgerEntry) : null,
+      }));
   }
 
   /** The rows of the call ledger, for tests and diagnostics. */

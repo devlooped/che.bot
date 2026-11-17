@@ -24,6 +24,14 @@ function list(items: readonly string[]): string {
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
+const dollars = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 4,
+  maximumFractionDigits: 4,
+});
+const count = new Intl.NumberFormat("es-AR");
+
 const MODEL_NAMES: Record<ModelId, string> = {
   grok: "Grok",
   claude: "Claude",
@@ -344,6 +352,40 @@ export const esAR = {
     utility: "Asistente",
     utilityRole: "Juntó las respuestas y escribió los resúmenes.",
     effort: (effort: string) => `esfuerzo ${effortName(effort)}`,
+  },
+
+  spend: {
+    title: "Gasto",
+    usd: (amount: number) => dollars.format(amount),
+    count: (n: number) => count.format(n),
+    running: (n: number) => `${n} ${plural(n, "llamada en curso", "llamadas en curso")}`,
+    none: "Todavía no terminó ninguna llamada a un modelo.",
+    failed: "No se pudo leer el gasto.",
+    groupBy: "Agrupar por",
+    pivots: { agent: "Agente", model: "Modelo", stage: "Etapa" },
+    chart: (by: string) => `Gasto en dólares por ${by.toLowerCase()}; el detalle está en la tabla`,
+    caption: (by: string) => `Gasto por ${by.toLowerCase()}: llamadas, tokens y dólares`,
+    columns: {
+      calls: "Llamadas",
+      inputTokens: "Tokens de entrada",
+      outputTokens: "Tokens de salida",
+      usd: "Dólares",
+    },
+    classifier: "Clasificador",
+    stages: {
+      classify: "Clasificación",
+      draft: "Respuestas",
+      brief: "Datos",
+      merge: "Unión de las respuestas",
+      "chart-merge": "Unión de los datos",
+      spec: "Gráfico",
+      round: "Rondas",
+      dedupe: "Propuestas repetidas",
+      moments: "Resúmenes",
+      edit: "Redacción final",
+      "edit-check": "Control de la redacción",
+    } as Record<string, string>,
+    note: "Lo que Vercel AI Gateway informó por cada llamada, en dólares, sumando todos los intentos y la clasificación de la pregunta. Una llamada en curso suma cuando termina.",
   },
 
   flags: {

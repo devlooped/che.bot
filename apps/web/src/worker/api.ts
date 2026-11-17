@@ -19,6 +19,7 @@ import { spendMeter } from "./spend-meter.ts";
 //   DELETE /api/runs/:id              the owner or an admin
 //   GET    /api/runs/:id[/events|/ws|/snapshots/:v]   anyone with the link (`mine` for the owner)
 //   GET    /api/runs/:id/charts/:v.svg  the render of version v of a chart run, anyone with the link
+//   GET    /api/runs/:id/spend        admin: what the run's model calls cost so far
 //   GET    /api/me/runs               signed in
 //   GET|PUT /api/admin/models|prices  admin
 //   POST   /api/pay/hook              the jobs service, with the token of the run as Bearer
@@ -40,7 +41,7 @@ const error = (status: number, message: string, extra: Record<string, unknown> =
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const UUID_ONLY = new RegExp(`^${UUID}$`, "i");
 const RUN_PATH = new RegExp(
-  `^/api/runs/(${UUID})(/events|/ws|/pay|/rerun|/snapshots/(\\d+)|/charts/(\\d+)\\.svg)?$`,
+  `^/api/runs/(${UUID})(/events|/ws|/pay|/rerun|/spend|/snapshots/(\\d+)|/charts/(\\d+)\\.svg)?$`,
   "i",
 );
 
@@ -258,6 +259,13 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     if (after === null) return error(400, "after is a sequence number.");
     const events = await stub.events(after);
     return events ? json(200, { events }) : error(404, "No such run.");
+  }
+
+  if (sub === "/spend") {
+    const admin = requireAdmin(identity);
+    if (admin instanceof Response) return admin;
+    const spend = await stub.spend();
+    return spend ? json(200, spend) : error(404, "No such run.");
   }
 
   if (sub === "/ws") {

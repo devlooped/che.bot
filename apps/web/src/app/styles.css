@@ -1515,6 +1515,108 @@ a.button {
   overflow-wrap: anywhere;
 }
 
+/* Run: the spend, for admins ------------------------------------------------------------------- */
+
+.spend {
+  display: grid;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.9rem;
+}
+
+.spend summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.spend[open] summary {
+  margin-bottom: 0.75rem;
+}
+
+.spend-pivot {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.spend-pivot select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+}
+
+.spend-bars {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.spend-bar-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+  margin-bottom: 0.2rem;
+}
+
+.spend-bar-name {
+  overflow-wrap: anywhere;
+}
+
+.spend-amount,
+.spend .spend-table td {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.spend-track {
+  display: flex;
+  height: 0.5rem;
+  border-radius: 2px;
+  background: var(--rule);
+  overflow: hidden;
+}
+
+.spend-bar {
+  background: var(--ink-model, var(--ink-soft));
+}
+
+.spend-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 0.5rem;
+}
+
+.spend-table {
+  width: 100%;
+  min-width: 30rem;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+.spend .spend-table th,
+.spend .spend-table td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.spend .spend-table th:first-child {
+  text-align: left;
+  padding-left: 0;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.spend .spend-table thead th {
+  font-weight: 650;
+}
+
 /* Sheets (the discussion of a paragraph, the local sign-in) ------------------------------------ */
 
 .sheet {

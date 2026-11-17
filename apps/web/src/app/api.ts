@@ -110,6 +110,27 @@ export interface Price {
   currency: string;
 }
 
+/** How GET /api/runs/:id/spend groups the calls (src/worker/spend.ts). */
+export type SpendPivot = "agent" | "model" | "stage";
+
+export interface SpendRow {
+  /** A seat (or "classifier"), a model id, or the stage of a call key. */
+  label: string;
+  calls: number;
+  running: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+}
+
+/** GET /api/runs/:id/spend: what the model calls of a run cost so far, for admins. */
+export interface RunSpend {
+  totalUsd: number;
+  calls: number;
+  running: number;
+  rows: Record<SpendPivot, SpendRow[]>;
+}
+
 export const MAX_QUESTION_CHARS = 2_000;
 
 /** The paid attempt of a question and its one free rerun (MAX_ATTEMPTS of src/worker/run-object.ts). */
@@ -190,6 +211,8 @@ export function createApi(base = "") {
       }).then((r) => r.prices),
     /** Public; `mine` says whether the signed-in user owns it. */
     summary: (runId: string) => call<RunSummary>(`/api/runs/${runId}`),
+    /** Admin. */
+    spend: (runId: string) => call<RunSpend>(`/api/runs/${runId}/spend`),
     /** Public. */
     events: (runId: string, after: number) =>
       call<{ events: LoggedEvent[] }>(`/api/runs/${runId}/events?after=${after}`).then(

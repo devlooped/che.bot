@@ -1,8 +1,11 @@
 import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import type { LoggedEvent } from "@chebot/protocol";
 import { describe, expect, test, vi } from "vitest";
-import type { RunObject } from "../src/worker/run-object.ts";
-import { api, as, eventsOf, fakes, paidRun, quoted, runAlarms } from "./helpers.ts";
+import { type RunObject, runStub } from "../src/worker/run-object.ts";
+import { RunStore } from "../src/worker/run-store.ts";
+import type { RunSpend } from "../src/worker/spend.ts";
+import { api, as, ask, contrib, eventsOf, fakes, paidRun, quoted, runAlarms } from "./helpers.ts";
 
 const user = () => `user-${crypto.randomUUID()}`;
 
@@ -124,6 +127,66 @@ describe("running a failed run again", () => {
     const running = await api(`/api/runs/${id}/rerun`, { method: "POST", headers: as(owner) });
     expect(running.status).toBe(409);
     expect(await running.json()).toMatchObject({ reason: "not_failed" });
+  });
+});
+
+describe("the spend of a run", () => {
+  const spendOf = async (id: string, headers: Record<string, string>) =>
+    (await (await api(`/api/runs/${id}/spend`, { headers })).json()) as RunSpend;
+
+  test("only an admin reads it; it counts the classification, each call as it lands, and the calls in flight", async () => {
+    fakes();
+    const admin = as(user(), ["Admin"]);
+    const { runId: id } = (await (await ask(admin)).json()) as { runId: string };
+    expect((await api(`/api/runs/${id}/pay`, { method: "POST", headers: admin })).status).toBe(202);
+    const stub = runStub(env, id);
+
+    expect((await api(`/api/runs/${id}/spend`)).status).toBe(401);
+    expect((await api(`/api/runs/${id}/spend`, { headers: contrib(user()) })).status).toBe(403);
+    expect((await api(`/api/runs/${crypto.randomUUID()}/spend`, { headers: admin })).status).toBe(
+      404,
+    );
+
+    // Before the first tick: only the classification (FakeClassifier: US$0.001).
+    const classified = await spendOf(id, admin);
+    expect(classified).toMatchObject({ totalUsd: 0.001, calls: 1, running: 0 });
+    expect(classified.rows.agent).toEqual([
+      expect.objectContaining({ label: "classifier", calls: 1, inputTokens: 10, outputTokens: 1 }),
+    ]);
+    expect(classified.rows.stage.map((r) => r.label)).toEqual(["classify"]);
+
+    // A draft that started and has not landed is in flight, under its agent, model and stage.
+    await runInDurableObject(stub, async (_: RunObject, state) => {
+      await new RunStore(state.storage.sql).ledger("").begin?.("draft:0:grok", Date.now());
+    });
+    const inFlight = await spendOf(id, admin);
+    expect(inFlight).toMatchObject({ totalUsd: 0.001, calls: 1, running: 1 });
+    expect(inFlight.rows.agent.find((r) => r.label === "grok")).toMatchObject({
+      calls: 0,
+      running: 1,
+      costUsd: 0,
+    });
+    expect(inFlight.rows.stage.find((r) => r.label === "draft")).toMatchObject({ running: 1 });
+
+    // The drafts land: four calls of the panel, each with its cost.
+    await runDurableObjectAlarm(stub);
+    const drafted = await spendOf(id, admin);
+    expect(drafted.running).toBe(0);
+    expect(drafted.rows.stage.find((r) => r.label === "draft")).toMatchObject({ calls: 4 });
+    expect(drafted.rows.agent.map((r) => r.label).sort()).toEqual(
+      ["claude", "classifier", "gemini", "grok", "openai"].sort(),
+    );
+
+    // At the end, the total is what the run spent plus the classification, in every pivot.
+    await runAlarms(stub);
+    const done = await spendOf(id, admin);
+    const ended = (await eventsOf(stub)).find((e) => e.type === "run.completed");
+    if (ended?.type !== "run.completed") throw new Error("the run did not complete");
+    expect(done.totalUsd).toBeCloseTo(ended.spentUsd + 0.001, 9);
+    for (const rows of Object.values(done.rows))
+      expect(rows.reduce((sum, r) => sum + r.costUsd, 0)).toBeCloseTo(done.totalUsd, 9);
+    expect(done.rows.agent.map((r) => r.label)).toContain("utility");
+    expect(done.rows.agent.map((r) => r.label)).not.toContain("renderer");
   });
 });
 

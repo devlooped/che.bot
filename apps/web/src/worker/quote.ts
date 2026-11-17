@@ -5,9 +5,11 @@ import {
   parseCsv,
   type QuestionClass,
 } from "@chebot/protocol";
+import { ProviderError } from "@chebot/providers";
 import { deps } from "./deps.ts";
 import type { Env } from "./env.ts";
 import { runStub } from "./run-object.ts";
+import type { ClassifyCost } from "./run-store.ts";
 import { priceOf, resolveRunModels } from "./settings.ts";
 
 // The quote of POST /api/runs: the decision model classes the question simple or complex, and
@@ -68,7 +70,7 @@ export function chartOf(
 export async function classifyQuestion(
   env: Env,
   question: string,
-): Promise<{ class: QuestionClass; probability: number | null; costUsd: number }> {
+): Promise<{ class: QuestionClass; probability: number | null; cost: ClassifyCost }> {
   const model = (await resolveRunModels(env)).classifier;
   if (!model) throw new Error("The settings have no classifier.");
   try {
@@ -77,10 +79,29 @@ export async function classifyQuestion(
       model,
       signal: AbortSignal.timeout(CLASSIFY_TIMEOUT_MS),
     });
-    return { class: result.class, probability: result.probability, costUsd: result.costUsd };
+    return {
+      class: result.class,
+      probability: result.probability,
+      cost: {
+        model: model.id,
+        costUsd: result.costUsd,
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
+      },
+    };
   } catch (error) {
     console.warn("The classification failed; the question counts as complex.", error);
-    return { class: "complex", probability: null, costUsd: 0 };
+    const failure = ProviderError.isInstance(error) ? error : null;
+    return {
+      class: "complex",
+      probability: null,
+      cost: {
+        model: model.id,
+        costUsd: failure?.costUsd ?? 0,
+        inputTokens: failure?.usage?.inputTokens ?? 0,
+        outputTokens: failure?.usage?.outputTokens ?? 0,
+      },
+    };
   }
 }
 
@@ -103,12 +124,13 @@ export async function quoteQuestion(
     amount: price.amount,
     currency: price.currency,
     chart,
+    classify: classification.cost,
   });
   return {
     runId: summary.id,
     class: summary.class,
     amount: summary.amount,
     currency: summary.currency,
-    costUsd: classification.costUsd,
+    costUsd: classification.cost.costUsd,
   };
 }

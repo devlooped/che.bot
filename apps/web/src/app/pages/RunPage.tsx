@@ -10,6 +10,7 @@ import { History } from "../components/History.tsx";
 import { Moments } from "../components/Moments.tsx";
 import { Panel, Sources } from "../components/RunDetails.tsx";
 import { Seats } from "../components/Seats.tsx";
+import { Spend } from "../components/Spend.tsx";
 import { useRun } from "../events/useRun.ts";
 import { t } from "../i18n/index.ts";
 import { Link, navigate } from "../router/index.tsx";
@@ -182,6 +183,7 @@ export function RunPage({ params }: { params: Record<string, string> }) {
             </>
           )}
           {started && <Panel view={view} />}
+          {started && isAdmin(user) && <Spend runId={runId} running={view.status === "running"} />}
         </div>
       </div>
     </main>

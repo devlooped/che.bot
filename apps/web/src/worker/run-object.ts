@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { checkSnapshot, runCalls } from "@chebot/driver";
+import { checkSnapshot, modelFor, runCalls } from "@chebot/driver";
 import {
   beginStep,
   type ChartInput,
@@ -25,8 +25,15 @@ import {
 import { deps } from "./deps.ts";
 import type { Env } from "./env.ts";
 import { type JobSnapshot, JobsError } from "./jobs.ts";
-import { attemptPrefix, type RunRecord, type RunStatus, RunStore } from "./run-store.ts";
+import {
+  attemptPrefix,
+  type ClassifyCost,
+  type RunRecord,
+  type RunStatus,
+  RunStore,
+} from "./run-store.ts";
 import { indexRun, removeRun, resolveRunModels, setRunStatus } from "./settings.ts";
+import { type RunSpend, type SpendCall, spendOf, stageOfKey } from "./spend.ts";
 import { spendMeter } from "./spend-meter.ts";
 
 /** Runs of the alarm handler for one tick before the run fails ("error"). */
@@ -67,6 +74,8 @@ export interface QuoteInput {
   currency: string;
   /** A chart run: the upload parsed by code (`parseCsv`), or none for data from the web. */
   chart?: ChartInput | null;
+  /** What the classification of the question cost, for the spend of the run. */
+  classify?: ClassifyCost | null;
 }
 
 export interface PayInput {
@@ -614,6 +623,53 @@ export class RunObject extends DurableObject<Env> {
   async events(after = 0, limit = 1000): Promise<LoggedEvent[] | null> {
     if (!this.store.run()) return null;
     return this.store.events(after, limit);
+  }
+
+  /**
+   * The spend of the run so far, for admins: every call of the ledger (all attempts) and the
+   * classification. A call of the step in flight that has not landed counts as running; a call
+   * left unfinished by an earlier attempt or a restart cost nothing that was reported.
+   */
+  async spend(): Promise<RunSpend | null> {
+    const run = this.store.run();
+    if (!run) return null;
+    const calls: SpendCall[] = [];
+    if (run.classify)
+      calls.push({ agent: "classifier", stage: "classify", running: false, ...run.classify });
+    const inFlight = new Map<string, SpendCall>();
+    if (run.status === "running" && run.state) {
+      const step = nextStep(run.state, Date.now());
+      if (step.kind === "calls")
+        for (const call of step.calls)
+          inFlight.set(`${attemptPrefix(run.attempt)}${call.key}`, {
+            agent: call.seat,
+            model: modelFor(run.state.models, call.seat).id,
+            stage: stageOfKey(call.key),
+            running: true,
+            costUsd: 0,
+            inputTokens: 0,
+            outputTokens: 0,
+          });
+    }
+    for (const { key, entry } of this.store.spendCalls()) {
+      if (!entry) {
+        const running = inFlight.get(key);
+        if (running && running.agent !== "renderer") calls.push(running);
+        continue;
+      }
+      if (entry.seat === "renderer") continue; // code, not a model: it costs nothing
+      const usage = entry.result.status === "ok" ? entry.result.usage : entry.usage;
+      calls.push({
+        agent: entry.seat,
+        model: entry.model.id,
+        stage: stageOfKey(key),
+        running: false,
+        costUsd: entry.result.costUsd,
+        inputTokens: usage?.inputTokens ?? 0,
+        outputTokens: usage?.outputTokens ?? 0,
+      });
+    }
+    return spendOf(calls);
   }
 
   async snapshot(version: number): Promise<Snapshot | null> {
