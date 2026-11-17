@@ -518,29 +518,30 @@ describe("a sheet the user has graded", async () => {
 describe("the spending cap", () => {
   test("stops the evaluation, marks the report incomplete; a rerun resumes where it stopped", async () => {
     const set = writeSet(["e1"]);
-    // Drafts at their worst case (US$0.25 each): room for the classification, the drafts and the
-    // merge under US$1.10; round 1 does not fit.
-    const capped = deps(fake(0.25));
-    const stopped = await evaluate(args(set, { maxUsd: 1.1, concurrency: 1 }), capped);
+    // Drafts at their worst case (US$0.55 each): room for the classification, the drafts and the
+    // merge under US$2.30; a call of round 1 (US$0.36) does not fit. The budget of the question
+    // (US$5) leaves the rounds to the cap of the evaluation.
+    const capped = deps(fake(0.55));
+    const stopped = await evaluate(args(set, { maxUsd: 2.3, runUsd: 5, concurrency: 1 }), capped);
     expect(stopped.code).toBe(1);
     expect(stopped.report?.coverage.complete).toBe(false);
     expect(stopped.report?.criteria.every((c) => c.status === "pending")).toBe(true);
     const md = readFileSync(join(stopped.out as string, "report.md"), "utf8");
-    expect(md).toContain("Incomplete: the spending cap of US$1.1000 was reached");
+    expect(md).toContain("Incomplete: the spending cap of US$2.3000 was reached");
     expect(existsSync(join(stopped.out as string, SHEET_FILE))).toBe(false);
     const made = capped.provider.calls.map((c) => c.callKey);
     expect(made).toEqual(expect.arrayContaining(["draft:0:grok", "merge:0"]));
     expect(made.some((k) => k.startsWith("round:"))).toBe(false);
     const spent = stopped.report?.context.spent;
-    expect((spent?.runs ?? 0) + (spent?.classify ?? 0)).toBeLessThanOrEqual(1.1);
+    expect((spent?.runs ?? 0) + (spent?.classify ?? 0)).toBeLessThanOrEqual(2.3);
 
     // A second invocation under a cap already used up starts nothing.
     const still = deps();
-    expect((await evaluate(args(set, { maxUsd: 0.3 }), still)).code).toBe(1);
+    expect((await evaluate(args(set, { maxUsd: 0.3, runUsd: 5 }), still)).code).toBe(1);
     expect(still.provider.calls).toEqual([]);
 
     const resumed = deps();
-    const done = await evaluate(args(set, { maxUsd: 50 }), resumed);
+    const done = await evaluate(args(set, { maxUsd: 50, runUsd: 5 }), resumed);
     expect(done.code).toBe(0);
     const again = resumed.provider.calls
       .map((c) => c.callKey)

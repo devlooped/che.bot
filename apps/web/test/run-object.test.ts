@@ -265,7 +265,9 @@ describe("the alarm driver", () => {
   });
 
   test("an exhausted budget cuts the rounds as the protocol defines", async () => {
-    const { provider } = fakes({ config: { budgetUsd: 1, worstCaseUsd: { round1: 0.5 } } });
+    const { provider } = fakes({
+      config: { budgetUsd: 1, worstCaseUsd: { draft: 0.25, round1: 0.5 } },
+    });
     const { stub } = await paidRun();
     await runAlarms(stub);
     const log = await eventsOf(stub);

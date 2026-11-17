@@ -11,6 +11,7 @@ import {
   webChart,
 } from "./chart-fixtures.ts";
 import { holdsUp } from "./chart-run.ts";
+import { DEFAULT_CONFIG } from "./config.ts";
 import { drive, eventsOf, ok, type Responder } from "./fixtures.ts";
 import type { Chart, ModelId } from "./model.ts";
 import { templateMoments } from "./moments.ts";
@@ -446,7 +447,11 @@ describe("the chart run's stopping rules", () => {
     const run = drive(
       { mode: "thorough", question: WEB_QUESTION, chart: { dataset: null } },
       webChart,
-      { tick: (s) => (s.phase === "round" && s.stage === "round2" ? 300_000 : 1000) },
+      // round 2 ends past the deadline
+      {
+        tick: (s) =>
+          s.phase === "round" && s.stage === "round2" ? DEFAULT_CONFIG.deadlineMs.thorough : 1000,
+      },
     );
     const lastRender = run.steps.filter((s) => s.phase === "render").at(-1)?.calls[0];
     expect(lastRender?.timeoutMs).toBe(run.state.config.callTimeoutMs.render);

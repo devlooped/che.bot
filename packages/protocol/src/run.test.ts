@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
 import { selectAnswer } from "./answer.ts";
+import { DEFAULT_CONFIG } from "./config.ts";
 import { appendEvents, paymentConfirmedEvent, quotedEvent } from "./events.ts";
 import {
   abstain,
@@ -18,6 +19,7 @@ import { replay } from "./replay.ts";
 import { clone, seededShuffle } from "./util.ts";
 
 const text = (p: unknown) => (p as Paragraph).text;
+const THOROUGH = DEFAULT_CONFIG.deadlineMs.thorough;
 
 describe("a scripted thorough run", () => {
   const run = drive({ mode: "thorough" }, scripted);
@@ -443,8 +445,9 @@ describe("stopping rules", () => {
   });
 
   test("deadline: a round that cannot end in time goes to the editor pass with what exists", () => {
+    // round 1 ends less than a round, an editor pass or a utility call before the deadline
     const slowRound1 = (s: { phase: string; stage: string }) =>
-      s.phase === "round" && s.stage === "round1" ? 200_000 : 1000;
+      s.phase === "round" && s.stage === "round1" ? THOROUGH - 50_000 : 1000;
     const { state, log } = drive({ mode: "thorough" }, scripted, { tick: slowRound1 });
     expect(state.rounds.map((r) => r.round)).toEqual([1]);
     expect(state.flags.deadlineReached).toBe(true);
@@ -478,7 +481,8 @@ describe("stopping rules", () => {
                   ],
           })
         : scripted(call, state);
-    const tick = (s: { phase: string; stage: string }) => (s.phase === "round" ? 200_000 : 1000);
+    const tick = (s: { phase: string; stage: string }) =>
+      s.phase === "round" ? THOROUGH - 50_000 : 1000;
     const { state, log } = drive({ mode: "thorough" }, unanimous, { tick });
     expect(eventsOf(log, "stage.changed").find((e) => e.cut)).toMatchObject({
       stage: "done",
@@ -491,25 +495,48 @@ describe("stopping rules", () => {
   });
 
   test("deadline: the editor pass runs only if it and its check end before the deadline", () => {
-    // the rounds end at 240 - 75 s: room for the editor (60 s) and its check (20 s) is gone
-    const config = { callTimeoutMs: { editor: 60_000, utility: 20_000 } };
+    // The editor (3 min) and its check (1 min) need 4 min. Round 3 ends 5 s past the last moment
+    // that leaves them room in one run, 20 s before it in the other.
+    const { editor, utility } = DEFAULT_CONFIG.callTimeoutMs;
+    const last = THOROUGH - editor - utility;
     const tick = (s: { phase: string; stage: string }) =>
-      s.phase === "round" && s.stage === "round3" ? 155_000 : 1000;
-    const late = drive({ mode: "thorough", config }, scripted, { tick });
+      s.phase === "round" && s.stage === "round3" ? last - 5_000 : 1000;
+    const late = drive({ mode: "thorough" }, scripted, { tick });
     expect(late.state.edit).toBeNull();
     expect(late.state.flags.deadlineReached).toBe(true);
     expect(late.steps.flatMap((s) => s.calls.map((c) => c.kind))).not.toContain("editor");
-    const inTime = drive({ mode: "thorough", config }, scripted, {
-      tick: (s) => (s.phase === "round" && s.stage === "round3" ? 140_000 : 1000),
+    const inTime = drive({ mode: "thorough" }, scripted, {
+      tick: (s) => (s.phase === "round" && s.stage === "round3" ? last - 20_000 : 1000),
     });
     expect(inTime.state.edit?.editor).toBeDefined();
   });
 
+  test("deadline: with every call at its full timeout, a run still goes through every stage", () => {
+    const full = (s: { calls: { timeoutMs: number }[] }) =>
+      Math.max(1000, ...s.calls.map((c) => c.timeoutMs));
+    const thorough = drive({ mode: "thorough" }, scripted, { tick: full });
+    expect(eventsOf(thorough.log, "stage.changed").map((e) => [e.stage, e.cut])).toEqual(
+      ["drafting", "merging", "round1", "round2", "round3", "editing", "done"].map((stage) => [
+        stage,
+        null,
+      ]),
+    );
+    expect(thorough.state.flags.deadlineReached).toBe(false);
+    // no call was shortened by the deadline
+    const timeouts = Object.values(DEFAULT_CONFIG.callTimeoutMs);
+    for (const c of thorough.steps.flatMap((s) => s.calls)) expect(timeouts).toContain(c.timeoutMs);
+    const quick = drive({ mode: "quick" }, scripted, { tick: full });
+    expect(quick.state.status).toBe("completed");
+    expect(quick.state.flags.deadlineReached).toBe(false);
+  });
+
   test("deadline: no call outlives it; the merge gets the time that is left", () => {
-    const tick = (s: { phase: string }) => (s.phase === "draft" ? 100_000 : 1000);
+    const quick = DEFAULT_CONFIG.deadlineMs.quick;
+    const drafts = quick - 100_000; // less than a merge (3 min) is left
+    const tick = (s: { phase: string }) => (s.phase === "draft" ? drafts : 1000);
     const { steps, state } = drive({ mode: "quick" }, scripted, { tick });
     const merge = steps.find((s) => s.phase === "merge")?.calls[0];
-    expect(merge?.timeoutMs).toBe(120_000 - 100_000);
+    expect(merge?.timeoutMs).toBe(quick - drafts);
     const draft = steps.find((s) => s.phase === "draft")?.calls[0];
     expect(draft?.timeoutMs).toBe(state.config.callTimeoutMs.draft);
   });

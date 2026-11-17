@@ -427,13 +427,12 @@ function call(
   const timeoutMs =
     kind === "draft" || kind === "brief_web"
       ? t.draft
-      : kind === "merge" || kind === "chart_merge"
+      : kind === "merge" || kind === "chart_merge" || kind === "chart_spec"
         ? t.merge
         : kind === "round1" ||
             kind === "round2" ||
             kind === "round3" ||
             kind === "brief_user" ||
-            kind === "chart_spec" ||
             kind === "chart_round1" ||
             kind === "chart_round2" ||
             kind === "chart_round3"

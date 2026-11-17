@@ -111,6 +111,7 @@ export function RunPage({ params }: { params: Record<string, string> }) {
         <div className="run-share">
           <CopyLink url={new URL(runPath(runId), window.location.origin).href} />
           <p className="fine">{t.run.shareNote}</p>
+          {view.status === "running" && <p className="fine">{t.run.takesMinutes}</p>}
         </div>
         {(summary?.attempt ?? 1) > 1 && view.status !== "failed" && (
           <p className="fine">{t.failure.secondAttempt}</p>

@@ -28,7 +28,9 @@ test("sign in, ask, see the class and the price, pay, and reach a finished answe
 
   // The run plays live: the seats think, the stage line moves, the document appears.
   await expect(page.locator('[data-status="thinking"]').first()).toBeVisible();
+  await expect(page.getByText(t.run.takesMinutes)).toBeVisible();
   await expect(page.getByTestId("stage-line")).toHaveText(DONE, { timeout: 90_000 });
+  await expect(page.getByText(t.run.takesMinutes)).toHaveCount(0);
   await expect(page.getByTestId("paragraph")).toHaveCount(6);
   await expect(page.getByTestId("dissent")).toHaveCount(1);
   await expect(page.locator('[data-model="gemini"]')).toHaveAttribute("data-status", "abstained");
