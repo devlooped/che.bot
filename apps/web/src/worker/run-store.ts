@@ -7,6 +7,7 @@ import type {
   RunEvent,
   RunState,
   Snapshot,
+  Stage,
 } from "@chebot/protocol";
 
 // The SQLite storage of one RunObject: the run, its event log, its document versions and the
@@ -300,6 +301,16 @@ export class RunStore {
     return (
       this.sql.exec<{ seq: number | null }>("SELECT MAX(seq) AS seq FROM events").one().seq ?? 0
     );
+  }
+
+  /** The stage of the last `stage.changed` event: the step in flight, before its state is stored. */
+  lastStage(): Stage | null {
+    const row = this.sql
+      .exec<{ data: string }>(
+        "SELECT data FROM events WHERE type = 'stage.changed' ORDER BY seq DESC LIMIT 1",
+      )
+      .toArray()[0];
+    return row ? (JSON.parse(row.data) as { stage: Stage }).stage : null;
   }
 
   snapshot(version: number): Snapshot | null {

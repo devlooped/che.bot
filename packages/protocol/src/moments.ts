@@ -197,13 +197,30 @@ export function templateMoments(events: readonly RunEvent[], ctx: MomentContext 
   return out;
 }
 
-/** The events of a batch as plain English facts, for the utility call that phrases the moments. */
+/** The parts of a chart in plain English: the facts name them so the phrasing says no technical term. */
+const CHART_PARTS_EN: Record<ChartLayer, string> = {
+  title: "the title of the chart",
+  encoding: "the type of chart",
+  caption: "the explanation under the chart",
+  transform: "the calculation of the chart",
+  data: "the data of the chart",
+};
+
+/**
+ * The events of a batch as plain English facts, for the utility call that phrases the moments. In
+ * a chart run each proposal names the part of the chart it is about, and what has no agreement
+ * stays noted under the chart.
+ */
 export function momentFacts(
   events: readonly RunEvent[],
   suggestions: Readonly<Record<string, Suggestion>>,
+  ctx: { chart?: boolean } = {},
 ): string[] {
   const facts: string[] = [];
   const name = (m: ModelId) => MODEL_NAMES[m];
+  const partOf = (s: Suggestion | undefined) =>
+    (s?.target.layer && CHART_PARTS_EN[s.target.layer]) || "the chart";
+  const ofThread = (thread: string) => Object.values(suggestions).find((s) => s.thread === thread);
   for (const e of events) {
     switch (e.type) {
       case "stage.changed":
@@ -259,7 +276,9 @@ export function momentFacts(
       }
       case "suggestion.opened":
         facts.push(
-          `${name(e.suggestion.author)} proposed to ${e.suggestion.op.replace("_", " ")} a part of the text, because: ${e.suggestion.reason}`,
+          ctx.chart
+            ? `${name(e.suggestion.author)} proposed a change to ${partOf(e.suggestion)}, because: ${e.suggestion.reason}`
+            : `${name(e.suggestion.author)} proposed to ${e.suggestion.op.replace("_", " ")} a part of the text, because: ${e.suggestion.reason}`,
         );
         break;
       case "suggestion.merged":
@@ -271,7 +290,7 @@ export function momentFacts(
       case "thread.accepted": {
         const s = suggestions[e.winner];
         facts.push(
-          `A change${s ? ` proposed by ${name(s.author)} (${s.reason})` : ""} was accepted, ${e.tally.for.length} of 4 in favor.`,
+          `A change${ctx.chart ? ` to ${partOf(s)}` : ""}${s ? ` proposed by ${name(s.author)} (${s.reason})` : ""} was accepted, ${e.tally.for.length} of 4 in favor.`,
         );
         break;
       }
@@ -280,7 +299,9 @@ export function momentFacts(
         break;
       case "thread.unresolved":
         facts.push(
-          "There was no agreement on a proposed change; it stays as a note in the margin.",
+          ctx.chart
+            ? `There was no agreement on a proposed change to ${partOf(ofThread(e.thread))}; it stays noted under the chart as a proposal without agreement.`
+            : "There was no agreement on a proposed change; it stays as a note in the margin.",
         );
         break;
       case "snapshot.created":

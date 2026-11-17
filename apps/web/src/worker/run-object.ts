@@ -680,7 +680,7 @@ export class RunObject extends DurableObject<Env> {
     const stage: Stage | null =
       run.status === "quoted" || run.status === "awaiting_payment" || run.status === "expired"
         ? run.status
-        : (run.state?.stage ?? null);
+        : (run.state?.stage ?? (run.status === "running" ? this.store.lastStage() : null));
     return {
       id: run.id,
       question: run.question,

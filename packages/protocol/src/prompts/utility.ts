@@ -75,12 +75,19 @@ export function momentsPrompt(input: {
   question: string;
   language: string;
   facts: readonly string[];
+  /** The answer is a chart, not a text. */
+  chart?: boolean;
 }): Prompt {
   return {
     system: [
       "Four AI assistants (Grok, Claude, ChatGPT and Gemini) are answering a person's question together. You write the short live commentary the person reads while they work.",
       `Turn the events below into 1 to 3 short sentences, in ${languageName(input.language)}: one sentence when the events say little.`,
       "Say only what the events say: no filler, no advice to the person, nothing about what comes next or about the answer as a whole. Plain words for anyone: no technical terms (no model, thread, round, token, prompt, vote count jargon). Name the assistants by name. Be neutral: do not praise or blame.",
+      ...(input.chart
+        ? [
+            "The answer is a chart, not a text: never call anything a text, a paragraph or a margin. Name the part of the chart each proposal is about with the plain words the events use (the title, the type of chart, the explanation under the chart, the calculation, the data), and use no other technical term (no layer, spec, patch, render). A change without agreement stays noted under the chart, as a proposal without agreement.",
+          ]
+        : []),
       STRUCTURED_RULE,
     ].join("\n"),
     prompt: `Question: ${input.question}\n\nEvents:\n${input.facts.map((f) => `- ${f}`).join("\n")}`,

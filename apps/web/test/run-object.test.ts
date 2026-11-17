@@ -2,12 +2,19 @@ import { abortAllDurableObjects, runDurableObjectAlarm, runInDurableObject } fro
 import { env } from "cloudflare:workers";
 import { drive, memoryLedger, runCalls, startRun } from "@chebot/driver";
 import { CATALOG, catalogEntry, script } from "@chebot/driver/testing";
-import { type LoggedEvent, nextStep, quotedEvent, replay, selectAnswer } from "@chebot/protocol";
+import {
+  beginStep,
+  type LoggedEvent,
+  nextStep,
+  quotedEvent,
+  replay,
+  selectAnswer,
+} from "@chebot/protocol";
 import { FakeProvider, resolveModels } from "@chebot/providers";
 import { describe, expect, test } from "vitest";
 import { overrideDeps } from "../src/worker/deps.ts";
 import { type RunObject, runStub } from "../src/worker/run-object.ts";
-import { RunStore } from "../src/worker/run-store.ts";
+import { attemptPrefix, RunStore } from "../src/worker/run-store.ts";
 import { eventsOf, fakes, HOOK_URL, paidRun, QUESTION, quoted, runAlarms } from "./helpers.ts";
 
 type Stub = DurableObjectStub<RunObject>;
@@ -144,6 +151,21 @@ describe("the alarm driver", () => {
     expect(await stub.snapshot(1)).toEqual(cli.state.snapshots[0]);
     const { results } = await env.DB.prepare("SELECT status FROM runs WHERE id = ?").bind(id).all();
     expect(results).toEqual([{ status: "completed" }]);
+  });
+
+  test("the summary names the stage of the step in flight, before its state is stored", async () => {
+    fakes();
+    const { stub } = await paidRun();
+    expect(await stub.summary()).toMatchObject({ status: "running", stage: null });
+    // What a tick does when a step begins: the stage event lands, the calls are still in flight.
+    await inside(stub, (store) => {
+      const run = store.run();
+      if (!run?.state) throw new Error("no state");
+      const step = nextStep(run.state, Date.now());
+      store.append(beginStep(run.state, step), Date.now(), attemptPrefix(run.attempt));
+    });
+    expect(await inside(stub, (store) => store.run()?.state?.stage)).toBeNull();
+    expect(await stub.summary()).toMatchObject({ status: "running", stage: "drafting" });
   });
 
   test("a second alarm for the same stage repeats no finished call", async () => {

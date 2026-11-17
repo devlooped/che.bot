@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { appendEvents, paymentRequestedEvent, quotedEvent, type RunEvent } from "./events.ts";
 import { drive, scripted } from "./fixtures.ts";
 import { momentFacts, templateMoments } from "./moments.ts";
+import { momentsPrompt } from "./prompts/utility.ts";
 import { nextStep, reviewerLabels } from "./reducer.ts";
 import { replay } from "./replay.ts";
 
@@ -83,6 +84,56 @@ describe("template moments", () => {
       {},
     );
     expect(facts).toEqual(["ChatGPT changed position, because: El censo lo confirma."]);
+  });
+});
+
+describe("moments of a chart run and of a prose run", () => {
+  const tally = { for: ["grok", "claude", "openai"], against: [], none: [] };
+  const suggestion = {
+    id: "s1",
+    thread: "t1",
+    author: "claude",
+    reason: "el dato de 2024 viene de otra fuente",
+    target: { block: "c", layer: "caption" },
+    op: "patch",
+  };
+  const events = [
+    ev({ type: "suggestion.opened", suggestion }),
+    ev({ type: "thread.accepted", thread: "t1", winner: "s1", tally }),
+    ev({ type: "thread.unresolved", thread: "t1", why: "no_majority", tally }),
+  ];
+  const suggestions = { s1: suggestion } as never;
+
+  test("the facts of a chart run name the part and say what stays under the chart", () => {
+    const facts = momentFacts(events, suggestions, { chart: true });
+    expect(facts).toEqual([
+      "Claude proposed a change to the explanation under the chart, because: el dato de 2024 viene de otra fuente",
+      "A change to the explanation under the chart proposed by Claude (el dato de 2024 viene de otra fuente) was accepted, 3 of 4 in favor.",
+      "There was no agreement on a proposed change to the explanation under the chart; it stays noted under the chart as a proposal without agreement.",
+    ]);
+    expect(facts.join(" ")).not.toMatch(/text|paragraph|margin|layer|spec|patch|render/i);
+  });
+
+  test("the facts of a prose run are what they were", () => {
+    expect(momentFacts(events, suggestions)).toEqual([
+      "Claude proposed to patch a part of the text, because: el dato de 2024 viene de otra fuente",
+      "A change proposed by Claude (el dato de 2024 viene de otra fuente) was accepted, 3 of 4 in favor.",
+      "There was no agreement on a proposed change; it stays as a note in the margin.",
+    ]);
+  });
+
+  test("only the prompt of a chart run says the answer is a chart", () => {
+    const base = { question: "¿Cómo evolucionó la inflación?", language: "es-AR", facts: ["x"] };
+    const prose = momentsPrompt(base);
+    const chart = momentsPrompt({ ...base, chart: true });
+    expect(prose).toEqual(momentsPrompt({ ...base, chart: false }));
+    expect(prose.system).not.toMatch(/chart/);
+    expect(chart.prompt).toBe(prose.prompt);
+    expect(chart.system).toContain("The answer is a chart, not a text");
+    expect(chart.system).toContain("noted under the chart");
+    expect(chart.system.split("\n").filter((l) => !l.startsWith("The answer is a chart"))).toEqual(
+      prose.system.split("\n"),
+    );
   });
 });
 

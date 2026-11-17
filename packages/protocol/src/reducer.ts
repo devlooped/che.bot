@@ -662,7 +662,7 @@ function dedupeStep(state: RunState, now: number): CallsStep {
 
 function momentsStep(state: RunState, now: number): CallsStep {
   const stage = state.stage ?? "drafting";
-  const facts = momentFacts(state.recent, state.suggestions);
+  const facts = momentFacts(state.recent, state.suggestions, { chart: state.chart !== null });
   const useModel =
     state.config.moments === "model" &&
     facts.length > 0 &&
@@ -679,6 +679,7 @@ function momentsStep(state: RunState, now: number): CallsStep {
             question: state.question,
             language: state.config.interfaceLanguage,
             facts,
+            chart: state.chart !== null,
           }),
         ),
       ]
