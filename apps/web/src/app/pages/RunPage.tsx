@@ -4,12 +4,12 @@ import { isAdmin } from "../auth/types.ts";
 import { AnswerDocument } from "../components/AnswerDocument.tsx";
 import { ChartDocument } from "../components/ChartDocument.tsx";
 import { Checkout } from "../components/Checkout.tsx";
-import { CopyLink } from "../components/CopyLink.tsx";
 import { Failure } from "../components/Failure.tsx";
 import { History } from "../components/History.tsx";
 import { Moments } from "../components/Moments.tsx";
 import { Panel, Sources } from "../components/RunDetails.tsx";
 import { Seats } from "../components/Seats.tsx";
+import { ShareLink } from "../components/ShareLink.tsx";
 import { Spend } from "../components/Spend.tsx";
 import { useRun } from "../events/useRun.ts";
 import { t } from "../i18n/index.ts";
@@ -110,8 +110,7 @@ export function RunPage({ params }: { params: Record<string, string> }) {
           <p className="muted">{t.common.loading}</p>
         )}
         <div className="run-share">
-          <CopyLink url={new URL(runPath(runId), window.location.origin).href} />
-          <p className="fine">{t.run.shareNote}</p>
+          <ShareLink url={new URL(runPath(runId), window.location.origin).href} />
           {view.status === "running" && <p className="fine">{t.run.takesMinutes}</p>}
         </div>
         {(summary?.attempt ?? 1) > 1 && view.status !== "failed" && (

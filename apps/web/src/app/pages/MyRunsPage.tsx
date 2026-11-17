@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { MyRun } from "../api.ts";
 import { useSession } from "../auth/context.tsx";
-import { CopyLink } from "../components/CopyLink.tsx";
+import { ShareLink } from "../components/ShareLink.tsx";
 import { t } from "../i18n/index.ts";
 import { Link } from "../router/index.tsx";
 import { runPath } from "../routes.tsx";
@@ -83,7 +83,7 @@ function Row({ run, onDelete }: { run: MyRun; onDelete: (opener: HTMLButtonEleme
         {run.amount !== null && <span>{t.myRuns.price(t.money(run.amount, "ARS"))}</span>}
       </p>
       <div className="my-run-actions">
-        <CopyLink
+        <ShareLink
           url={new URL(runPath(run.id), window.location.origin).href}
           describedBy={questionId}
         />

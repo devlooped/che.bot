@@ -66,7 +66,7 @@ export const esAR = {
     close: "Cerrar",
     cancel: "Cancelar",
     retry: "Probar de nuevo",
-    copyLink: "Copiar el link",
+    share: "Compartir",
     linkCopied: "Link copiado",
   },
 
@@ -804,7 +804,6 @@ export const esAR = {
 
   run: {
     title: "Pregunta",
-    shareNote: "Esta respuesta se puede leer con el link, sin cuenta.",
     takesMinutes:
       "Puede tardar varios minutos. Podés cerrar esta página y volver por el link cuando quieras.",
   },
