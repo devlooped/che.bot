@@ -100,7 +100,7 @@ export function browserSpec(chart: Chart, height: number): Record<string, unknow
     ...(chart.transform.length > 0 ? { transform: clone(chart.transform) } : {}),
     config: pageConfig(),
   };
-  const axes = chart.data.origin === "web" ? webChannels(chart) : null;
+  const axes = webChannels(chart);
   if (!axes) return Object.assign(spec, main);
   const { measure, dimension } = axes;
   const dim = clone(chart.encoding[dimension]) as Record<string, unknown>;

@@ -10,14 +10,14 @@ The full plan: [.alta/plans/2026-11-16-consensus-answers.md](.alta/plans/2026-11
 1. **Protocol**: the protocol as a headless script, and its evaluation on about 50 questions (does it beat the best single model?).
 2. **Runtime**: the Cloudflare Durable Object runtime, sign-in, payment and the event stream.
 3. **UI**: the Spanish (rioplatense) UI over the event stream.
-4. **Charts**: charts as document blocks.
+4. **Charts**: charts as blocks of the answer, chosen by the drafts ([the plan](.alta/plans/2026-11-17-charts-inside-answers.md)).
 
 ## Layout
 
 - `packages/protocol`: types, schemas, reducer, prompts. No I/O.
 - `packages/providers`: model providers, roles, families, catalog.
 - `packages/driver`: the loop that makes the calls of a step through a ledger (CLI and `RunObject`).
-- `packages/charts`: the render gate of chart runs: Vega-Lite to SVG in Vega's interpreter mode.
+- `packages/charts`: the render gate of the charts: Vega-Lite to SVG in Vega's interpreter mode.
 - `apps/cli`: headless runner and evaluation (Node).
 - `apps/web`: the Worker (API, `RunObject` per question, `SpendMeter`), D1 migrations, and the React app (phase 3).
 - `eval/`: the question set (`questions.jsonl`) and the evaluation reports (`results/`).
@@ -40,12 +40,12 @@ pnpm lint
 # after the merge. Logs go to .runs/.
 pnpm cli ask "¿Cuánto mide el Aconcagua?" --max-usd 1
 
-# A chart run: the four models find the data on the web, each value with its citation, or chart
-# the rows of a CSV (--csv implies --chart). Writes chart.vl.json (the Vega-Lite spec, data and
-# theme included), rows.json (the rows with their sources and disputes) and chart-v<N>.svg (every
-# version) next to the logs, and prints the brief, the rows, the disputes and the cost.
-pnpm cli ask "¿Cuál fue la inflación mensual de Argentina en 2026?" --chart --max-usd 1.5
-pnpm cli ask "¿Cuánto facturó cada producto por trimestre?" --csv ventas.csv
+# An answer with charts: when two drafts or more chart the same measure (found on the web, each
+# value with its citation), the answer has that chart among its paragraphs, up to 3. For each chart
+# it writes chart-<id>.vl.json (the Vega-Lite spec, data and theme included), rows-<id>.json (the
+# rows with their sources and disputes) and chart-<id>-v<N>.svg (every version) next to the logs,
+# and prints the rows, the disputes and the charts proposed and not drawn.
+pnpm cli ask "¿Cuál fue la inflación mensual de Argentina en 2026?" --max-usd 3
 
 # The evaluation of phase 1. --max-usd caps the spend of the whole evaluation, earlier
 # invocations included; every call is kept under eval/results/raw/, so a rerun pays nothing twice
@@ -82,11 +82,11 @@ sign-in that picks a test user (`Contrib`, `Admin`, or no role) and sets the sam
 the real sign-in (`POST /api/local/sign-in`; "Salir" only clears it). The production entry never imports
 `src/local`, and `pnpm build` fails if anything of it is in the output (`scripts/check-build.mjs`).
 
-A run asked for a chart ("Quiero un gráfico" on the ask page) plays the scripted chart run of
-`src/local/chart-scenario.ts` instead, through the real renderer: with data from the web, the monthly
-inflation of the first half of 2025, whatever the question; with an upload, any CSV (the briefs read
-its columns: three sum the first number column by the first text column, one averages it).
-`SAMPLE_CSV` in that file is an upload to try.
+Its drafts propose no chart. `CHART_QUESTION` of `src/local/chart-scenario.ts` ("¿Cuánto fue la
+inflación de cada mes del primer semestre de 2025, y cómo le fue al salario?", with anything after
+it) plays a run whose answer has two charts among its two paragraphs, through the real renderer:
+the monthly inflation of the first half of 2025, which the four drafts chart, and the wages, which
+two chart alike; a chart of the dollar that only Claude proposes is left out.
 
 The states around the happy path are played the same way, to see and test them:
 
@@ -97,16 +97,16 @@ The states around the happy path are played the same way, to see and test them:
 | The budget reached before the discussion | Ask with `[presupuesto]`: the drafts spend nearly all of it                                                             |
 | An expired payment                       | "Simular que venció el QR" under the QR (`POST /api/local/expire/:id`)                                                  |
 | A model that does not answer             | Every run: Gemini misses the last round of votes                                                                        |
-| A chart: agreed rows                     | "Quiero un gráfico", data from the web: January, February and April                                                     |
-| A point corrected by its source          | The same chart: March, drawn at 3,3 (two models) and settled at 3,7 by the statistics office                            |
-| A point drawn as a range                 | The same chart: May, 1,5 and 1,9, neither source held up                                                                |
-| A value of one model, not confirmed      | The same chart: June, Gemini's alone                                                                                    |
-| Voted layers, and one without agreement  | The same chart: the title and the explanation accepted, bars instead of the line two against two                        |
-| An earlier version of a chart            | "Ver cómo cambió el gráfico" on a finished chart: three versions                                                        |
-| A chart of the user's table              | "Quiero un gráfico", "De mi tabla", and a CSV file; a file beyond the limits is refused before asking                   |
+| Charts among the paragraphs              | Ask `CHART_QUESTION`: inflation after the first paragraph, wages after the second                                       |
+| A chart: agreed rows                     | The inflation chart: January, February and April; every row of the wages                                                |
+| A point corrected by its source          | The inflation chart: March, drawn at 3,3 (two models) and settled at 3,7 by the statistics office                       |
+| A point drawn as a range                 | The inflation chart: May, 1,5 and 1,9, neither source held up                                                           |
+| A value of one model, not confirmed      | The inflation chart: June, Gemini's alone                                                                               |
+| Voted layers, and one without agreement  | The inflation chart: the title and the explanation accepted, bars instead of the line two against two                   |
+| Earlier versions of the charts           | "Cómo cambió la respuesta" on a finished answer: three versions, the marks of each chart moving                         |
 
-The pages: `/` asks (for a text, or for a chart of data from the web or of a CSV), `/r/:id` follows
-a run and replays how its text or its chart formed, `/mis-preguntas` lists
+The pages: `/` asks, `/r/:id` follows a run and replays how its text and its charts formed,
+`/mis-preguntas` lists
 the user's questions (copy a link, delete one), and `/admin` sets the model of each role and the two
 prices (admins only; the menu hides it from others).
 
@@ -124,47 +124,43 @@ needs `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET` and `SESSION_SECR
 `AI_GATEWAY_API_KEY` to ask, and `JOBS_URL` and `JOBS_TOKEN` to pay (the jobs service calls the
 hook back on the origin of the page, which it cannot reach on localhost).
 
-| Route                                                                        | Who may call it                                                       |
-| ---------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `GET /auth/login?returnTo=/path`, `/auth/callback`, `/auth/logout`           | anyone: the sign-in, see below                                        |
-| `GET /api/me` → `{id, name, admin, mayAsk}` or `null`                        | anyone: the signed-in user                                            |
-| `POST /api/runs {question, chart?}` → `201 {runId, class, amount, currency}` | signed in; the `Admin` or `Contrib` role until `LAUNCHED` is `"true"` |
-| `POST /api/runs/:id/pay` → `202`                                             | the owner; an `Admin` owner runs free, with no payment job            |
-| `POST /api/runs/:id/rerun` → `202`                                           | the owner, once, after a paid run failed                              |
-| `DELETE /api/runs/:id`                                                       | the owner or an admin                                                 |
-| `GET /api/runs/:id`, `/events?after=`, `/ws?after=`, `/snapshots/:v`         | anyone with the link (`mine` in the summary: the caller owns it)      |
-| `GET /api/runs/:id/charts/:v.svg`                                            | anyone with the link: the render of version `v` of a chart run        |
-| `GET /api/me/runs`                                                           | signed in                                                             |
-| `GET`, `PUT /api/admin/models`, `/api/admin/prices`                          | `Admin`                                                               |
-| `POST /api/pay/hook`                                                         | the jobs service, with the run's own token as Bearer                  |
+| Route                                                                | Who may call it                                                       |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `GET /auth/login?returnTo=/path`, `/auth/callback`, `/auth/logout`   | anyone: the sign-in, see below                                        |
+| `GET /api/me` → `{id, name, admin, mayAsk}` or `null`                | anyone: the signed-in user                                            |
+| `POST /api/runs {question}` → `201 {runId, class, amount, currency}` | signed in; the `Admin` or `Contrib` role until `LAUNCHED` is `"true"` |
+| `POST /api/runs/:id/pay` → `202`                                     | the owner; an `Admin` owner runs free, with no payment job            |
+| `POST /api/runs/:id/rerun` → `202`                                   | the owner, once, after a paid run failed                              |
+| `DELETE /api/runs/:id`                                               | the owner or an admin                                                 |
+| `GET /api/runs/:id`, `/events?after=`, `/ws?after=`, `/snapshots/:v` | anyone with the link (`mine` in the summary: the caller owns it)      |
+| `GET /api/runs/:id/charts/:chart/:v.svg`                             | anyone with the link: the render of a chart (`c1`) at version `v`     |
+| `GET /api/me/runs`                                                   | signed in                                                             |
+| `GET`, `PUT /api/admin/models`, `/api/admin/prices`                  | `Admin`                                                               |
+| `POST /api/pay/hook`                                                 | the jobs service, with the run's own token as Bearer                  |
 
-A chart run is asked with `chart` in the body: `{ "chart": {} }` for data from the web, or
-`{ "chart": { "csv": "<the text of the file>" } }` for an upload, parsed when it is asked (at most
-64 KB, 500 rows and 12 columns; a bad file answers 400 before anything is paid, with `reason`
-`csv_<code>`, such as `csv_too_many_rows`, which the page words for the user). The summary of a run
-says `chart: "web" | "user" | null`.
+Nobody asks for a chart: the drafts propose them, and the summary of a run says how many charts its
+answer has (`charts`).
 
-The render gate of chart runs runs inside `RunObject`. Step 36 measured it in the Workers runtime:
+The render gate of the charts runs inside `RunObject`. Step 36 measured it in the Workers runtime:
 Vega in interpreter mode renders a chart in 35 ms the first time and 7 ms after (without the
 interpreter Vega fails there with "Code generation from strings disallowed"); its packages add
 851 KiB minified (296 KiB gzip), whose evaluation takes 40-110 ms of the 1 s startup limit. The
 production build puts them in a chunk of their own that `RunObject` imports on its first render, so
 a Worker that only answers the API never evaluates it; the whole upload is 2,545 KiB (631 KiB gzip).
 
-The page of a chart run (step 41) draws the chart with `vega-embed` (no interpreter: the browser may
+The page of a run (step 41) draws each chart of the answer, in its place among the paragraphs, with `vega-embed` (no interpreter: the browser may
 compile expressions), loaded with a dynamic import by `ChartCanvas`, so a text answer never downloads
 it: the browser chunk of the chart is 854 KB minified (294 KB gzip), beside 429 KB (132 KB gzip)
 for the rest of the app. The spec of the page (`src/app/chart/spec.ts`) is the chart's layers and
 fixed theme, with the title out of the drawing (it is a heading), a named data
-set, and for web data the range of an unsettled row with both its ends and the number of the note of
+set, the range of an unsettled row with both its ends, and the number of the note of
 every corrected, disputed or unconfirmed point. A new version with the same layers moves the marks:
 the data set is tweened frame by frame (`src/app/chart/embed.ts`); a version whose kind, axes or
 calculation changed is drawn again, faded in; with reduced motion every change is immediate. Under
-the chart, the table is its text: every web row with its value, its source and the words that state
-it, and a note on each corrected point (what it was, what it is, the source that settled it, who
-said what), on each range (both values and their sources) and on each value no source confirmed; a
-chart of an upload says that every number comes from the table, and the calculation the models
-agreed on in plain words. The layers the models voted on (the kind of chart, the title, the
+the chart, the table is its text: every row with its value, its source and the words that state it,
+and a note on each corrected point (what it was, what it is, the source that settled it, who said
+what), on each range (both values and their sources) and on each value no source confirmed. The
+layers the models voted on (the kind of chart, the title, the
 explanation, the calculation) open their discussions like the paragraphs of a text.
 
 Sign-in happens in the Worker (`src/worker/auth0.ts`), with the authorization code flow of the

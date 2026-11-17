@@ -44,24 +44,26 @@ describe("template moments", () => {
     expect(templateMoments([])).toEqual([]);
   });
 
-  test("a chart run gets chart wordings; a prose run keeps the prose ones", () => {
+  test("a change to a chart gets chart wordings; a change to the text keeps the prose ones", () => {
     const tally = { for: ["grok", "claude", "openai"], against: [], none: [] };
     const events = [
       ev({ type: "thread.accepted", thread: "t1", winner: "s1", tally }),
       ev({ type: "thread.unresolved", thread: "t2", why: "no_majority", tally }),
     ];
     const suggestions = (layer: string) =>
-      ({ s1: { id: "s1", target: { block: "c", layer } } }) as never;
-    expect(templateMoments(events, { chart: true, suggestions: suggestions("title") })).toEqual([
+      ({
+        s1: { id: "s1", thread: "t1", target: { block: "c1", layer } },
+        s2: { id: "s2", thread: "t2", target: { block: "c1", layer } },
+      }) as never;
+    expect(templateMoments(events, { suggestions: suggestions("title") })).toEqual([
       "Se aceptó un cambio en el título del gráfico, con el apoyo de 3 de 4.",
-      "En un punto del gráfico no hubo acuerdo y queda como estaba.",
+      "En un punto de un gráfico no hubo acuerdo y queda como estaba.",
     ]);
     const part = (layer: string) =>
-      templateMoments(events.slice(0, 1), { chart: true, suggestions: suggestions(layer) })[0];
+      templateMoments(events.slice(0, 1), { suggestions: suggestions(layer) })[0];
     expect(part("encoding")).toContain("en el tipo de gráfico");
     expect(part("caption")).toContain("en la explicación del gráfico");
     expect(part("transform")).toContain("en el cálculo del gráfico");
-    expect(templateMoments(events.slice(0, 1), { chart: true })[0]).toContain("en el gráfico,");
     expect(templateMoments(events)).toEqual([
       "Se aceptó un cambio al texto, con el apoyo de 3 de 4.",
       "En un punto no hubo acuerdo y queda anotado al margen.",
@@ -87,7 +89,7 @@ describe("template moments", () => {
   });
 });
 
-describe("moments of a chart run and of a prose run", () => {
+describe("moments of a change to a chart and of a change to the text", () => {
   const tally = { for: ["grok", "claude", "openai"], against: [], none: [] };
   const suggestion = {
     id: "s1",
@@ -104,8 +106,8 @@ describe("moments of a chart run and of a prose run", () => {
   ];
   const suggestions = { s1: suggestion } as never;
 
-  test("the facts of a chart run name the part and say what stays under the chart", () => {
-    const facts = momentFacts(events, suggestions, { chart: true });
+  test("the facts of a change to a chart name the part and say what stays under the chart", () => {
+    const facts = momentFacts(events, suggestions);
     expect(facts).toEqual([
       "Claude proposed a change to the explanation under the chart, because: el dato de 2024 viene de otra fuente",
       "A change to the explanation under the chart proposed by Claude (el dato de 2024 viene de otra fuente) was accepted, 3 of 4 in favor.",
@@ -114,24 +116,26 @@ describe("moments of a chart run and of a prose run", () => {
     expect(facts.join(" ")).not.toMatch(/text|paragraph|margin|layer|spec|patch|render/i);
   });
 
-  test("the facts of a prose run are what they were", () => {
-    expect(momentFacts(events, suggestions)).toEqual([
-      "Claude proposed to patch a part of the text, because: el dato de 2024 viene de otra fuente",
+  test("the facts of a change to the text are what they were", () => {
+    const text = { ...suggestion, target: { block: "p2" }, op: "replace" };
+    const prose = [ev({ type: "suggestion.opened", suggestion: text }), ...events.slice(1)];
+    expect(momentFacts(prose, { s1: text } as never)).toEqual([
+      "Claude proposed to replace a part of the text, because: el dato de 2024 viene de otra fuente",
       "A change proposed by Claude (el dato de 2024 viene de otra fuente) was accepted, 3 of 4 in favor.",
       "There was no agreement on a proposed change; it stays as a note in the margin.",
     ]);
   });
 
-  test("only the prompt of a chart run says the answer is a chart", () => {
+  test("only the prompt of an answer with charts speaks of charts", () => {
     const base = { question: "¿Cómo evolucionó la inflación?", language: "es-AR", facts: ["x"] };
     const prose = momentsPrompt(base);
-    const chart = momentsPrompt({ ...base, chart: true });
-    expect(prose).toEqual(momentsPrompt({ ...base, chart: false }));
+    const chart = momentsPrompt({ ...base, charts: true });
+    expect(prose).toEqual(momentsPrompt({ ...base, charts: false }));
     expect(prose.system).not.toMatch(/chart/);
     expect(chart.prompt).toBe(prose.prompt);
-    expect(chart.system).toContain("The answer is a chart, not a text");
+    expect(chart.system).toContain("The answer has charts beside its text");
     expect(chart.system).toContain("noted under the chart");
-    expect(chart.system.split("\n").filter((l) => !l.startsWith("The answer is a chart"))).toEqual(
+    expect(chart.system.split("\n").filter((l) => !l.startsWith("The answer has charts"))).toEqual(
       prose.system.split("\n"),
     );
   });

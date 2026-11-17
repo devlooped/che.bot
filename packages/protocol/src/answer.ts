@@ -149,9 +149,8 @@ export interface ChartAnswerValue {
 export interface ChartAnswerRow {
   key: string;
   status: RowStatus;
-  /** Web: { value }; user: the uploaded row. */
-  values: Record<string, CellValue>;
-  /** The source of the value drawn (web); null for an uploaded row. */
+  values: Record<string, CellValue>; // { value }
+  /** The source of the value drawn. */
   source: Source | null;
   quote: string;
   support: ModelId[];
@@ -179,7 +178,6 @@ export interface ChartAnswer {
   version: number;
   final: boolean;
   block: string;
-  origin: Chart["data"]["origin"];
   brief: Chart["brief"];
   title: string;
   caption: string;
@@ -198,16 +196,20 @@ export interface ChartAnswer {
 }
 
 /**
- * The chart of a chart run, at its latest version or at `version`, with its data, the source of
- * every web row, its disputes and the open disagreements on its layers. Null before the chart
- * exists, for an unknown version, or for a prose run.
+ * The chart `block` of a run, at its latest version or at `version`, with its data, the source of
+ * every row, its disputes and the open disagreements on its layers. Null before the chart exists,
+ * for an unknown version, or for a block that is not a chart.
  */
-export function selectChart(input: ChartAnswerInput, version?: number): ChartAnswer | null {
+export function selectChart(
+  input: ChartAnswerInput,
+  block: string,
+  version?: number,
+): ChartAnswer | null {
   const last = input.snapshots.at(-1);
   const snapshot =
     version === undefined ? last : input.snapshots.find((s) => s.version === version);
   if (!snapshot || !last) return null;
-  const chart = snapshot.order.map((id) => snapshot.blocks[id]).find((b) => b?.kind === "chart");
+  const chart = snapshot.blocks[block];
   if (chart?.kind !== "chart") return null;
   const source = (id: string) => input.sources.find((s) => s.id === id) ?? null;
   const disputes = Object.values(input.disputes).sort((a, b) => byNumericId(a.id, b.id));
@@ -228,7 +230,7 @@ export function selectChart(input: ChartAnswerInput, version?: number): ChartAns
       key: r.key,
       status: r.status,
       values: { ...r.values },
-      source: r.source === "upload" ? null : source(r.source),
+      source: source(r.source),
       quote: r.quote,
       support: [...r.support],
       alternatives: r.alternatives.map(value),
@@ -259,7 +261,6 @@ export function selectChart(input: ChartAnswerInput, version?: number): ChartAns
     version: snapshot.version,
     final: input.status === "completed" && snapshot.version === last.version,
     block: chart.id,
-    origin: chart.data.origin,
     brief: clone(chart.brief),
     title: chart.title,
     caption: chart.caption,
@@ -268,8 +269,9 @@ export function selectChart(input: ChartAnswerInput, version?: number): ChartAns
     disputed: rows.filter(
       (r) => r.status === "disputed" || r.status === "unsettled" || r.dispute?.state === "open",
     ),
-    dissent: prose?.dissent ?? [],
-    render: input.renders.findLast((r) => r.version === snapshot.version) ?? null,
+    dissent: (prose?.dissent ?? []).filter((d) => d.block === chart.id),
+    render:
+      input.renders.findLast((r) => r.block === chart.id && r.version === snapshot.version) ?? null,
     sources: input.sources.filter((s) => cited.has(s.id)).sort((a, b) => byNumericId(a.id, b.id)),
     flags: { ...input.flags },
     abstained: prose?.abstained ?? [],

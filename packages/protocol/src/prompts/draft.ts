@@ -1,6 +1,12 @@
+import { draftChartRules } from "./chart.ts";
 import { LANGUAGE_RULE, type Prompt, STRUCTURED_RULE } from "./common.ts";
 
-export function draftPrompt(input: { question: string; maxResults: number }): Prompt {
+export function draftPrompt(input: {
+  question: string;
+  maxResults: number;
+  maxCharts: number;
+  maxRows: number;
+}): Prompt {
   return {
     system: [
       "You are one of several experts who each answer the same question alone. You do not see the other answers and they do not see yours, so give your own best answer, not a guess at what others will say.",
@@ -8,6 +14,7 @@ export function draftPrompt(input: { question: string; maxResults: number }): Pr
       "Return:",
       "- answer: a complete, direct answer in plain prose, in paragraphs separated by blank lines. If the question rests on a false premise or is ambiguous, say so and answer what can be answered.",
       "- claims: the key statements your answer rests on, in order. Each is one self-contained sentence a reader can check or dispute on its own (a fact, a figure, a judgment or a recommendation), with your confidence (high, medium or low) and the URLs that support it (empty if none).",
+      ...draftChartRules({ maxCharts: input.maxCharts, maxRows: input.maxRows }),
       "Be accurate rather than complete: a claim you are unsure of gets a low confidence, not a confident tone.",
       LANGUAGE_RULE,
       STRUCTURED_RULE,

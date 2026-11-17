@@ -1,4 +1,5 @@
 import type { Snapshot, Source } from "../model.ts";
+import { chartRoundRules, type DisputeView, renderCharts, renderDisputes } from "./chart.ts";
 import {
   LANGUAGE_RULE,
   type Prompt,
@@ -30,16 +31,27 @@ export function roundPrompt(input: {
   sources: readonly Source[];
   threads: readonly ThreadView[];
   locked: readonly string[];
+  /** The charts of the answer, when it has any: the rows to check and the chart locks. */
+  charts: { locked: readonly string[]; disputes: readonly DisputeView[] } | null;
 }): Prompt {
-  const { round } = input;
+  const { round, charts } = input;
   const proposes = round < 3;
   const votes = round > 1;
+  const tasks = [
+    proposes
+      ? charts
+        ? "suggest changes to the text and patches to the charts"
+        : "suggest changes"
+      : null,
+    votes ? "vote on open threads" : null,
+    charts?.disputes.length ? "check the sources of disputed rows" : null,
+  ].filter(Boolean);
   const rules = [
-    `You are one of four reviewers improving a shared answer to a user's question, in round ${round} of 3. You never edit the text: you ${proposes && votes ? "vote on open threads and suggest changes" : proposes ? "suggest changes" : "vote on open threads"}. Code applies the decisions once at the end of the round.`,
+    `You are one of four reviewers improving a shared answer to a user's question, in round ${round} of 3. You never edit the answer: you ${tasks.join(", ")}. Code applies the decisions once at the end of the round.`,
   ];
   if (proposes) {
     rules.push(
-      "Suggestions:",
+      charts ? "Suggestions on the text:" : "Suggestions:",
       `- At most ${input.cap} suggestions, most important first: any beyond ${input.cap} are discarded unread.`,
       "- Substance only: content that is wrong, missing or misleading (kind wrong, missing or misleading). Wording, tone, style and order are not your job; a suggestion of kind style is discarded.",
       "- Each targets a paragraph by its id: replace (the full new text of the paragraph), insert_after (the full text of a new paragraph after it) or delete (empty text).",
@@ -52,11 +64,27 @@ export function roundPrompt(input: {
         `- Paragraphs ${input.locked.join(", ")} have an open thread: they are locked. A suggestion on them joins their thread as one more alternative instead of opening a new one; vote there if an existing alternative says what you mean.`,
       );
     }
+    if (charts)
+      rules.push(
+        "- A suggestion targets a paragraph, never a chart. Where a paragraph states a figure that a chart's settled row (held or agreed) contradicts, suggest the fix.",
+      );
+  }
+  if (charts) {
+    rules.push(
+      ...chartRoundRules({
+        proposes,
+        cap: input.cap,
+        locked: round === 3 ? [] : charts.locked,
+        disputes: charts.disputes.length > 0,
+      }),
+    );
+  } else if (proposes) {
+    rules.push("- The answer has no chart: leave patches and checks empty.");
   }
   if (votes) {
     rules.push(
       "Votes:",
-      '- For each open thread, hold one position: one of its suggestion ids, or "keep" (leave the paragraph as it is). You may vote on every thread.',
+      '- For each open thread, hold one position: one of its suggestion ids, or "keep" (leave the paragraph or the chart as it is). You may vote on every thread.',
       "- The other reviewers are shown as Reviewer A, B and C, in an order shuffled per thread. Judge the arguments and the sources, not how many hold a position.",
       "- If you change your position, give a one-sentence reason with the new argument that convinced you; a change without a reason is ignored and your previous position stands.",
       "- A suggestion is accepted when at least 2 reviewers other than its author hold it and they are a majority of the others who took a position.",
@@ -86,6 +114,6 @@ export function roundPrompt(input: {
 
   return {
     system: rules.join("\n"),
-    prompt: `Question:\n${input.question}\n\nThe current answer:\n\n${renderDocument(input.snapshot)}\n\nSources:\n${renderSources(input.sources)}${threads}`,
+    prompt: `Question:\n${input.question}\n\nThe current answer:\n\n${renderDocument(input.snapshot)}${charts ? `\n\nCharts:\n\n${renderCharts(input.snapshot)}` : ""}\n\nSources:\n${renderSources(input.sources)}${threads}${charts?.disputes.length ? `\n\nRows to check:\n\n${renderDisputes(charts.disputes)}` : ""}`,
   };
 }

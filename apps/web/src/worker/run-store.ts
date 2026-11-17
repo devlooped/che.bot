@@ -1,6 +1,5 @@
 import type { CallLedger, LedgerEntry } from "@chebot/driver";
 import type {
-  ChartInput,
   LoggedEvent,
   ModelSnapshot,
   QuestionClass,
@@ -40,7 +39,6 @@ const SCHEMA = [
      deadline_at INTEGER,
      attempt INTEGER NOT NULL DEFAULT 0,
      state TEXT,
-     chart TEXT,
      classify TEXT
    )`,
   `CREATE TABLE IF NOT EXISTS events (
@@ -119,8 +117,6 @@ export interface RunRecord {
   attempt: number;
   /** The protocol state of the current attempt. */
   state: RunState | null;
-  /** A chart run: its upload (parsed when it was asked) or none (web data); null for prose. */
-  chart: ChartInput | null;
   /** What the classification cost; null when it was not recorded. */
   classify: ClassifyCost | null;
 }
@@ -150,15 +146,13 @@ interface RunRow extends Record<string, SqlStorageValue> {
   deadline_at: number | null;
   attempt: number;
   state: string | null;
-  /** Absent (undefined) in the rows of objects created before charts. */
-  chart: string | null;
   /** Absent (undefined) in the rows of objects created before the spend was shown. */
   classify: string | null;
 }
 
 /** The columns of the run row that `updateRun` may set. */
 export type RunUpdate = Partial<
-  Omit<RunRow, "id" | "owner" | "question" | "created_at" | "chart" | "classify">
+  Omit<RunRow, "id" | "owner" | "question" | "created_at" | "classify">
 >;
 
 /**
@@ -223,7 +217,6 @@ export class RunStore {
       deadlineAt: row.deadline_at,
       attempt: row.attempt,
       state: row.state ? (JSON.parse(row.state) as RunState) : null,
-      chart: row.chart ? (JSON.parse(row.chart) as ChartInput) : null,
       classify: row.classify ? (JSON.parse(row.classify) as ClassifyCost) : null,
     };
   }
@@ -237,12 +230,11 @@ export class RunStore {
     amount: number;
     currency: string;
     createdAt: number;
-    chart?: ChartInput | null;
     classify?: ClassifyCost | null;
   }): void {
     this.sql.exec(
-      `INSERT INTO run (id, owner, question, class, probability, amount, currency, status, created_at, chart, classify)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'quoted', ?, ?, ?)`,
+      `INSERT INTO run (id, owner, question, class, probability, amount, currency, status, created_at, classify)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'quoted', ?, ?)`,
       run.id,
       run.owner,
       run.question,
@@ -251,7 +243,6 @@ export class RunStore {
       run.amount,
       run.currency,
       run.createdAt,
-      run.chart ? JSON.stringify(run.chart) : null,
       run.classify ? JSON.stringify(run.classify) : null,
     );
   }

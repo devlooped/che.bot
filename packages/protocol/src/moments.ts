@@ -28,11 +28,18 @@ function plural(n: number, one: string, many: string): string {
   return n === 1 ? one : many;
 }
 
-/** What the templates know besides the events: a chart run reads differently from a prose run. */
+/** What the templates know besides the events. */
 export interface MomentContext {
-  chart?: boolean;
-  /** The suggestions of the run: they tell which part of a chart an accepted change touched. */
+  /** The suggestions of the run: they tell whether a change is to the text or to a chart, and to which part. */
   suggestions?: Readonly<Record<string, Suggestion>>;
+}
+
+/** The suggestions of a thread, from the run's. */
+function ofThread(
+  suggestions: Readonly<Record<string, Suggestion>> | undefined,
+  thread: string,
+): Suggestion | undefined {
+  return Object.values(suggestions ?? {}).find((s) => s.thread === thread);
 }
 
 const CHART_PARTS: Record<ChartLayer, string> = {
@@ -63,15 +70,17 @@ const TEMPLATES: ((events: readonly RunEvent[], ctx: MomentContext) => string | 
       : `${names(who)} no llegaron a contestar esta vez y sigue el resto.`;
   },
   (events) => {
-    const chart = chartOf(of(events, "document.seeded")[0]);
-    if (!chart) return null;
-    const check = chart.data.rows.filter(
-      (r) => r.status === "single" || r.status === "disputed",
-    ).length;
-    if (chart.data.origin === "user") return "Armamos el gráfico con los datos que subiste.";
+    const charts = chartsOf(of(events, "document.seeded")[0]);
+    if (charts.length === 0) return null;
+    const rows = charts.flatMap((c) => c.data.rows);
+    const check = rows.filter((r) => r.status === "single" || r.status === "disputed").length;
+    const what =
+      charts.length === 1
+        ? `un gráfico con ${rows.length} ${plural(rows.length, "dato", "datos")}`
+        : `${charts.length} gráficos con ${rows.length} datos`;
     return check === 0
-      ? `Juntamos los datos en un gráfico: ${chart.data.rows.length} ${plural(chart.data.rows.length, "dato", "datos")}, y coinciden en todos.`
-      : `Juntamos los datos en un gráfico: ${chart.data.rows.length} ${plural(chart.data.rows.length, "dato", "datos")}, y ${check} ${plural(check, "queda", "quedan")} para verificar con las fuentes.`;
+      ? `Sumamos a la respuesta ${what}, y coinciden en todos.`
+      : `Sumamos a la respuesta ${what}, y ${check} ${plural(check, "queda", "quedan")} para verificar con las fuentes.`;
   },
   (events) => {
     const settled = of(events, "dispute.settled");
@@ -87,17 +96,10 @@ const TEMPLATES: ((events: readonly RunEvent[], ctx: MomentContext) => string | 
     return `${parts.join("; ")}.`.replace(/^./, (c) => c.toUpperCase());
   },
   (events) => {
-    const n = of(events, "brief.completed").length;
-    if (n === 0) return null;
-    return n === 4
-      ? "Los cuatro ya juntaron sus datos, cada uno por su cuenta."
-      : `${n} de los cuatro juntaron sus datos.`;
-  },
-  (events) => {
     const seeded = of(events, "document.seeded")[0];
-    if (!seeded || chartOf(seeded)) return null;
-    const statuses = Object.values(seeded.snapshot.blocks).map((b) =>
-      b.kind === "paragraph" ? b.status : "agreed",
+    if (!seeded) return null;
+    const statuses = Object.values(seeded.snapshot.blocks).flatMap((b) =>
+      b.kind === "paragraph" ? [b.status] : [],
     );
     const contested = statuses.filter((s) => s === "contested").length;
     const shared = statuses.length - contested;
@@ -115,24 +117,27 @@ const TEMPLATES: ((events: readonly RunEvent[], ctx: MomentContext) => string | 
     const accepted = of(events, "thread.accepted");
     const [first] = accepted;
     if (!first) return null;
-    if (ctx.chart) {
-      const layer = ctx.suggestions?.[first.winner]?.target.layer;
-      const part = layer ? CHART_PARTS[layer] : "el gráfico";
-      return accepted.length === 1
-        ? `Se aceptó un cambio en ${part}, con el apoyo de ${first.tally.for.length} de 4.`
-        : `Se aceptaron ${accepted.length} cambios al gráfico.`;
+    const layers = accepted.map((e) => ctx.suggestions?.[e.winner]?.target.layer);
+    if (accepted.length === 1) {
+      const part = layers[0] ? `en ${CHART_PARTS[layers[0]]}` : "al texto";
+      return `Se aceptó un cambio ${part}, con el apoyo de ${first.tally.for.length} de 4.`;
     }
-    return accepted.length === 1
-      ? `Se aceptó un cambio al texto, con el apoyo de ${first.tally.for.length} de 4.`
-      : `Se aceptaron ${accepted.length} cambios al texto.`;
+    const where = layers.every((l) => l)
+      ? "a los gráficos"
+      : layers.some((l) => l)
+        ? "al texto y a los gráficos"
+        : "al texto";
+    return `Se aceptaron ${accepted.length} cambios ${where}.`;
   },
   (events, ctx) => {
-    const n = of(events, "thread.unresolved").length;
+    const unresolved = of(events, "thread.unresolved");
+    const n = unresolved.length;
     if (n === 0) return null;
-    if (ctx.chart)
+    const charts = unresolved.filter((e) => ofThread(ctx.suggestions, e.thread)?.target.layer);
+    if (charts.length === n)
       return n === 1
-        ? "En un punto del gráfico no hubo acuerdo y queda como estaba."
-        : `En ${n} puntos del gráfico no hubo acuerdo y quedan como estaban.`;
+        ? "En un punto de un gráfico no hubo acuerdo y queda como estaba."
+        : `En ${n} puntos de los gráficos no hubo acuerdo y quedan como estaban.`;
     return n === 1
       ? "En un punto no hubo acuerdo y queda anotado al margen."
       : `En ${n} puntos no hubo acuerdo y quedan anotados al margen.`;
@@ -148,12 +153,12 @@ const TEMPLATES: ((events: readonly RunEvent[], ctx: MomentContext) => string | 
       ? `${names(who)} cambió de opinión después de leer los argumentos de los demás.`
       : `${names(who)} cambiaron de opinión después de leer los argumentos de los demás.`;
   },
-  (events, ctx) => {
+  (events) => {
     const opened = of(events, "suggestion.opened");
     if (opened.length === 0) return null;
     const who = new Set(opened.map((e) => e.suggestion.author));
     return opened.length === 1
-      ? `${names(who)} propuso corregir una parte ${ctx.chart ? "del gráfico" : "del texto"}.`
+      ? `${names(who)} propuso corregir una parte ${opened[0]?.suggestion.target.layer ? "de un gráfico" : "del texto"}.`
       : `Hay ${opened.length} propuestas de cambio sobre la mesa, de ${names(who)}.`;
   },
   (events) => {
@@ -168,6 +173,14 @@ const TEMPLATES: ((events: readonly RunEvent[], ctx: MomentContext) => string | 
     if (who.size === 0) return null;
     return `${names(who)} ${plural(who.size, "propuso", "propusieron")} lo mismo que otro y ${plural(who.size, "suma", "suman")} su apoyo.`;
   },
+  (events) => {
+    const declined = of(events, "chart.declined").filter((e) => e.why === "one_draft");
+    const [first] = declined;
+    if (!first) return null;
+    return declined.length === 1
+      ? `${names(first.models)} ${plural(first.models.length, "propuso", "propusieron")} un gráfico, pero los demás no lo armaron, así que la respuesta sigue sin él.`
+      : "Hubo propuestas de gráficos que los demás no armaron, así que la respuesta sigue sin ellas.";
+  },
   (events) =>
     of(events, "snapshot.created").some((e) => e.cause === "edit")
       ? "Se pulió la redacción final sin cambiar el contenido."
@@ -180,10 +193,9 @@ const TEMPLATES: ((events: readonly RunEvent[], ctx: MomentContext) => string | 
     of(events, "run.completed").length > 0 ? "Listo: la respuesta está terminada." : null,
 ];
 
-function chartOf(seeded: EventOf<"document.seeded"> | undefined): Chart | null {
-  if (!seeded) return null;
-  const block = Object.values(seeded.snapshot.blocks).find((b) => b.kind === "chart");
-  return block?.kind === "chart" ? block : null;
+function chartsOf(seeded: EventOf<"document.seeded"> | undefined): Chart[] {
+  if (!seeded) return [];
+  return Object.values(seeded.snapshot.blocks).filter((b): b is Chart => b.kind === "chart");
 }
 
 /** The template moments of a batch of events: at most 3 sentences, most important first. */
@@ -207,20 +219,18 @@ const CHART_PARTS_EN: Record<ChartLayer, string> = {
 };
 
 /**
- * The events of a batch as plain English facts, for the utility call that phrases the moments. In
- * a chart run each proposal names the part of the chart it is about, and what has no agreement
- * stays noted under the chart.
+ * The events of a batch as plain English facts, for the utility call that phrases the moments. A
+ * proposal on a chart names the part of the chart it is about, and what has no agreement on a
+ * chart stays noted under it.
  */
 export function momentFacts(
   events: readonly RunEvent[],
   suggestions: Readonly<Record<string, Suggestion>>,
-  ctx: { chart?: boolean } = {},
 ): string[] {
   const facts: string[] = [];
   const name = (m: ModelId) => MODEL_NAMES[m];
   const partOf = (s: Suggestion | undefined) =>
-    (s?.target.layer && CHART_PARTS_EN[s.target.layer]) || "the chart";
-  const ofThread = (thread: string) => Object.values(suggestions).find((s) => s.thread === thread);
+    s?.target.layer ? CHART_PARTS_EN[s.target.layer] : null;
   for (const e of events) {
     switch (e.type) {
       case "stage.changed":
@@ -232,12 +242,14 @@ export function momentFacts(
         break;
       case "draft.completed":
         facts.push(
-          `${name(e.model)} finished its own answer, alone, with ${e.claims.length} key points.`,
+          `${name(e.model)} finished its own answer, alone, with ${e.claims.length} key points${e.charts.length ? ` and ${e.charts.length === 1 ? "a chart" : `${e.charts.length} charts`} of figures, each with its source` : ""}.`,
         );
         break;
-      case "brief.completed":
+      case "chart.declined":
         facts.push(
-          `${name(e.model)} prepared the data of the chart alone${e.brief.rows.length ? `, ${e.brief.rows.length} values each with its source` : ""}.`,
+          e.why === "one_draft"
+            ? `${e.models.map(name).join(" and ")} proposed a chart of ${e.measure}, but no other made one: the answer goes without it.`
+            : `A chart of ${e.measure} was left out: the answer already has three charts.`,
         );
         break;
       case "dispute.settled":
@@ -258,29 +270,28 @@ export function momentFacts(
           );
         break;
       case "document.seeded": {
-        const chart = chartOf(e);
-        if (chart) {
-          facts.push(
-            `The data was merged into one chart with ${chart.data.rows.length} rows${chart.data.origin === "web" ? `, ${chart.data.rows.filter((r) => r.status === "single" || r.status === "disputed").length} of them to check against their sources` : ""}.`,
-          );
-          break;
-        }
-        const statuses = Object.values(e.snapshot.blocks).map((b) =>
-          b.kind === "paragraph" ? b.status : "agreed",
+        const statuses = Object.values(e.snapshot.blocks).flatMap((b) =>
+          b.kind === "paragraph" ? [b.status] : [],
         );
         const count = (s: string) => statuses.filter((x) => x === s).length;
         facts.push(
           `The answers were merged into one text: ${count("agreed")} parts all four agree on, ${count("majority")} parts three agree on, ${count("contested")} parts in dispute.`,
         );
+        for (const chart of chartsOf(e))
+          facts.push(
+            `The figures were merged into a chart of ${chart.brief.measures[0] ?? "data"} inside the answer, with ${chart.data.rows.length} values, ${chart.data.rows.filter((r) => r.status === "single" || r.status === "disputed").length} of them to check against their sources.`,
+          );
         break;
       }
-      case "suggestion.opened":
+      case "suggestion.opened": {
+        const part = partOf(e.suggestion);
         facts.push(
-          ctx.chart
-            ? `${name(e.suggestion.author)} proposed a change to ${partOf(e.suggestion)}, because: ${e.suggestion.reason}`
+          part
+            ? `${name(e.suggestion.author)} proposed a change to ${part}, because: ${e.suggestion.reason}`
             : `${name(e.suggestion.author)} proposed to ${e.suggestion.op.replace("_", " ")} a part of the text, because: ${e.suggestion.reason}`,
         );
         break;
+      }
       case "suggestion.merged":
         facts.push(`${name(e.model)} proposed the same change as another and supports it.`);
         break;
@@ -289,21 +300,24 @@ export function momentFacts(
         break;
       case "thread.accepted": {
         const s = suggestions[e.winner];
+        const part = partOf(s);
         facts.push(
-          `A change${ctx.chart ? ` to ${partOf(s)}` : ""}${s ? ` proposed by ${name(s.author)} (${s.reason})` : ""} was accepted, ${e.tally.for.length} of 4 in favor.`,
+          `A change${part ? ` to ${part}` : ""}${s ? ` proposed by ${name(s.author)} (${s.reason})` : ""} was accepted, ${e.tally.for.length} of 4 in favor.`,
         );
         break;
       }
       case "thread.rejected":
         facts.push("A proposed change found no support; that part stays as it was.");
         break;
-      case "thread.unresolved":
+      case "thread.unresolved": {
+        const part = partOf(ofThread(suggestions, e.thread));
         facts.push(
-          ctx.chart
-            ? `There was no agreement on a proposed change to ${partOf(ofThread(e.thread))}; it stays noted under the chart as a proposal without agreement.`
+          part
+            ? `There was no agreement on a proposed change to ${part}; it stays noted under the chart as a proposal without agreement.`
             : "There was no agreement on a proposed change; it stays as a note in the margin.",
         );
         break;
+      }
       case "snapshot.created":
         if (e.cause === "edit")
           facts.push("The final wording was polished without changing the content.");

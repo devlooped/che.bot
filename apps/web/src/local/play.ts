@@ -1,8 +1,8 @@
-// Test support: the scripted chart runs of the local mode, played through the driver and the real
+// Test support: the scripted runs of the local mode, played through the driver and the real
 // renderer in Node, for the tests of the local script and of the chart view.
 import { chartRenderer } from "@chebot/charts";
 import { drive, startRun } from "@chebot/driver";
-import { parseCsv, replay } from "@chebot/protocol";
+import { replay } from "@chebot/protocol";
 import { FakeProvider } from "@chebot/providers";
 import { LOCAL_RUN_CONFIG } from "./config.ts";
 import { scenario } from "./scenario.ts";
@@ -15,8 +15,8 @@ const MODELS = {
   utility: { id: "anthropic/claude-haiku-5.5", effort: null },
 };
 
-/** Plays a chart run of the local mode through the driver and the real renderer. */
-export async function playChart(question: string, csv: string | null) {
+/** Plays a run of the local mode through the driver and the real renderer. */
+export async function playChart(question: string) {
   const run = startRun(
     {
       id: crypto.randomUUID(),
@@ -24,7 +24,6 @@ export async function playChart(question: string, csv: string | null) {
       mode: "thorough",
       models: MODELS,
       config: LOCAL_RUN_CONFIG,
-      chart: { dataset: csv === null ? null : parseCsv(csv) },
     },
     Date.now(),
   );

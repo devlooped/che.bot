@@ -2,8 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import { checkSnapshot, modelFor, runCalls } from "@chebot/driver";
 import {
   beginStep,
-  type ChartInput,
-  type ChartOrigin,
+  chartIds,
   createRun,
   expiredEvent,
   type FailureReason,
@@ -72,8 +71,6 @@ export interface QuoteInput {
   probability: number | null;
   amount: number;
   currency: string;
-  /** A chart run: the upload parsed by code (`parseCsv`), or none for data from the web. */
-  chart?: ChartInput | null;
   /** What the classification of the question cost, for the spend of the run. */
   classify?: ClassifyCost | null;
 }
@@ -106,8 +103,8 @@ export interface RunSummary {
   attempt: number;
   createdAt: number;
   failure: FailureReason | null;
-  /** A chart run: where its data comes from; null for a prose run. */
-  chart: ChartOrigin | null;
+  /** How many charts the answer has (0 before they are decided, or when it has none). */
+  charts: number;
 }
 
 export type RerunResult =
@@ -288,7 +285,6 @@ export class RunObject extends DurableObject<Env> {
             mode: "thorough",
             models,
             config,
-            chart: run.chart,
           },
           now,
         );
@@ -425,7 +421,6 @@ export class RunObject extends DurableObject<Env> {
             ...deps.runConfig(this.env),
             ...(run.budgetUsd !== null ? { budgetUsd: run.budgetUsd } : {}),
           },
-          chart: run.chart,
         },
         now,
       );
@@ -678,12 +673,15 @@ export class RunObject extends DurableObject<Env> {
   }
 
   /**
-   * The SVG of a version of the chart of a chart run: the render the run made of it (the render
-   * gate keeps it in the call ledger). Null when there is no such version or it did not render.
+   * The SVG of the chart `block` (c1, c2, c3) at a version: the render the run made of it (the
+   * render gate keeps it in the call ledger). Null when there is no such chart or version, or it
+   * did not render.
    */
-  async chartSvg(version: number): Promise<string | null> {
+  async chartSvg(block: string, version: number): Promise<string | null> {
     const run = this.store.run();
-    const render = run?.state?.chart?.renders.findLast((r) => r.version === version && r.ok);
+    const render = run?.state?.charts?.renders.findLast(
+      (r) => r.block === block && r.version === version && r.ok,
+    );
     if (!run || !render) return null;
     const entry = await this.store.ledger(attemptPrefix(run.attempt)).get(render.call);
     if (entry?.result.status !== "ok") return null;
@@ -750,7 +748,8 @@ export class RunObject extends DurableObject<Env> {
       attempt: run.attempt,
       createdAt: run.createdAt,
       failure: run.state?.failure ?? null,
-      chart: run.chart ? (run.chart.dataset ? "user" : "web") : null,
+      // a run state from before the charts of an answer has no `charts`
+      charts: run.state?.charts ? chartIds(run.state).length : 0,
     };
   }
 

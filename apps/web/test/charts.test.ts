@@ -1,16 +1,16 @@
 import { env } from "cloudflare:workers";
 import { renderSpecs } from "@chebot/charts";
 import { drive, startRun } from "@chebot/driver";
-import { CATALOG, respondUserChart, respondWebChart, SALES_CSV } from "@chebot/driver/testing";
-import { chartSpec, replay, selectChart } from "@chebot/protocol";
+import { CATALOG, respondWebChart } from "@chebot/driver/testing";
+import { replay, selectChart } from "@chebot/protocol";
 import { FakeProvider, resolveModels } from "@chebot/providers";
 import { describe, expect, test } from "vitest";
 import { lazyRenderer } from "../src/worker/deps.ts";
 import { runStub } from "../src/worker/run-object.ts";
 import { api, contrib, eventsOf, fakes, HOOK_URL, runAlarms } from "./helpers.ts";
 
-// Charts in the Workers runtime: the render gate (Vega in interpreter mode, step 36) and a chart
-// run driven by the alarms of RunObject (steps 37 to 40).
+// Charts in the Workers runtime: the render gate (Vega in interpreter mode, step 36) and a run
+// whose answer has a chart, driven by the alarms of RunObject.
 
 const WEB_QUESTION = "¿Cuál fue la inflación mensual de Argentina en 2026?";
 
@@ -63,8 +63,8 @@ describe("the render gate in the Workers runtime", () => {
   });
 });
 
-describe("a chart run through the alarms of RunObject", () => {
-  test("web data: the same chart versions as the CLI driver; the SVG of each version is served", async () => {
+describe("an answer with a chart through the alarms of RunObject", () => {
+  test("the same versions as the CLI driver; the SVG of each version of the chart is served", async () => {
     const { provider } = fakes({ respond: respondWebChart });
     const id = crypto.randomUUID();
     const stub = runStub(env, id);
@@ -76,13 +76,12 @@ describe("a chart run through the alarms of RunObject", () => {
       probability: 0.9,
       amount: 10000,
       currency: "ARS",
-      chart: { dataset: null },
     });
     await stub.pay({ hookUrl: HOOK_URL, free: true });
     await runAlarms(stub);
     expect(provider.repeated()).toEqual([]);
     const summary = await stub.summary();
-    expect(summary).toMatchObject({ status: "completed", chart: "web", version: 3 });
+    expect(summary).toMatchObject({ status: "completed", charts: 1, version: 3 });
 
     const log = await eventsOf(stub);
     const view = replay(log);
@@ -93,7 +92,6 @@ describe("a chart run through the alarms of RunObject", () => {
           question: WEB_QUESTION,
           mode: "thorough",
           models: resolveModels([], CATALOG),
-          chart: { dataset: null },
         },
         1_800_000_000_000,
       ),
@@ -103,9 +101,10 @@ describe("a chart run through the alarms of RunObject", () => {
       },
     );
     expect(view.snapshots).toEqual(cli.state.snapshots);
-    expect(view.disputes).toEqual(cli.state.chart?.disputes);
-    expect(view.renders).toEqual(cli.state.chart?.renders);
-    const chart = selectChart(view);
+    expect(view.disputes).toEqual(cli.state.charts.disputes);
+    expect(view.renders).toEqual(cli.state.charts.renders);
+    expect(view.snapshots.at(-1)?.order).toEqual(["p1", "c1", "p2"]);
+    const chart = selectChart(view, "c1");
     expect(chart?.rows.map((r) => [r.key, r.status])).toEqual([
       ["2026-01", "agreed"],
       ["2026-03", "held"],
@@ -114,54 +113,28 @@ describe("a chart run through the alarms of RunObject", () => {
     expect(view.droppedPatches.map((d) => d.why)).toEqual(["theme_only", "render_failed"]);
 
     for (const version of [1, 2, 3]) {
-      const response = await api(`/api/runs/${id}/charts/${version}.svg`);
+      const response = await api(`/api/runs/${id}/charts/c1/${version}.svg`);
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toBe("image/svg+xml; charset=utf-8");
       expect(await response.text()).toMatch(/^<svg/);
     }
-    expect((await api(`/api/runs/${id}/charts/9.svg`)).status).toBe(404);
+    expect((await api(`/api/runs/${id}/charts/c1/9.svg`)).status).toBe(404);
+    expect((await api(`/api/runs/${id}/charts/c2/1.svg`)).status).toBe(404);
   });
 
-  test("user data through the API: the CSV is parsed when asked; no number of the chart is a model's", async () => {
-    fakes({ respond: respondUserChart });
-    const bad = await api("/api/runs", {
-      method: "POST",
-      headers: { ...contrib("csv-user"), "content-type": "application/json" },
-      body: JSON.stringify({ question: "¿Cuánto vendió cada región?", chart: { csv: "a,b\n1" } }),
-    });
-    expect(bad.status).toBe(400);
-    expect(await bad.json()).toMatchObject({ reason: "csv_ragged" });
+  test("through the API a question is only a question: the drafts decide on the charts", async () => {
+    fakes({ respond: respondWebChart });
     const asked = await api("/api/runs", {
       method: "POST",
-      headers: { ...contrib("csv-user"), "content-type": "application/json" },
-      body: JSON.stringify({ question: "¿Cuánto vendió cada región?", chart: { csv: SALES_CSV } }),
+      headers: { ...contrib("chart-user"), "content-type": "application/json" },
+      body: JSON.stringify({ question: WEB_QUESTION }),
     });
     expect(asked.status).toBe(201);
     const { runId } = (await asked.json()) as { runId: string };
     const stub = runStub(env, runId);
+    expect(await stub.summary()).toMatchObject({ status: "quoted", charts: 0 });
     await stub.pay({ hookUrl: HOOK_URL, free: true });
     await runAlarms(stub);
-    expect(await stub.summary()).toMatchObject({ status: "completed", chart: "user" });
-    const view = replay(await eventsOf(stub));
-    expect(view.chart?.origin).toBe("user");
-    const chart = selectChart(view);
-    if (!chart) throw new Error("no chart");
-    const values = (chart.spec.data as { values: unknown[] }).values;
-    expect(values).toEqual(view.chart?.dataset?.rows);
-    expect(values).toHaveLength(5);
-    expect(view.droppedPatches.map((d) => [d.layer, d.why])).toEqual([["data", "user_data"]]);
-    // what the chart draws is the sum by region of the uploaded rows
-    const rendered = await renderSpecs({
-      specs: [{ id: "x", spec: chartSpec(view.snapshots.at(-1)?.blocks.c1 as never) }],
-    });
-    const drawn = JSON.parse(rendered.results[0]?.marks ?? "[]") as {
-      region: string;
-      total: number;
-    }[];
-    expect(Object.fromEntries(drawn.map((m) => [m.region, m.total]))).toEqual({
-      Norte: 250,
-      Sur: 175.5,
-      Oeste: 40,
-    });
+    expect(await stub.summary()).toMatchObject({ status: "completed", charts: 1 });
   });
 });

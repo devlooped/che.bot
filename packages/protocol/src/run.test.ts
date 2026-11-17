@@ -488,6 +488,8 @@ describe("stopping rules", () => {
                       sources: [],
                     },
                   ],
+            patches: [],
+            checks: [],
           })
         : scripted(call, state);
     const tick = (s: { phase: string; stage: string }) =>

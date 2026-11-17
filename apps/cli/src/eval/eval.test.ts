@@ -518,22 +518,22 @@ describe("a sheet the user has graded", async () => {
 describe("the spending cap", () => {
   test("stops the evaluation, marks the report incomplete; a rerun resumes where it stopped", async () => {
     const set = writeSet(["e1"]);
-    // Drafts at their worst case (US$0.55 each): room for the classification, the drafts and the
-    // merge under US$2.30; a call of round 1 (US$0.36) does not fit. The budget of the question
+    // Drafts at their worst case (US$0.65 each): room for the classification, the drafts and the
+    // merge under US$2.70; a call of round 1 (US$0.40) does not fit. The budget of the question
     // (US$5) leaves the rounds to the cap of the evaluation.
-    const capped = deps(fake(0.55));
-    const stopped = await evaluate(args(set, { maxUsd: 2.3, runUsd: 5, concurrency: 1 }), capped);
+    const capped = deps(fake(0.65));
+    const stopped = await evaluate(args(set, { maxUsd: 2.7, runUsd: 5, concurrency: 1 }), capped);
     expect(stopped.code).toBe(1);
     expect(stopped.report?.coverage.complete).toBe(false);
     expect(stopped.report?.criteria.every((c) => c.status === "pending")).toBe(true);
     const md = readFileSync(join(stopped.out as string, "report.md"), "utf8");
-    expect(md).toContain("Incomplete: the spending cap of US$2.3000 was reached");
+    expect(md).toContain("Incomplete: the spending cap of US$2.7000 was reached");
     expect(existsSync(join(stopped.out as string, SHEET_FILE))).toBe(false);
     const made = capped.provider.calls.map((c) => c.callKey);
     expect(made).toEqual(expect.arrayContaining(["draft:0:grok", "merge:0"]));
     expect(made.some((k) => k.startsWith("round:"))).toBe(false);
     const spent = stopped.report?.context.spent;
-    expect((spent?.runs ?? 0) + (spent?.classify ?? 0)).toBeLessThanOrEqual(2.3);
+    expect((spent?.runs ?? 0) + (spent?.classify ?? 0)).toBeLessThanOrEqual(2.7);
 
     // A second invocation under a cap already used up starts nothing.
     const still = deps();

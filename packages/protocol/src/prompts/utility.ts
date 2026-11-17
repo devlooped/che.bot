@@ -38,11 +38,12 @@ export function editorPrompt(input: {
       "You are the editor of an answer that four reviewers wrote together. Some paragraphs were just changed by accepted suggestions, so the text may now repeat itself, contradict its own order, or refer to something no longer there.",
       "Smooth the wording and fix those inconsistencies. No change of substance: keep every claim, figure, date, name, qualifier, caveat and stated disagreement exactly as it is; add nothing and remove nothing that the text asserts. Do not take sides where the text reports a disagreement.",
       "Every rewrite is checked against the original; a rewrite that changes a claim is discarded.",
+      "The charts of the answer are not yours to change: keep the wording of the paragraphs consistent with them.",
       "Return only the paragraphs you changed, by id, with their full new text. Return an empty list if the text reads well.",
       LANGUAGE_RULE,
       STRUCTURED_RULE,
     ].join("\n"),
-    prompt: `Question:\n${input.question}\n\nParagraphs changed in the rounds: ${input.changed.join(", ") || "none"}\n\nThe answer:\n\n${renderDocument(input.snapshot, false)}`,
+    prompt: `Question:\n${input.question}\n\nParagraphs changed in the rounds: ${input.changed.join(", ") || "none"}\n\nThe answer:\n\n${renderDocument(input.snapshot, false, "summary")}`,
   };
 }
 
@@ -75,17 +76,17 @@ export function momentsPrompt(input: {
   question: string;
   language: string;
   facts: readonly string[];
-  /** The answer is a chart, not a text. */
-  chart?: boolean;
+  /** The answer has charts beside its text. */
+  charts?: boolean;
 }): Prompt {
   return {
     system: [
       "Four AI assistants (Grok, Claude, ChatGPT and Gemini) are answering a person's question together. You write the short live commentary the person reads while they work.",
       `Turn the events below into 1 to 3 short sentences, in ${languageName(input.language)}: one sentence when the events say little.`,
       "Say only what the events say: no filler, no advice to the person, nothing about what comes next or about the answer as a whole. Plain words for anyone: no technical terms (no model, thread, round, token, prompt, vote count jargon). Name the assistants by name. Be neutral: do not praise or blame.",
-      ...(input.chart
+      ...(input.charts
         ? [
-            "The answer is a chart, not a text: never call anything a text, a paragraph or a margin. Name the part of the chart each proposal is about with the plain words the events use (the title, the type of chart, the explanation under the chart, the calculation, the data), and use no other technical term (no layer, spec, patch, render). A change without agreement stays noted under the chart, as a proposal without agreement.",
+            "The answer has charts beside its text. For a proposal about a chart, name the part of the chart it is about with the plain words the events use (the title, the type of chart, the explanation under the chart, the calculation, the data), and use no other technical term (no layer, spec, patch, render). A change to a chart without agreement stays noted under the chart, as a proposal without agreement.",
           ]
         : []),
       STRUCTURED_RULE,

@@ -148,6 +148,7 @@ export function respond(req: GenerateRequest<unknown>): FakeOutcome {
         {
           answer: DRAFTS[seat].map((c) => c.text).join("\n\n"),
           claims: DRAFTS[seat].map((c) => ({ ...c, confidence: "high" })),
+          charts: [],
         },
         { sources: FOUND[seat], costUsd: 0.05 },
       );
@@ -168,9 +169,9 @@ export function respond(req: GenerateRequest<unknown>): FakeOutcome {
       });
     }
     case "round":
-      if (n === "1") return out({ suggestions: ROUND1[seat] });
-      if (n === "2") return out(ROUND2[seat]);
-      return out({ votes: ROUND3[seat] });
+      if (n === "1") return out({ suggestions: ROUND1[seat], patches: [], checks: [] });
+      if (n === "2") return out({ ...ROUND2[seat], patches: [], checks: [] });
+      return out({ votes: ROUND3[seat], checks: [] });
     case "dedupe": {
       const pairs = [...req.prompt.matchAll(/^## (\S+)$/gm)].map((m) => m[1] ?? "");
       return out({

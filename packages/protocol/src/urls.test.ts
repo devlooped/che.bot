@@ -23,6 +23,7 @@ test("a claim keeps a source its search found when the URL differs only by www. 
             sources: ["https://www.example.org/canberra/", "https://example.org/other"],
           },
         ],
+        charts: [],
       },
       {
         sources: [

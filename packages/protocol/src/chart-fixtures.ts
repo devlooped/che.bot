@@ -1,7 +1,6 @@
-// Test support, not exported by the package: scripted chart runs (web data and an upload) and a
-// fake renderer that fails any spec mentioning the field "nope". The real renderer (Vega in
-// interpreter mode) is tested in packages/charts and in the Workers runtime.
-import { parseCsv } from "./csv.ts";
+// Test support, not exported by the package: a scripted run whose answer has two charts among its
+// paragraphs, and a fake renderer that fails any spec mentioning the field "nope". The real
+// renderer (Vega in interpreter mode) is tested in packages/charts and in the Workers runtime.
 import { ok, type Responder } from "./fixtures.ts";
 import type { ModelId } from "./model.ts";
 import type { Call, CallResult, RunState } from "./reducer.ts";
@@ -16,17 +15,20 @@ export const FOUND: Record<ModelId, ReturnType<typeof src>[]> = {
     src("https://indec.gob.ar/ipc-febrero", "INDEC febrero", "En febrero el IPC subió 2,4%"),
     src("https://indec.gob.ar/ipc-marzo", "INDEC marzo", "marzo 3,1%"),
     src("https://consultora.example/mayo", "Consultora", "mayo 3,5%"),
+    src("https://indec.gob.ar/eph", "INDEC EPH", "desocupación: 7,1% y 6,9%"),
   ],
   claude: [
     src("https://indec.gob.ar/ipc-enero", "INDEC enero", "La inflación de enero fue de 2,2%"),
     src("https://indec.gob.ar/ipc-febrero", "INDEC febrero", "En febrero el IPC subió 2,4%"),
     src("https://diario.example/marzo", "Diario", "en marzo el IPC subió 3%"),
     src("https://otra.example/mayo", "Otra", "mayo: 3,7%"),
+    src("https://indec.gob.ar/eph", "INDEC EPH", "desocupación: 7,1% y 6,9%"),
   ],
   openai: [
     src("https://indec.gob.ar/ipc-enero", "INDEC enero", "La inflación de enero fue de 2,2%"),
     src("https://indec.gob.ar/ipc-febrero", "INDEC febrero", "En febrero el IPC subió 2,4%"),
     src("https://indec.gob.ar/ipc-marzo", "INDEC marzo", "marzo 3,1%"),
+    src("https://indec.gob.ar/salarios", "INDEC salarios", "los salarios subieron 2,0%"),
   ],
   gemini: [
     src("https://www.indec.gob.ar/ipc-enero/", "INDEC", "La inflación de enero fue de 2,2%"),
@@ -69,6 +71,46 @@ export const BRIEF_ROWS: Record<ModelId, ReturnType<typeof row>[]> = {
   ],
 };
 
+/** The rows of the second measure, which grok and claude chart alike: no dispute. */
+export const UNEMPLOYMENT_ROWS = [
+  row("2025-T4", "7.1", "https://indec.gob.ar/eph", "desocupación: 7,1%"),
+  row("2026-T1", "6.9", "https://indec.gob.ar/eph", "6,9%"),
+];
+
+const brief = (measure: string, mark: string, rows: ReturnType<typeof row>[]) => ({
+  question: measure.startsWith("Inflación")
+    ? "¿Cuánto subieron los precios cada mes?"
+    : `¿Cómo evolucionó la ${measure.toLowerCase()}?`,
+  dimension: measure.startsWith("Inflación") ? "Mes" : "Trimestre",
+  measure,
+  mark,
+  rows,
+});
+
+/** The charts each draft proposes: inflation (all four), unemployment (two), wages (openai alone). */
+export const DRAFT_CHARTS: Record<ModelId, ReturnType<typeof brief>[]> = {
+  grok: [
+    brief("Inflación mensual (%)", "line", BRIEF_ROWS.grok),
+    brief("Desocupación (%)", "bar", UNEMPLOYMENT_ROWS),
+  ],
+  claude: [
+    brief("Inflación mensual (%)", "line", BRIEF_ROWS.claude),
+    brief("Desocupación (%)", "bar", UNEMPLOYMENT_ROWS),
+  ],
+  openai: [
+    brief("Inflación mensual (%)", "line", BRIEF_ROWS.openai),
+    brief("Salario real (%)", "bar", [
+      row("2026-01", "2.0", "https://indec.gob.ar/salarios", "los salarios subieron 2,0%"),
+    ]),
+  ],
+  gemini: [brief("Inflación mensual (%)", "line", BRIEF_ROWS.gemini)],
+};
+
+/** The claims of every draft: the text agrees, the figures are in the charts. */
+const CLAIMS = [
+  "La inflación mensual se moderó durante 2026.",
+  "Marzo fue el mes de mayor inflación.",
+];
 export const WRITER_SPEC = JSON.stringify({
   mark: "line",
   encoding: {
@@ -83,12 +125,14 @@ export const CAPTION =
   "Inflación mensual según el INDEC; en marzo y mayo las fuentes no coinciden.";
 
 const patch = (
+  chart: string,
   layer: string,
   path: string,
   value: string,
   reason: string,
   extra: { kind?: string; sources?: string[]; quote?: string } = {},
 ) => ({
+  chart,
   layer,
   path,
   value,
@@ -98,7 +142,8 @@ const patch = (
   quote: extra.quote ?? "",
 });
 
-const check = (r: string, value: string, verdict: string) => ({
+const check = (r: string, value: string, verdict: string, chart = "c1") => ({
+  chart,
   row: r,
   value,
   verdict,
@@ -131,58 +176,101 @@ export function fakeRender(call: Call): CallResult {
   );
 }
 
-/** The scripted web chart run (see chart-run.test.ts for what each step shows). */
+/** The paragraph gemini wants to make precise in round 1, accepted in round 2. */
+export const MARCH = "Marzo fue el mes de mayor inflación, con 3,1% según el INDEC.";
+
+/**
+ * The scripted run with charts (see chart-run.test.ts for what each step shows). The answer: p1,
+ * the inflation chart c1, p2, the unemployment chart c2.
+ */
 export const webChart: Responder = (call, state) => {
   const [, n, seat] = call.key.split(":") as [string, string, ModelId];
   switch (call.kind) {
     case "render":
       return fakeRender(call);
-    case "brief_web":
+    case "draft":
       return ok(
         call,
         {
-          question: "¿Cuánto subieron los precios cada mes?",
-          dimension: "Mes",
-          measure: "Inflación mensual (%)",
-          mark: "line",
-          rows: BRIEF_ROWS[seat],
+          answer: CLAIMS.join("\n\n"),
+          claims: CLAIMS.map((text) => ({ text, confidence: "high", sources: [] })),
+          charts: DRAFT_CHARTS[seat],
         },
         { sources: FOUND[seat], costUsd: 0.05 },
       );
+    case "merge": {
+      const claim = (i: number) => state.drafts.map((d) => d.claims[i] ?? "");
+      return ok(call, {
+        paragraphs: [
+          { text: CLAIMS[0], claims: claim(0) },
+          { text: CLAIMS[1], claims: claim(1) },
+        ],
+        conflicts: [],
+      });
+    }
     case "chart_merge": {
-      const rows = [...call.prompt.matchAll(/^- (\w+): (.*)$/gm)].map((m) => ({
+      const proposals = [
+        ...call.prompt.matchAll(/^## Proposal (\w+)\n(?:.*\n){2}measure: (.*)$/gm),
+      ];
+      const rows = [...call.prompt.matchAll(/^- ([\w.]+): (.*)$/gm)].map((m) => ({
         row: m[1] ?? "",
         key: /enero/i.test(m[2] ?? "") ? "2026-01" : (m[2] ?? ""),
       }));
-      const drafts = [...call.prompt.matchAll(/^## Draft (\w)$/gm)].map((m) => ({
-        draft: m[1] ?? "",
-        measure: "same",
-      }));
-      return ok(call, {
-        question: "¿Cuánto subieron los precios cada mes de 2026?",
-        dimension: "Mes",
-        measure: "Inflación mensual (%)",
-        drafts,
-        keys: rows,
-      });
+      const measures = [...new Set(proposals.map((m) => m[2] ?? ""))];
+      const charts = measures
+        .map((measure) => {
+          const ids = proposals.filter((m) => m[2] === measure).map((m) => m[1] ?? "");
+          return {
+            question: measure.startsWith("Inflación")
+              ? "¿Cuánto subieron los precios cada mes de 2026?"
+              : `¿Cómo evolucionó la ${measure.toLowerCase()}?`,
+            dimension: measure.startsWith("Inflación") ? "Mes" : "Trimestre",
+            measure,
+            briefs: ids,
+            keys: rows.filter((r) => ids.some((id) => r.row.startsWith(`${id}.`))),
+          };
+        })
+        .sort((a, b) => b.briefs.length - a.briefs.length);
+      return ok(call, { charts });
     }
     case "chart_spec":
-      return ok(call, {
-        spec: WRITER_SPEC,
-        title: "Inflación mensual de 2026",
-        caption: "Según el INDEC.",
-      });
-    case "chart_round1": {
+      return ok(
+        call,
+        n === "c1"
+          ? {
+              spec: WRITER_SPEC,
+              title: "Inflación mensual de 2026",
+              caption: "Según el INDEC.",
+              after: "p1",
+            }
+          : {
+              spec: JSON.stringify({
+                mark: "bar",
+                encoding: {
+                  x: { field: "key", type: "nominal", title: "Trimestre" },
+                  y: { field: "value", type: "quantitative", title: "Desocupación (%)" },
+                },
+              }),
+              title: "Desocupación",
+              caption: "Según la EPH del INDEC.",
+              after: "p2",
+            },
+      );
+    case "round1": {
       const R1: Record<ModelId, unknown> = {
         grok: {
+          suggestions: [],
           patches: [
             patch(
+              "c1",
               "encoding",
               "encoding.y.title",
               '"Inflación mensual (%)"',
               "El eje no dice que es mensual.",
             ),
-            patch("caption", "", CAPTION, "Falta decir qué está en duda.", { kind: "missing" }),
+            patch("c1", "caption", "", CAPTION, "Falta decir qué está en duda.", {
+              kind: "missing",
+            }),
           ],
           checks: [
             check("2026-03", "v2", "fails"),
@@ -191,16 +279,16 @@ export const webChart: Responder = (call, state) => {
           ],
         },
         claude: {
+          suggestions: [],
           patches: [
-            patch("encoding", "encoding.y.scale.scheme", '"reds"', "El rojo marca la suba."),
+            patch("c1", "encoding", "encoding.y.scale.scheme", '"reds"', "El rojo marca la suba."),
             patch(
+              "c1",
               "transform",
               "",
               '[{"filter":"datum.nope > 0"}]',
               "Hay que sacar los meses sin dato.",
-              {
-                kind: "wrong",
-              },
+              { kind: "wrong" },
             ),
           ],
           checks: [
@@ -210,10 +298,21 @@ export const webChart: Responder = (call, state) => {
           ],
         },
         openai: {
+          suggestions: [],
           patches: [
-            patch("caption", "", CAPTION, "Hay que avisar qué meses están en duda.", {
+            patch("c1", "caption", "", CAPTION, "Hay que avisar qué meses están en duda.", {
               kind: "missing",
             }),
+            patch(
+              "c2",
+              "title",
+              "",
+              "Desocupación trimestral (%)",
+              "El título no dice el período.",
+              {
+                kind: "missing",
+              },
+            ),
           ],
           checks: [
             check("2026-03", "v2", "fails"),
@@ -223,8 +322,18 @@ export const webChart: Responder = (call, state) => {
           ],
         },
         gemini: {
+          suggestions: [
+            {
+              paragraph: "p2",
+              op: "replace",
+              kind: "missing",
+              text: MARCH,
+              reason: "Falta la cifra de marzo.",
+              sources: [],
+            },
+          ],
           patches: [
-            patch("data", "2026-02", "2.5", "Una consultora mide otra cifra para febrero.", {
+            patch("c1", "data", "2026-02", "2.5", "Una consultora mide otra cifra para febrero.", {
               kind: "wrong",
               sources: [sourceId(state, "https://privada.example/febrero")],
               quote: "febrero 2,5%",
@@ -240,133 +349,42 @@ export const webChart: Responder = (call, state) => {
       };
       return ok(call, R1[seat]);
     }
-    case "chart_round2": {
+    case "round2": {
+      const none = { suggestions: [], patches: [] };
       const R2: Record<ModelId, unknown> = {
-        grok: { votes: [], patches: [], checks: [check("2026-02", "v2", "fails")] },
+        grok: {
+          ...none,
+          votes: [vote("t3", "s3"), vote("t4", "s4")],
+          checks: [check("2026-02", "v2", "fails")],
+        },
         claude: {
-          votes: [vote("t1", "s1"), vote("t2", "s2")],
-          patches: [],
+          ...none,
+          votes: [vote("t1", "s1"), vote("t2", "s2"), vote("t3", "s3"), vote("t4", "s4")],
           checks: [check("2026-02", "v2", "fails")],
         },
         openai: {
-          votes: [vote("t1", "s1")],
-          patches: [],
+          ...none,
+          votes: [vote("t1", "s1"), vote("t4", "s4")],
           checks: [check("2026-02", "v2", "fails")],
         },
         gemini: {
+          ...none,
           votes: [vote("t1", "keep"), vote("t2", "keep")],
-          patches: [],
           checks: [check("2026-02", "v1", "holds")],
         },
       };
       return ok(call, R2[seat]);
     }
-    case "chart_round3":
+    case "round3":
       return ok(call, { votes: [], checks: [] });
+    case "editor":
+      return ok(call, {
+        paragraphs: [{ id: "p1", text: "Durante 2026 la inflación mensual se moderó." }],
+      });
+    case "editor_check":
+      return ok(call, { checks: [{ id: "p1", verdict: "same" }] });
     case "moments":
       return ok(call, { sentences: [`Momento ${n}.`] });
-    default:
-      return null;
-  }
-};
-
-// ---------------------------------------------------------------------------------------------
-// User data
-
-export const SALES_CSV = [
-  "region;mes;ventas",
-  "Norte;2026-01;100",
-  "Norte;2026-02;150",
-  "Sur;2026-01;80",
-  'Sur;2026-02;"95,5"',
-  "Oeste;2026-01;40",
-  "Oeste;2026-02;",
-].join("\n");
-
-export const SALES = parseCsv(SALES_CSV);
-
-export const SUM_BY_REGION =
-  '[{"aggregate":[{"op":"sum","field":"ventas","as":"total"}],"groupby":["region"]}]';
-
-export const userChart: Responder = (call) => {
-  const [, , seat] = call.key.split(":") as [string, string, ModelId];
-  switch (call.kind) {
-    case "render":
-      return fakeRender(call);
-    case "brief_user":
-      return ok(
-        call,
-        seat === "gemini"
-          ? {
-              question: "¿Cómo cambian las ventas por mes?",
-              dimension: "mes",
-              measures: ["ventas", "inventada"],
-              mark: "line",
-              transform:
-                '[{"lookup":"region","from":{"data":{"values":[{"region":"Norte","ventas":999}]},"key":"region"}}]',
-            }
-          : {
-              question: "¿Cuánto vendió cada región?",
-              dimension: "region",
-              measures: ["ventas"],
-              mark: "bar",
-              transform: SUM_BY_REGION,
-            },
-      );
-    case "chart_spec":
-      // a spec that types the data itself: refused, the plain chart of code is used
-      return ok(call, {
-        spec: JSON.stringify({
-          data: { values: [{ region: "Norte", total: 1000 }] },
-          mark: "bar",
-          encoding: { x: { field: "region" }, y: { field: "total" } },
-        }),
-        title: "Ventas por región",
-        caption: "El Norte vende más.",
-      });
-    case "chart_round1": {
-      const R1: Record<ModelId, unknown> = {
-        grok: {
-          patches: [patch("data", "r1", "1000", "El Norte vendió más.", { kind: "wrong" })],
-          checks: [],
-        },
-        claude: {
-          patches: [
-            patch(
-              "encoding",
-              "encoding.y",
-              '{"datum":999,"type":"quantitative"}',
-              "Falta una referencia.",
-            ),
-          ],
-          checks: [],
-        },
-        openai: {
-          patches: [
-            patch(
-              "encoding",
-              "encoding.y",
-              '{"field":"total","type":"quantitative","title":"Ventas totales"}',
-              "El eje no dice que es la suma.",
-            ),
-          ],
-          checks: [],
-        },
-        gemini: { patches: [], checks: [] },
-      };
-      return ok(call, R1[seat]);
-    }
-    case "chart_round2": {
-      const R2: Record<ModelId, unknown> = {
-        grok: { votes: [vote("t1", "s1")], patches: [], checks: [] },
-        claude: { votes: [vote("t1", "s1")], patches: [], checks: [] },
-        openai: { votes: [], patches: [], checks: [] },
-        gemini: { votes: [vote("t1", "keep")], patches: [], checks: [] },
-      };
-      return ok(call, R2[seat]);
-    }
-    case "moments":
-      return ok(call, { sentences: ["Momento."] });
     default:
       return null;
   }

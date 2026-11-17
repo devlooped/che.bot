@@ -17,7 +17,6 @@ export type ApiErrorKind =
   | "not_found"
   | "invalid"
   | "cannot_rerun"
-  | "bad_file"
   | "network"
   | "other";
 
@@ -28,7 +27,7 @@ export class ApiError extends Error {
     message: string,
     /** The refusal of each field, as the API words it (`errors` of a 400 of the admin routes). */
     readonly fields: Record<string, string> = {},
-    /** Why the API refused, when it says (`reason`: "daily_cap", or "csv_<CsvError>" for a file). */
+    /** Why the API refused, when it says (`reason`: "daily_cap"). */
     readonly reason: string | null = null,
   ) {
     super(message);
@@ -68,12 +67,9 @@ export interface RunSummary {
   failure: FailureReason | null;
   /** The caller owns the run: the page offers to pay, or to run a failed question again. */
   mine: boolean;
-  /** A chart run: of data from the web, or of the user's own table; null for a text answer. */
-  chart: "web" | "user" | null;
+  /** How many charts the answer has (0 before they are decided, or when it has none). */
+  charts: number;
 }
-
-/** What to ask for besides the question: a chart of data from the web, or of the user's CSV. */
-export type ChartRequest = { csv: string } | Record<string, never>;
 
 /** A row of GET /api/me/runs. */
 export interface MyRun {
@@ -153,7 +149,6 @@ function kindOf(status: number, path: string, body: ErrorBody): ApiErrorKind {
   if (status === 429) return "too_many";
   if (status === 413) return "too_long";
   if (status === 503 && body.reason === "daily_cap") return "daily_limit";
-  if (status === 400 && body.reason?.startsWith("csv_")) return "bad_file";
   if (status === 400 && /at most/i.test(body.error ?? "")) return "too_long";
   if (status === 400 && /write a question/i.test(body.error ?? "")) return "empty";
   if (status === 400 && body.errors) return "invalid";
@@ -184,12 +179,9 @@ export function createApi(base = "") {
   return {
     /** The signed-in user, or null. */
     me: () => call<AuthUser | null>("/api/me"),
-    /** A quote for a question; with `chart`, for its answer as a chart. */
-    ask: (question: string, chart: ChartRequest | null = null) =>
-      call<Quote>("/api/runs", {
-        method: "POST",
-        body: JSON.stringify(chart ? { question, chart } : { question }),
-      }),
+    /** A quote for a question. */
+    ask: (question: string) =>
+      call<Quote>("/api/runs", { method: "POST", body: JSON.stringify({ question }) }),
     pay: (runId: string) => call<RunSummary>(`/api/runs/${runId}/pay`, { method: "POST" }),
     /** The free rerun of a paid run that failed. */
     rerun: (runId: string) => call<RunSummary>(`/api/runs/${runId}/rerun`, { method: "POST" }),

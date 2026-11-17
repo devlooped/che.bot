@@ -2,6 +2,7 @@ import { MODELS } from "@chebot/protocol";
 import { useEffect, useRef, useState } from "react";
 import { t } from "../i18n/index.ts";
 import type { DocumentView, ParagraphView } from "../view/derive.ts";
+import { ChartBlock } from "./ChartDocument.tsx";
 import { DiscussionSheet } from "./Discussion.tsx";
 import { Support, Votes, WithMarks } from "./ModelMark.tsx";
 import { Notes } from "./RunDetails.tsx";
@@ -37,6 +38,10 @@ function Dissent({ paragraph }: { paragraph: ParagraphView }) {
   );
 }
 
+/**
+ * The answer: its paragraphs, with the margin marks of what was not unanimous or was discussed, and
+ * the charts the models drew, each in its place among them.
+ */
 export function AnswerDocument({
   doc,
   final,
@@ -79,53 +84,58 @@ export function AnswerDocument({
       <Notes notes={notes} />
       <p className="legend">{t.answer.legend}</p>
       <div className="doc">
-        {doc.paragraphs.map((p) => (
-          <div
-            key={p.id}
-            className={`para para-${p.status}${p.marked ? " para-marked" : ""}`}
-            data-testid="paragraph"
-            data-status={p.status}
-          >
-            <div className="gutter">
-              {p.marked && (
-                <button
-                  type="button"
-                  className={`mark mark-${p.status}`}
-                  aria-haspopup="dialog"
-                  aria-expanded={open === p.id}
-                  aria-label={t.answer.markLabel(
-                    p.tally.for,
-                    p.tally.of,
-                    t.answer.statusName[p.status],
-                  )}
-                  data-testid="mark"
-                  ref={(el) => {
-                    if (el) marks.current.set(p.id, el);
-                    else marks.current.delete(p.id);
-                  }}
-                  onClick={() => setOpen(p.id)}
+        {doc.blocks.map((block) => {
+          if (block.kind === "chart")
+            return <ChartBlock key={block.chart.id} chart={block.chart} />;
+          const p = block.paragraph;
+          return (
+            <div
+              key={p.id}
+              className={`para para-${p.status}${p.marked ? " para-marked" : ""}`}
+              data-testid="paragraph"
+              data-status={p.status}
+            >
+              <div className="gutter">
+                {p.marked && (
+                  <button
+                    type="button"
+                    className={`mark mark-${p.status}`}
+                    aria-haspopup="dialog"
+                    aria-expanded={open === p.id}
+                    aria-label={t.answer.markLabel(
+                      p.tally.for,
+                      p.tally.of,
+                      t.answer.statusName[p.status],
+                    )}
+                    data-testid="mark"
+                    ref={(el) => {
+                      if (el) marks.current.set(p.id, el);
+                      else marks.current.delete(p.id);
+                    }}
+                    onClick={() => setOpen(p.id)}
+                  >
+                    <Support support={p.support} />
+                    <span className="badge">{t.answer.badge(p.tally.for, p.tally.of)}</span>
+                  </button>
+                )}
+              </div>
+              <div className="para-body">
+                <p
+                  key={`${p.id}:${p.text}`}
+                  className={isNew(`${p.id}:${p.text}`) ? "para-text para-new" : "para-text"}
                 >
-                  <Support support={p.support} />
-                  <span className="badge">{t.answer.badge(p.tally.for, p.tally.of)}</span>
-                </button>
-              )}
+                  {p.text}
+                  {p.sources.map((n) => (
+                    <sup key={n} className="cite">
+                      <a href={`#src-${n}`}>{n}</a>
+                    </sup>
+                  ))}
+                </p>
+                <Dissent paragraph={p} />
+              </div>
             </div>
-            <div className="para-body">
-              <p
-                key={`${p.id}:${p.text}`}
-                className={isNew(`${p.id}:${p.text}`) ? "para-text para-new" : "para-text"}
-              >
-                {p.text}
-                {p.sources.map((n) => (
-                  <sup key={n} className="cite">
-                    <a href={`#src-${n}`}>{n}</a>
-                  </sup>
-                ))}
-              </p>
-              <Dissent paragraph={p} />
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       {opened && (
         // Keyed by paragraph: another paragraph opens its own sheet, never the closing one.

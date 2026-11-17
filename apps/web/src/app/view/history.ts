@@ -1,9 +1,10 @@
 import { MODELS, type ModelId, type RunView, type Snapshot } from "@chebot/protocol";
 import { t } from "../i18n/index.ts";
+import { type ChartChange, chartChangesOf, chartIdsOf } from "./chart.ts";
 
-// The history of the text (step 32): every stored version of the document, with what each step
-// changed, computed from the replayed view (`snapshots` and `versions`). No text here except
-// through `t`.
+// The history of the answer (steps 32 and 41): every stored version of the document, with what each
+// step changed in its text and in its charts, computed from the replayed view (`snapshots` and
+// `versions`). No text here except through `t`.
 
 /** A piece of a paragraph: as it was, entered in this step, or left in this step. */
 export interface Piece {
@@ -20,12 +21,21 @@ export interface HistoryParagraph {
   by: ModelId | null;
 }
 
+/** A chart at a step: where it stands among the paragraphs, and what the step changed in it. */
+export interface HistoryChart {
+  id: string;
+  /** The paragraph it follows; null: before the first one. */
+  after: string | null;
+  changes: ChartChange[];
+}
+
 export interface HistoryStep {
   version: number;
   label: string;
   /** What this step did, in one sentence. */
   what: string;
   paragraphs: HistoryParagraph[];
+  charts: HistoryChart[];
 }
 
 /**
@@ -113,10 +123,23 @@ function authorsOf(view: RunView, threads: readonly string[], snapshot: Snapshot
   return { byBlock, authors: MODELS.filter((m) => authors.includes(m)) };
 }
 
-function labelOf(cause: RunView["versions"][number]): string {
+function labelOf(cause: RunView["versions"][number], rows: number): string {
   if (cause.cause === "merge") return t.history.steps.merge;
   if (cause.cause === "edit") return t.history.steps.edit;
+  if (cause.cause === "render") return t.chart.history.steps.render;
+  // a version made only by the sources of the rows of the charts
+  if (cause.threads.length === 0 && rows > 0) return t.chart.history.steps.sources;
   return t.history.steps.round(cause.round);
+}
+
+/** The charts of a version, each after the paragraph before it, with what the step changed in it. */
+function chartsOf(view: RunView, snapshot: Snapshot, index: number): HistoryChart[] {
+  return chartIdsOf(snapshot).map((id) => {
+    const at = snapshot.order.indexOf(id);
+    const after =
+      snapshot.order.slice(0, at).findLast((b) => snapshot.blocks[b]?.kind === "paragraph") ?? null;
+    return { id, after, changes: chartChangesOf(view, id, index) };
+  });
 }
 
 /**
@@ -158,12 +181,29 @@ export function historyOf(view: RunView): HistoryStep[] {
         by: byBlock.get(id) ?? null,
       });
     }
+    const charts = chartsOf(view, snapshot, index);
+    const rows = charts.flatMap((c) => c.changes).filter((c) => c.kind === "row").length;
+    const h = t.chart.history.what;
     const what =
       cause.cause === "merge"
         ? t.history.what.merge(view.drafts.length || 4)
         : cause.cause === "edit"
           ? t.history.what.edit
-          : t.history.what.round(t.modelNames(authors), cause.threads.length);
-    return { version: snapshot.version, label: labelOf(cause), what, paragraphs };
+          : cause.cause === "render"
+            ? h.render
+            : cause.threads.length === 0
+              ? rows > 0
+                ? h.sources(rows)
+                : h.none
+              : rows > 0
+                ? h.both(rows, t.modelNames(authors), cause.threads.length)
+                : t.history.what.round(t.modelNames(authors), cause.threads.length);
+    return {
+      version: snapshot.version,
+      label: labelOf(cause, rows),
+      what,
+      paragraphs,
+      charts,
+    };
   });
 }

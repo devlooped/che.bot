@@ -1,10 +1,10 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import { esAR as t } from "../src/app/i18n/es-AR.ts";
-import { CHART_QUESTION, SAMPLE_CSV, UPLOAD_QUESTION } from "../src/local/chart-scenario.ts";
+import { CHART_QUESTION } from "../src/local/chart-scenario.ts";
 import { MARKERS, SCENARIO_QUESTION } from "../src/local/scenario.ts";
 import { BASE_URL } from "./base-url.ts";
 
-export { CHART_QUESTION, MARKERS, SAMPLE_CSV, SCENARIO_QUESTION, t, UPLOAD_QUESTION };
+export { CHART_QUESTION, MARKERS, SCENARIO_QUESTION, t };
 
 /** The scripted question, made unique (a run of the local mode keys some fakes by the question). */
 export const uniqueQuestion = (marker = "") =>
@@ -51,13 +51,12 @@ export async function ask(page: Page, question = SCENARIO_QUESTION): Promise<str
 const admins = new WeakMap<APIRequestContext, Promise<void>>();
 
 /**
- * An admin run through the API, to its end: no payment. `chart`: a chart run (see POST /api/runs).
- * `request` is signed in as an admin of its own.
+ * An admin run through the API, to its end: no payment. `request` is signed in as an admin of its
+ * own.
  */
 export async function finishedRun(
   request: APIRequestContext,
   question = SCENARIO_QUESTION,
-  chart: { csv?: string } | null = null,
 ): Promise<string> {
   let admin = admins.get(request);
   if (!admin) {
@@ -67,7 +66,7 @@ export async function finishedRun(
   await admin;
   const quote = await request.post("/api/runs", {
     headers: fromApp,
-    data: chart ? { question, chart } : { question },
+    data: { question },
   });
   const { runId } = (await quote.json()) as { runId: string };
   await request.post(`/api/runs/${runId}/pay`, { headers: fromApp });

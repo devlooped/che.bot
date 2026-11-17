@@ -1,4 +1,4 @@
-import { chartSpec, parseCsv } from "@chebot/protocol";
+import { chartSpec, type Row } from "@chebot/protocol";
 import { expect, test } from "vitest";
 import { renderSpec, renderSpecs } from "./render.ts";
 
@@ -64,45 +64,46 @@ test("a spec that does not compile, does not run or draws nothing fails with its
   expect(out.results[2]?.error).toBe("The chart draws nothing.");
 });
 
-test("user data: every drawn number is the orchestrator's computation over the uploaded rows", async () => {
-  const csv =
-    'region;mes;ventas\nNorte;2026-01;100\nNorte;2026-02;150\nSur;2026-01;80\nSur;2026-02;"95,5"\nOeste;2026-01;40\nOeste;2026-02;';
-  const data = parseCsv(csv);
+test("a chart draws the values of its rows, and an unsettled row as the range of its values", async () => {
+  const row = (key: string, value: number, extra: Partial<Row> = {}): Row => ({
+    key,
+    values: { value },
+    source: "src1",
+    quote: "",
+    support: ["grok", "claude"],
+    status: "agreed",
+    alternatives: [],
+    ...extra,
+  });
   const spec = chartSpec({
     kind: "chart",
     id: "c1",
-    brief: { question: "q", measures: ["ventas"], dimensions: ["region"] },
+    brief: { question: "q", measures: ["Inflación (%)"], dimensions: ["Mes"] },
     data: {
-      origin: "user",
-      columns: data.columns,
-      rows: data.rows.map((values, i) => ({
-        key: `r${i + 1}`,
-        values,
-        source: "upload",
-        quote: "",
-        support: [],
-        status: "upload",
-        alternatives: [],
-      })),
+      rows: [
+        row("2026-01", 2.2),
+        row("2026-02", 3.5, {
+          status: "unsettled",
+          alternatives: [
+            { values: { value: 3.7 }, source: "src2", quote: "", support: ["openai"] },
+          ],
+        }),
+      ],
     },
-    transform: [{ aggregate: [{ op: "sum", field: "ventas", as: "total" }], groupby: ["region"] }],
+    transform: [],
     mark: "bar",
     encoding: {
-      x: { field: "region", type: "nominal" },
-      y: { field: "total", type: "quantitative" },
+      x: { field: "key", type: "nominal" },
+      y: { field: "value", type: "quantitative" },
     },
-    title: "Ventas",
+    title: "Inflación",
     caption: "",
   });
   const r = await renderSpec(spec);
-  // an independent computation, straight from the CSV text
-  const expected = new Map<string, number>();
-  for (const line of csv.split("\n").slice(1)) {
-    const [region, , raw] = line.split(";") as [string, string, string];
-    const v = raw === "" ? 0 : Number(raw.replace(/"/g, "").replace(",", "."));
-    expected.set(region, (expected.get(region) ?? 0) + v);
-  }
-  expect(Object.fromEntries(r.marks.map((m) => [m.region, m.total]))).toEqual(
-    Object.fromEntries(expected),
+  expect(r.marks).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ key: "2026-01", value: 2.2 }),
+      expect.objectContaining({ key: "2026-02", low: 3.5, high: 3.7 }),
+    ]),
   );
 });

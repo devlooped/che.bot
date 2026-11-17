@@ -76,11 +76,6 @@ export function Checkout({
           {t.quote.yourQuestion(t.quote.classes[quote.class])}
         </h2>
         <p className="checkout-why">{t.quote.classWhy[quote.class]}</p>
-        {summary.chart && (
-          <p className="checkout-why" data-testid="chart-request">
-            {t.quote.chart[summary.chart]}
-          </p>
-        )}
         <p className="checkout-price" data-testid="price">
           {price}
         </p>

@@ -1,10 +1,7 @@
-import { parseNumber } from "./csv.ts";
 import {
   type CellValue,
   type Chart,
   type ChartLayer,
-  type ChartOrigin,
-  type Column,
   MODELS,
   type ModelId,
   type Row,
@@ -15,7 +12,7 @@ import { clone } from "./util.ts";
 // model may change, and the Vega-Lite spec composed from the layers. Pure: the reducer, the
 // renderer and the browser all compose the same spec from the same block.
 
-/** The fields of a web dataset: one dimension and one measure; `low` and `high` draw a range. */
+/** The fields of the data of a chart: one dimension and one measure; `low` and `high` draw a range. */
 export const WEB_FIELDS = { key: "key", value: "value", low: "low", high: "high" } as const;
 
 /** The size of the rendered chart; the browser may draw it wider. */
@@ -183,7 +180,6 @@ export function carriesData(value: unknown): boolean {
 }
 
 export type PatchDropReason =
-  | "user_data" // a patch on the data layer of a chart from user data
   | "inline_data" // a value that carries data
   | "theme_only" // nothing left once the theme is stripped
   | "unknown_path" // a path that is not allowed in the layer
@@ -213,8 +209,8 @@ export function splitPath(path: string): string[] {
 }
 
 /**
- * The checks of a patch on a layer of a chart (not the data layer of web charts, which is settled
- * by source: see `checkDataPatch`). Allowed paths per layer:
+ * The checks of a patch on a layer of a chart (not the data layer, which is settled by source: see
+ * `checkDataPatch`). Allowed paths per layer:
  * - title, caption: "" (the whole text);
  * - transform: "" (the whole list) or "<index>" (one transform; the index after the last adds one);
  * - encoding: "mark", "encoding", or "encoding.<channel>[.<property>...]" (null removes it).
@@ -226,11 +222,8 @@ export function checkPatch(
   patch: { layer: ChartLayer; path: string; value: string },
 ): CheckedPatch {
   const fail = (why: PatchDropReason, detail: string): CheckedPatch => ({ ok: false, why, detail });
-  if (patch.layer === "data") {
-    return chart.data.origin === "user"
-      ? fail("user_data", "The data of an upload is not the models' to change.")
-      : fail("unknown_path", "A data patch names a row and a source (see checkDataPatch).");
-  }
+  if (patch.layer === "data")
+    return fail("unknown_path", "A data patch names a row and a source (see checkDataPatch).");
   const raw = readValue(patch.value);
   if (carriesData(raw)) return fail("inline_data", "The value carries data.");
   const path = splitPath(patch.path);
@@ -260,7 +253,7 @@ export function checkPatch(
     if (!Array.isArray(list)) return fail("invalid_value", "transform is a list.");
     const stripResult = stripTheme(list, ["transform"]);
     stripped = stripResult.stripped;
-    const problem = transformProblem(stripResult.value as unknown[], chart);
+    const problem = transformProblem(stripResult.value as unknown[]);
     if (problem) return fail("transform_not_allowed", problem);
     value = index === null ? stripResult.value : (stripResult.value as unknown[])[0];
   } else {
@@ -307,11 +300,8 @@ function isEmpty(value: unknown): boolean {
 }
 
 /** Why a list of transforms is not allowed, or null. */
-export function transformProblem(
-  list: readonly unknown[],
-  chart: Pick<Chart, "data">,
-): string | null {
-  const columns = new Set(dataFields(chart.data.origin, chart.data.columns));
+export function transformProblem(list: readonly unknown[]): string | null {
+  const columns = new Set<string>(Object.values(WEB_FIELDS));
   for (const t of list) {
     if (t === null || typeof t !== "object" || Array.isArray(t)) return "A transform is an object.";
     const op = TRANSFORMS.find((name) => name in (t as object));
@@ -351,11 +341,6 @@ export function transformFields(list: readonly unknown[]): { names: Set<string>;
     }
   }
   return { names, open };
-}
-
-/** The fields of the dataset a spec sees. */
-export function dataFields(origin: ChartOrigin, columns: readonly Column[]): string[] {
-  return origin === "web" ? Object.values(WEB_FIELDS) : columns.map((c) => c.name);
 }
 
 /** The JSON value of a layer: what a patch changes and what a thread locks. */
@@ -415,6 +400,46 @@ function setPath(target: Record<string, unknown>, keys: readonly string[], value
 
 // ---------------------------------------------------------------------------------------------
 // Numbers of the web: what a value is, when two values are the same, what a quote states.
+
+/**
+ * Reads a number written by a person or a page: "2.7", "2,7", "1.234.567", "1,234,567",
+ * "1 234 567", "-3,5 %", "US$ 12". A single separator followed by exactly 3 digits is a thousands
+ * separator when the other separator does not appear ("1.234" is 1234, "1,5" is 1.5). Null when
+ * the text is not one number.
+ */
+export function parseNumber(text: string): number | null {
+  let t = text
+    .trim()
+    .replace(/[   ]/g, " ")
+    .replace(/^(US\$|\$|€|£|ARS|USD)\s*/i, "")
+    .replace(/\s*(%|‰)$/, "")
+    .replace(/−/g, "-");
+  if (!/^[-+]?\d[\d.,\s]*$/.test(t)) return null;
+  t = t.replace(/\s(?=\d{3}\b)/g, "");
+  if (/\s/.test(t)) return null;
+  const dots = (t.match(/\./g) ?? []).length;
+  const commas = (t.match(/,/g) ?? []).length;
+  if (dots > 0 && commas > 0) {
+    const decimal = t.lastIndexOf(".") > t.lastIndexOf(",") ? "." : ",";
+    const thousands = decimal === "." ? "," : ".";
+    if ((t.match(new RegExp(`\\${decimal}`, "g")) ?? []).length > 1) return null;
+    t = t.split(thousands).join("").replace(decimal, ".");
+  } else if (dots + commas > 1) {
+    const sep = dots > 0 ? "." : ",";
+    if (!new RegExp(`^[-+]?\\d{1,3}(\\${sep}\\d{3})+$`).test(t)) return null;
+    t = t.split(sep).join("");
+  } else if (dots + commas === 1) {
+    const sep = dots > 0 ? "." : ",";
+    const [whole, frac] = t.split(sep) as [string, string];
+    if (frac.length === 3 && /^[-+]?\d{1,3}$/.test(whole) && sep === ".") {
+      // "1.234": a thousands separator in Spanish, a decimal in English. A dot followed by exactly
+      // three digits is read as thousands only when the whole part is not 0.
+      t = whole.replace(/^[-+]?0$/, "") === "" ? `${whole}.${frac}` : `${whole}${frac}`;
+    } else t = `${whole}.${frac}`;
+  }
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
 
 /** A value as a model writes it: digits, a dot for decimals; also "2,7" and "2.7 %". Strict. */
 export function readModelNumber(text: string): number | null {
@@ -508,9 +533,8 @@ export function temporalKeys(rows: readonly Row[]): boolean {
   return rows.length > 0 && rows.every((r) => /^\d{4}(-\d{2}(-\d{2})?)?$/.test(r.key));
 }
 
-/** The rows a spec draws: web rows as { key, value, low, high, source }, uploaded rows as they are. */
+/** The rows a spec draws, as { key, value, low, high, source }. */
 export function dataValues(chart: Chart): Record<string, CellValue>[] {
-  if (chart.data.origin === "user") return chart.data.rows.map((r) => ({ ...r.values }));
   return chart.data.rows.map((r) => {
     const values = [r.values.value, ...r.alternatives.map((a) => a.values.value)].filter(
       (v): v is number => typeof v === "number",
@@ -527,7 +551,7 @@ export function dataValues(chart: Chart): Record<string, CellValue>[] {
 }
 
 /**
- * The full Vega-Lite spec of a chart: its data, its layers and the app's theme. Web rows whose value
+ * The full Vega-Lite spec of a chart: its data, its layers and the app's theme. Rows whose value
  * stayed unsettled have no value and a `low`-`high` range, drawn by a rule over the dimension.
  */
 export function chartSpec(
@@ -536,7 +560,7 @@ export function chartSpec(
 ): Record<string, unknown> {
   const values = dataValues(chart);
   const main = { mark: chart.mark, encoding: clone(chart.encoding) };
-  const ranges = chart.data.origin === "web" && values.some((v) => v.low !== null);
+  const ranges = values.some((v) => v.low !== null);
   const spec: Record<string, unknown> = {
     $schema: "https://vega.github.io/schema/vega-lite/v6.json",
     width: CHART_SIZE.width,
@@ -573,10 +597,7 @@ function rangeLayer(encoding: Record<string, unknown>): Record<string, unknown> 
  * its first layer), with the theme stripped. A spec that carries data is refused; so are a mark,
  * channels or transforms that are not allowed.
  */
-export function layersFromSpec(
-  text: string,
-  chart: Chart,
-):
+export function layersFromSpec(text: string):
   | {
       ok: true;
       mark: string;
@@ -611,7 +632,7 @@ export function layersFromSpec(
     ["encoding"],
   );
   const tr = stripTheme(transform, ["transform"]);
-  const problem = transformProblem(tr.value as unknown[], chart);
+  const problem = transformProblem(tr.value as unknown[]);
   if (problem) return { ok: false, why: "transform_not_allowed", detail: problem };
   return {
     ok: true,
@@ -624,67 +645,31 @@ export function layersFromSpec(
 
 /**
  * The layers code writes when the writer's spec does not render (or there is none): the mark most
- * briefs chose, the dimension on x and the first measure (or the first output of an aggregate) on y.
+ * briefs chose, the dimension on x and the measure on y.
  */
 export function defaultLayers(
   chart: Chart,
   mark: string,
 ): { mark: string; encoding: Record<string, unknown> } {
-  if (chart.data.origin === "web") {
-    const temporal = temporalKeys(chart.data.rows);
-    return {
-      mark,
-      encoding: {
-        x: {
-          field: WEB_FIELDS.key,
-          type: temporal ? "temporal" : "nominal",
-          title: chart.brief.dimensions[0] ?? null,
-          ...(temporal ? {} : { sort: null }),
-        },
-        y: {
-          field: WEB_FIELDS.value,
-          type: "quantitative",
-          title: chart.brief.measures[0] ?? null,
-        },
-        tooltip: [
-          { field: WEB_FIELDS.key, type: temporal ? "temporal" : "nominal" },
-          { field: WEB_FIELDS.value, type: "quantitative" },
-        ],
-      },
-    };
-  }
-  const dim = chart.brief.dimensions[0] ?? chart.data.columns[0]?.name ?? "";
-  const aggregate = chart.transform.find(
-    (t): t is { aggregate: { as?: string }[] } =>
-      typeof t === "object" &&
-      t !== null &&
-      Array.isArray((t as { aggregate?: unknown }).aggregate),
-  );
-  const measure =
-    aggregate?.aggregate.find((a) => typeof a.as === "string")?.as ??
-    chart.brief.measures[0] ??
-    chart.data.columns.find((c) => c.type === "number")?.name ??
-    "";
-  const dimType = chart.data.columns.find((c) => c.name === dim)?.type;
-  // a second field the aggregate groups by is told apart by color (side by side for bars)
-  const group = (aggregate as { groupby?: unknown } | undefined)?.groupby;
-  const series = Array.isArray(group)
-    ? group.find((g) => typeof g === "string" && g !== dim)
-    : undefined;
+  const temporal = temporalKeys(chart.data.rows);
   return {
     mark,
     encoding: {
       x: {
-        field: dim,
-        type: dimType === "date" ? "temporal" : dimType === "number" ? "quantitative" : "nominal",
+        field: WEB_FIELDS.key,
+        type: temporal ? "temporal" : "nominal",
+        title: chart.brief.dimensions[0] ?? null,
+        ...(temporal ? {} : { sort: null }),
       },
-      y: { field: measure, type: "quantitative" },
-      ...(typeof series === "string"
-        ? {
-            color: { field: series, type: "nominal" },
-            ...(mark === "bar" ? { xOffset: { field: series, type: "nominal" } } : {}),
-          }
-        : {}),
+      y: {
+        field: WEB_FIELDS.value,
+        type: "quantitative",
+        title: chart.brief.measures[0] ?? null,
+      },
+      tooltip: [
+        { field: WEB_FIELDS.key, type: temporal ? "temporal" : "nominal" },
+        { field: WEB_FIELDS.value, type: "quantitative" },
+      ],
     },
   };
 }

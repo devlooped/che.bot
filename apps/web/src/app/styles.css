@@ -504,105 +504,6 @@ a.button {
   margin-top: -0.3rem;
 }
 
-/* Asking for a chart: a check, then where the data comes from, then the file. */
-.ask-chart {
-  display: grid;
-  gap: 0.45rem;
-  padding: 0.8rem 0.9rem;
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  background: var(--paper-raised);
-}
-
-.check {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.check input,
-.choice input {
-  width: 1.15rem;
-  height: 1.15rem;
-  margin: 0;
-  accent-color: var(--ink);
-  flex: none;
-}
-
-.ask-chart-options {
-  display: grid;
-  gap: 0.75rem;
-  padding-top: 0.5rem;
-  border-top: 1px dashed var(--rule);
-}
-
-.choices {
-  display: grid;
-  gap: 0.55rem;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  min-width: 0;
-}
-
-.choices-legend {
-  padding: 0;
-  margin-bottom: 0.35rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.choice {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.55rem;
-  cursor: pointer;
-}
-
-.choice input {
-  margin-top: 0.2rem;
-}
-
-.choice > span {
-  display: grid;
-}
-
-.choice-name {
-  font-weight: 600;
-}
-
-.file-field {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.file-pick {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 0.75rem;
-}
-
-/* The input stays in the page for the keyboard and screen readers; its label is the button. */
-.file-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  overflow: hidden;
-}
-
-.file-pick label {
-  cursor: pointer;
-}
-
-.file-input:focus-visible + label {
-  outline: 3px solid var(--accent);
-  outline-offset: 2px;
-}
-
 .signin-card {
   display: grid;
   gap: 0.9rem;
@@ -1132,7 +1033,13 @@ a.button {
   gap: 0.35rem;
 }
 
-/* Run: a chart (step 41) ------------------------------------------------------------------------ */
+/* Run: a chart of the answer, among its paragraphs (step 41) -------------------------------------- */
+
+/* A chart lines up with the text of the paragraphs, past their gutter. */
+.chart-block {
+  padding-left: calc(var(--gutter) + 0.85rem);
+  min-width: 0;
+}
 
 .chart-figure {
   display: grid;
@@ -1349,30 +1256,6 @@ a.button {
   color: var(--error);
 }
 
-.table-scroll {
-  overflow-x: auto;
-  max-width: 100%;
-}
-
-.chart-table-plain tbody tr {
-  border-top: 1px solid var(--rule);
-}
-
-.from-table {
-  display: grid;
-  gap: 0.35rem;
-  padding: 0.75rem 0.9rem;
-  border-left: 3px solid var(--ok);
-  background: var(--paper-raised);
-}
-
-.upload summary {
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.9rem;
-  padding: 0.35rem 0;
-}
-
 .layer-list {
   display: grid;
   gap: 0.5rem;
@@ -1478,7 +1361,7 @@ a.button {
     padding-right: 0.5rem;
   }
 
-  .chart-table:not(.chart-table-plain) thead {
+  .chart-table thead {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -1486,14 +1369,14 @@ a.button {
     clip-path: inset(50%);
   }
 
-  .chart-table:not(.chart-table-plain),
-  .chart-table:not(.chart-table-plain) tbody,
+  .chart-table,
+  .chart-table tbody,
   .note-line,
   .chart-table .note-line td {
     display: block;
   }
 
-  .chart-table:not(.chart-table-plain) .chart-row {
+  .chart-table .chart-row {
     display: grid;
     grid-template-columns: 1fr auto;
     border-top: 1px solid var(--rule);

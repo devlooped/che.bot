@@ -1,68 +1,63 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import {
   CHART_QUESTION,
   DONE,
   finishedRun,
   newUser,
-  SAMPLE_CSV,
+  SCENARIO_QUESTION,
   signIn,
   t,
-  UPLOAD_QUESTION,
 } from "./helpers.ts";
 
-// The chart view (step 41) against the scripted chart runs of the local mode
-// (src/local/chart-scenario.ts): web data with agreed rows, a row settled by its source, a range and
-// a lone value; and an upload whose numbers come from the table.
+// The charts of an answer (step 41) against the scripted runs of the local mode
+// (src/local/chart-scenario.ts): CHART_QUESTION answers with two paragraphs and two charts among
+// them. In the inflation chart, agreed rows, a row settled by its source, a range and a lone value;
+// the chart of the wages, every row agreed. Any other question answers with text alone.
 
 const unique = (question: string) => `${question} (${crypto.randomUUID().slice(0, 8)})`;
 
-/** Asks for a chart on the ask page, with the user's file when there is one. */
-async function askForChart(
-  page: Page,
-  question: string,
-  file: { name: string; csv: string } | null,
-) {
-  await page.goto("/");
-  await page.getByLabel(t.ask.label).fill(question);
-  await page.getByLabel(t.ask.chart.toggle).check();
-  if (file) {
-    await page.getByLabel(t.ask.chart.file).check();
-    await page.getByLabel(t.ask.chart.fileLabel).setInputFiles({
-      name: file.name,
-      mimeType: "text/csv",
-      buffer: Buffer.from(file.csv),
-    });
-  }
-}
+/** The chart `id` of the answer. */
+const chartOf = (page: Page, id: string) =>
+  page.locator(`[data-testid="chart-block"][data-chart="${id}"]`);
 
-/** Pays the quote shown and waits for the run to finish. */
-async function payAndFinish(page: Page) {
-  await page.getByRole("button", { name: /^Pagar/ }).click();
-  await page.getByRole("button", { name: t.local.pay }).click();
-  await expect(page.getByTestId("stage-line")).toHaveText(DONE, { timeout: 90_000 });
-  await expect(page.getByTestId("chart").locator("svg").first()).toBeVisible();
-}
+const row = (chart: Locator, label: string) =>
+  chart
+    .getByTestId("chart-row")
+    .filter({ has: chart.page().getByRole("rowheader", { name: label }) });
 
-const row = (page: Page, label: string) =>
-  page.getByTestId("chart-row").filter({ has: page.getByRole("rowheader", { name: label }) });
-
-test("ask for a chart of web data, pay, and read the finished chart with its sources and notes", async ({
+test("nothing to ask for: the drafts put charts in the answer, each in its place among the paragraphs", async ({
   page,
 }) => {
   await signIn(page, newUser());
-  await askForChart(page, unique(CHART_QUESTION), null);
+  await page.goto("/");
+  await expect(page.getByRole("checkbox")).toHaveCount(0);
+  await page.getByLabel(t.ask.label).fill(unique(CHART_QUESTION));
   await page.getByRole("button", { name: t.ask.submit }).click();
-  await expect(page.getByTestId("chart-request")).toHaveText(t.quote.chart.web);
-  await payAndFinish(page);
+  await page.getByRole("button", { name: /^Pagar/ }).click();
+  await page.getByRole("button", { name: t.local.pay }).click();
+  await expect(page.getByTestId("stage-line")).toHaveText(DONE, { timeout: 90_000 });
 
-  await expect(page.getByTestId("chart-title")).toHaveText(
+  // the paragraphs and the charts, in the order of the document
+  const blocks = page.locator(
+    '.doc > [data-testid="paragraph"], .doc > [data-testid="chart-block"]',
+  );
+  await expect(blocks).toHaveCount(4);
+  expect(
+    await blocks.evaluateAll((els) =>
+      els.map((e) => e.getAttribute("data-chart") ?? e.getAttribute("data-testid")),
+    ),
+  ).toEqual(["paragraph", "c1", "paragraph", "c2"]);
+
+  const inflation = chartOf(page, "c1");
+  await expect(inflation.getByTestId("chart").locator("svg").first()).toBeVisible();
+  await expect(inflation.getByTestId("chart-title")).toHaveText(
     "Inflación mensual en la Argentina, enero a junio de 2025",
   );
-  await expect(page.getByTestId("chart-caption")).toContainText("rango");
-  await expect(page.getByTestId("chart")).toHaveAttribute("aria-label", /^Gráfico: /);
+  await expect(inflation.getByTestId("chart-caption")).toContainText("rango");
+  await expect(inflation.getByTestId("chart")).toHaveAttribute("aria-label", /^Gráfico: /);
 
-  // every web-sourced row opens its citation
-  const rows = page.getByTestId("chart-row");
+  // every row opens its citation
+  const rows = inflation.getByTestId("chart-row");
   await expect(rows).toHaveCount(6);
   for (const r of await rows.all()) {
     await expect(r.locator(".row-source a")).toHaveAttribute("href", /^https:\/\//);
@@ -70,9 +65,9 @@ test("ask for a chart of web data, pay, and read the finished chart with its sou
   }
 
   // the corrected point: what it was, what it is, the source that settled it, who said what
-  const notes = page.getByTestId("row-note");
+  const notes = inflation.getByTestId("row-note");
   const march = notes.filter({ hasText: t.chart.note(1) });
-  await expect(row(page, "marzo de 2025")).toContainText(t.chart.kinds.corrected);
+  await expect(row(inflation, "marzo de 2025")).toContainText(t.chart.kinds.corrected);
   await expect(march).toContainText(t.chart.notes.corrected("3,3", "3,7"));
   await expect(march).toContainText(t.chart.notes.settledBy);
   await expect(march.getByRole("link", { name: /INDEC/ }).first()).toBeVisible();
@@ -84,7 +79,7 @@ test("ask for a chart of web data, pay, and read the finished chart with its sou
 
   // the disputed point: a range with both values and both sources
   const may = notes.filter({ hasText: t.chart.note(2) });
-  await expect(row(page, "mayo de 2025")).toContainText(t.chart.range("1,5", "1,9"));
+  await expect(row(inflation, "mayo de 2025")).toContainText(t.chart.range("1,5", "1,9"));
   await expect(may).toContainText(t.chart.notes.range("1,5", "1,9"));
   await expect(may.getByRole("link", { name: /Ecolatina/ })).toBeVisible();
   await expect(may.getByRole("link", { name: /Ciudad de Buenos Aires/ })).toBeVisible();
@@ -95,18 +90,29 @@ test("ask for a chart of web data, pay, and read the finished chart with its sou
   );
 
   // the bars stayed without agreement
-  await expect(page.getByTestId("dissent")).toContainText(t.chart.patch.mark("de barras"));
+  await expect(inflation.getByTestId("dissent")).toContainText(t.chart.patch.mark("de barras"));
+
+  // the chart of the wages: every row agreed, no note
+  const wages = chartOf(page, "c2");
+  await expect(wages.getByTestId("chart-row")).toHaveCount(3);
+  await expect(wages.getByTestId("row-note")).toHaveCount(0);
+
+  // the sources of the rows are listed once with those of the text
+  await expect(page.getByRole("link", { name: /RIPTE/ }).first()).toBeVisible();
 });
 
-test("a voted layer opens its discussion, and the history shows an earlier version", async ({
+test("a voted layer opens its discussion, and the history moves the charts with the text", async ({
   page,
   request,
 }) => {
-  const runId = await finishedRun(request, unique(CHART_QUESTION), {});
+  const runId = await finishedRun(request, unique(CHART_QUESTION));
   await page.goto(`/r/${runId}`);
   await expect(page.getByTestId("stage-line")).toHaveText(DONE);
 
-  await page.getByRole("button", { name: new RegExp(`^${t.chart.layers.names.title}`) }).click();
+  const inflation = chartOf(page, "c1");
+  await inflation
+    .getByRole("button", { name: new RegExp(`^${t.chart.layers.names.title}`) })
+    .click();
   const sheet = page.getByRole("dialog", { name: t.chart.layers.sheetTitle.title });
   await expect(sheet).toBeVisible();
   await expect(sheet.getByText(t.discussion.proposal("Claude", t.chart.patch.title))).toBeVisible();
@@ -114,56 +120,32 @@ test("a voted layer opens its discussion, and the history shows an earlier versi
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
 
-  await page.locator("summary", { hasText: t.chart.history.title }).click();
-  const step = page.getByTestId("history-chart");
+  await page.locator("summary", { hasText: t.history.title }).click();
+  const step = page.locator('[data-testid="history-chart"][data-chart="c1"]');
   await expect(page.getByTestId("history-label")).toContainText(t.history.steps.merge);
   await expect(step).toHaveAttribute("data-version", "1");
   await expect(step).toContainText("Inflación mensual de 2025");
   await expect(step.locator("svg").first()).toBeVisible();
+  await expect(page.getByTestId("history-chart")).toHaveCount(2);
+  await expect(page.getByTestId("history-paragraph")).toHaveCount(2);
   await page.getByRole("button", { name: t.history.next }).click();
   await expect(page.getByTestId("history-label")).toContainText(t.chart.history.steps.sources);
-  await expect(page.getByTestId("history-changes")).toContainText(
+  await expect(step.getByTestId("history-changes")).toContainText(
     t.chart.history.row.corrected("marzo de 2025", "3,3", "3,7"),
   );
   await page.getByRole("button", { name: t.history.next }).click();
-  await expect(page.getByTestId("history-changes")).toContainText(
+  await expect(step.getByTestId("history-changes")).toContainText(
     t.chart.history.layerBy(t.chart.layers.names.title, "Claude"),
   );
 });
 
-test("a chart of the user's table: the page says every number comes from the table", async ({
+test("a question whose drafts propose no chart answers with text alone", async ({
+  request,
   page,
 }) => {
-  await signIn(page, newUser());
-  await askForChart(page, unique(UPLOAD_QUESTION), { name: "ventas.csv", csv: SAMPLE_CSV });
-  await expect(page.getByText(t.ask.chart.fileReady("ventas.csv", 12, 3))).toBeVisible();
-  await page.getByRole("button", { name: t.ask.submit }).click();
-  await expect(page.getByTestId("chart-request")).toHaveText(t.quote.chart.user);
-  await payAndFinish(page);
-
-  const from = page.getByTestId("from-table");
-  await expect(from).toContainText(t.chart.user.fromTable);
-  await expect(from).toContainText(t.chart.user.calculation("la suma de «ventas» por «sucursal»"));
-  await expect(page.getByTestId("drawn-row")).toHaveCount(4);
-  await expect(page.getByTestId("drawn-row").first()).toContainText("4.514.750");
-  await expect(page.getByTestId("chart-row")).toHaveCount(0);
-});
-
-test("a file beyond the limits is refused in plain words, before anything is asked", async ({
-  page,
-}) => {
-  await signIn(page, newUser());
-  const rows = `a,b\n${"1,2\n".repeat(600)}`;
-  await askForChart(page, unique(UPLOAD_QUESTION), { name: "largo.csv", csv: rows });
-  await expect(page.getByTestId("file-error")).toHaveText(t.errors.file.too_many_rows as string);
-
-  await page.getByLabel(t.ask.chart.fileLabel).setInputFiles({
-    name: "pesado.csv",
-    mimeType: "text/csv",
-    buffer: Buffer.from(`texto\n${`${"x".repeat(150)}\n`.repeat(450)}`),
-  });
-  await expect(page.getByTestId("file-error")).toHaveText(t.errors.file.too_large as string);
-  await page.getByRole("button", { name: t.ask.submit }).click();
-  await expect(page.getByRole("alert").filter({ hasText: t.errors.file.too_large })).toHaveCount(2);
-  await expect(page).toHaveURL(/\/$/);
+  const runId = await finishedRun(request, unique(SCENARIO_QUESTION));
+  await page.goto(`/r/${runId}`);
+  await expect(page.getByTestId("stage-line")).toHaveText(DONE);
+  await expect(page.getByTestId("paragraph").first()).toBeVisible();
+  await expect(page.getByTestId("chart-block")).toHaveCount(0);
 });

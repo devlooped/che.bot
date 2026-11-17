@@ -1,10 +1,8 @@
 import {
-  type CellValue,
   type Chart,
   type ChartAnswer,
   type ChartAnswerRow,
   type ChartLayer,
-  type Column,
   type DissentNote,
   layerOf,
   MODELS,
@@ -22,20 +20,18 @@ import { browserSpec, type Datum, temporalFields, withLocalDates } from "../char
 import { t } from "../i18n/index.ts";
 import { type Discussion, discussionOf } from "./discussion.ts";
 
-// What the page of a chart run shows (step 41), from the replayed view and `selectChart`: the rows
-// with their sources and notes, the layers the models voted on and their discussions, the
-// calculation of an upload in plain words, and the steps of the history. No text here except
-// through `t`.
+// What the page shows of each chart of an answer (step 41), from the replayed view and
+// `selectChart`: the rows with their sources and notes, the layers the models voted on and their
+// discussions, and the changes of each step of the history. No text here except through `t`.
 
-/** How a web row ended, in the words of the table. */
+/** How a row ended, in the words of the table. */
 export type RowKind =
   | "agreed" // two models or more gave the value, each with a citation
   | "confirmed" // one value, its source checked and held up
   | "corrected" // values in dispute, settled by the source that held up
   | "range" // values in dispute, none held up: drawn as a range
   | "lone" // one model's value that no source confirmed (or not yet checked)
-  | "checking" // values in dispute, being checked
-  | "upload";
+  | "checking"; // values in dispute, being checked
 
 /** A value given for a row, with who gave it, its citation and how its check went. */
 export interface ValueView {
@@ -99,9 +95,10 @@ export interface ChartDissent extends DissentNote {
 }
 
 export interface ChartView {
+  /** The block of the chart in the document: c1, c2, c3. */
+  id: string;
   answer: ChartAnswer;
   chart: Chart;
-  origin: "web" | "user";
   title: string;
   caption: string;
   dimension: string;
@@ -111,10 +108,6 @@ export interface ChartView {
   notes: RowView[];
   layers: LayerView[];
   dissent: ChartDissent[];
-  /** The calculation of an upload in plain words. */
-  calculation: string;
-  /** The uploaded table, for a chart of the user's data. */
-  upload: { columns: Column[]; rows: Record<string, CellValue>[] } | null;
   /** The data set of the drawing (the dates of the axis as local times). */
   data: Datum[];
   /** The spec of the drawing at a height in pixels. */
@@ -154,14 +147,15 @@ export function cellText(value: unknown, temporal = false): string {
   return typeof value === "string" ? keyLabel(value) : String(value);
 }
 
-/** The chart block of a version of the document, or null. */
-export function chartBlock(snapshot: Snapshot | undefined): Chart | null {
-  if (!snapshot) return null;
-  for (const id of snapshot.order) {
-    const b = snapshot.blocks[id];
-    if (b?.kind === "chart") return b;
-  }
-  return null;
+/** The chart `id` of a version of the document, or null. */
+export function chartBlock(snapshot: Snapshot | undefined, id: string): Chart | null {
+  const b = snapshot?.blocks[id];
+  return b?.kind === "chart" ? b : null;
+}
+
+/** The ids of the charts of a version, in the order of the document. */
+export function chartIdsOf(snapshot: Snapshot | undefined): string[] {
+  return (snapshot?.order ?? []).filter((id) => snapshot?.blocks[id]?.kind === "chart");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -210,8 +204,6 @@ function valuesOf(row: ChartAnswerRow): ValueView[] {
 
 function kindOf(row: ChartAnswerRow, changed: boolean): RowKind {
   switch (row.status) {
-    case "upload":
-      return "upload";
     case "agreed":
       return "agreed";
     case "held":
@@ -278,7 +270,7 @@ function rowsOf(answer: ChartAnswer, first: Chart | null): RowView[] {
   });
 }
 
-/** The data set of a web chart: the fields of `chartSpec`, the note of a row and where it goes. */
+/** The data set of a chart: the fields of `chartSpec`, the note of a row and where it goes. */
 function webData(rows: readonly RowView[], chart: Chart): Datum[] {
   return rows.map((r) => {
     const range = r.kind === "range" ? ends(r.values) : null;
@@ -345,7 +337,7 @@ function transformText(step: unknown): string {
   return c.other;
 }
 
-/** A list of transforms in plain words: "la suma de «ventas» por «sucursal»". */
+/** A list of transforms in plain words: "la suma de «value» por «key»". */
 export function describeTransform(list: readonly unknown[]): string {
   if (list.length === 0) return t.chart.calc.none;
   return t.chart.calc.sequence(list.map(transformText));
@@ -448,61 +440,23 @@ function layersOf(view: RunView, chart: Chart, first: Chart | null): LayerView[]
   });
 }
 
-/** The fields the first layer draws, with their titles: the columns of the table of an upload. */
-export function drawnColumns(chart: Chart): { field: string; title: string; temporal: boolean }[] {
-  const out: { field: string; title: string; temporal: boolean }[] = [];
-  for (const channel of ["x", "y", "xOffset", "color", "theta", "column", "row", "size"]) {
-    const def = chart.encoding[channel] as
-      | {
-          field?: unknown;
-          aggregate?: unknown;
-          timeUnit?: unknown;
-          title?: unknown;
-          type?: unknown;
-        }
-      | undefined;
-    if (!def || typeof def.field !== "string") continue;
-    const prefix =
-      typeof def.aggregate === "string"
-        ? `${def.aggregate}_`
-        : typeof def.timeUnit === "string"
-          ? `${def.timeUnit}_`
-          : "";
-    const field = `${prefix}${def.field}`;
-    if (out.some((c) => c.field === field)) continue;
-    out.push({
-      field,
-      title: typeof def.title === "string" ? def.title : def.field,
-      temporal: def.type === "temporal",
-    });
-  }
-  return out;
-}
-
 // ---------------------------------------------------------------------------------------------
 // The chart of a version
 
 /**
- * What the page shows of the chart of a chart run, at its latest version or at `version` (the
+ * What the page shows of the chart `id` of an answer, at its latest version or at `version` (the
  * history). The discussions and the dissent describe the run as it stands. Null before the chart
- * exists, or for a text answer.
+ * exists.
  */
-export function chartViewOf(view: RunView, version?: number): ChartView | null {
-  const answer = selectChart(view, version);
+export function chartViewOf(view: RunView, id: string, version?: number): ChartView | null {
+  const answer = selectChart(view, id, version);
   if (!answer) return null;
   const snapshot = view.snapshots.find((s) => s.version === answer.version);
-  const chart = chartBlock(snapshot);
+  const chart = chartBlock(snapshot, id);
   if (!chart) return null;
-  const first = chartBlock(view.snapshots[0]);
-  const rows = answer.origin === "web" ? rowsOf(answer, first) : [];
-  const dates = temporalFields(chart.encoding);
-  const data =
-    answer.origin === "web"
-      ? withLocalDates(webData(rows, chart), dates)
-      : withLocalDates(
-          chart.data.rows.map((r) => ({ ...r.values })),
-          dates,
-        );
+  const first = chartBlock(view.snapshots[0], id);
+  const rows = rowsOf(answer, first);
+  const data = withLocalDates(webData(rows, chart), temporalFields(chart.encoding));
   const dissent = answer.dissent.flatMap((d): ChartDissent[] => {
     const thread = view.threads[d.thread];
     const layer = thread ? layerOfThread(thread) : null;
@@ -520,9 +474,9 @@ export function chartViewOf(view: RunView, version?: number): ChartView | null {
   });
   const title = chart.title || t.chart.untitled;
   return {
+    id,
     answer,
     chart,
-    origin: answer.origin,
     title,
     caption: chart.caption,
     dimension: chart.brief.dimensions[0] ?? "",
@@ -531,42 +485,36 @@ export function chartViewOf(view: RunView, version?: number): ChartView | null {
     notes: rows.filter((r) => r.note !== null),
     layers: layersOf(view, chart, first),
     dissent,
-    calculation: describeTransform(chart.transform),
-    upload:
-      answer.origin === "user"
-        ? { columns: chart.data.columns, rows: chart.data.rows.map((r) => ({ ...r.values })) }
-        : null,
     data,
     spec: (height) => browserSpec(chart, height),
     label: t.chart.label(title),
   };
 }
 
-/** The rows of the last version by how they ended: the stage line of a finished chart run. */
+/** The rows of the charts of the last version by how they ended: the stage line of a finished run. */
 export function chartCounts(view: RunView) {
-  const answer = selectChart(view);
-  const rows = answer ? rowsOf(answer, chartBlock(view.snapshots[0])) : [];
+  const ids = chartIdsOf(view.snapshots.at(-1));
+  const rows = ids.flatMap((id) => {
+    const answer = selectChart(view, id);
+    return answer ? rowsOf(answer, chartBlock(view.snapshots[0], id)) : [];
+  });
   const count = (...kinds: RowKind[]) => rows.filter((r) => kinds.includes(r.kind)).length;
   return {
-    origin: answer?.origin ?? "web",
+    charts: ids.length,
     rows: rows.length,
     agreed: count("agreed"),
     settled: count("corrected", "confirmed"),
     ranges: count("range"),
     lone: count("lone"),
-    dissent: new Set(answer?.dissent.map((d) => d.thread)).size,
   };
 }
 
-/** Points in discussion in a chart run: open discussions and rows being checked. */
-export function chartOpenPoints(view: RunView): number {
-  const threads = Object.values(view.threads).filter((th) => th.state === "open").length;
-  const disputes = Object.values(view.disputes).filter((d) => d.state === "open").length;
-  if (threads + disputes > 0) return threads + disputes;
-  const chart = chartBlock(view.snapshots.at(-1));
-  return (
-    chart?.data.rows.filter((r) => r.status === "single" || r.status === "disputed").length ?? 0
-  );
+/** The rows of the charts of the last version still to check against their sources. */
+export function rowsToCheck(view: RunView): number {
+  const last = view.snapshots.at(-1);
+  return chartIdsOf(last)
+    .flatMap((id) => chartBlock(last, id)?.data.rows ?? [])
+    .filter((r) => r.status === "single" || r.status === "disputed").length;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -575,13 +523,6 @@ export function chartOpenPoints(view: RunView): number {
 export type ChartChange =
   | { kind: "row"; text: string }
   | { kind: "layer"; name: string; by: ModelId | null; before: string; after: string };
-
-export interface ChartStep {
-  version: number;
-  label: string;
-  what: string;
-  changes: ChartChange[];
-}
 
 function rowValueText(chart: Chart, key: string): string {
   const row = chart.data.rows.find((r) => r.key === key);
@@ -595,7 +536,6 @@ function rowValueText(chart: Chart, key: string): string {
 }
 
 function rowChanges(before: Chart, after: Chart): string[] {
-  if (after.data.origin !== "web") return [];
   const out: string[] = [];
   const h = t.chart.history.row;
   for (const row of after.data.rows) {
@@ -626,67 +566,33 @@ function rowChanges(before: Chart, after: Chart): string[] {
 }
 
 /**
- * The steps of the chart, oldest first: the chart of the merged data, then each version after it
- * with what changed: the rows the sources settled, and the layers the votes changed, by whom.
+ * What a step of the history changed in the chart `id`: the rows the sources settled, and the
+ * layers the votes changed, by whom. Empty for the first version, or a chart the step left as it was.
  */
-export function chartHistoryOf(view: RunView): ChartStep[] {
-  const steps: ChartStep[] = [];
-  view.snapshots.forEach((snapshot, index) => {
-    const chart = chartBlock(snapshot);
-    if (!chart) return;
-    const cause = view.versions[index] ?? {
-      version: snapshot.version,
-      cause: index === 0 ? "merge" : "round",
-      threads: [],
-      round: null,
-    };
-    const before = index > 0 ? chartBlock(view.snapshots[index - 1]) : null;
-    const changes: ChartChange[] = [];
-    let rowsChanged = 0;
-    if (before) {
-      const rows = rowChanges(before, chart);
-      rowsChanged = rows.length;
-      changes.push(...rows.map((text) => ({ kind: "row" as const, text })));
-      for (const layer of VOTED) {
-        if (JSON.stringify(layerOf(before, layer)) === JSON.stringify(layerOf(chart, layer)))
-          continue;
-        const thread = cause.threads
-          .map((id) => view.threads[id])
-          .find((th) => th && layerOfThread(th) === layer && th.state === "accepted");
-        const by = thread?.winner ? (view.suggestions[thread.winner]?.author ?? null) : null;
-        changes.push({
-          kind: "layer",
-          name: t.chart.layers.names[layer],
-          by,
-          before: layerText(before, layer),
-          after: layerText(chart, layer),
-        });
-      }
-    }
-    const authors = MODELS.filter((m) => changes.some((c) => c.kind === "layer" && c.by === m));
-    const layerChanges = changes.filter((c) => c.kind === "layer").length;
-    const h = t.chart.history;
-    const label =
-      cause.cause === "merge"
-        ? t.history.steps.merge
-        : cause.cause === "render"
-          ? h.steps.render
-          : cause.round === null
-            ? h.steps.sources
-            : t.history.steps.round(cause.round);
-    const what =
-      cause.cause === "merge"
-        ? h.what.merge(view.briefs.length || 4)
-        : cause.cause === "render"
-          ? h.what.render
-          : rowsChanged > 0 && authors.length > 0
-            ? h.what.both(rowsChanged, t.modelNames(authors), layerChanges)
-            : rowsChanged > 0
-              ? h.what.sources(rowsChanged)
-              : authors.length > 0
-                ? t.history.what.round(t.modelNames(authors), layerChanges)
-                : h.what.none;
-    steps.push({ version: snapshot.version, label, what, changes });
-  });
-  return steps;
+export function chartChangesOf(view: RunView, id: string, index: number): ChartChange[] {
+  const chart = chartBlock(view.snapshots[index], id);
+  const before = index > 0 ? chartBlock(view.snapshots[index - 1], id) : null;
+  if (!chart || !before) return [];
+  const threads = view.versions[index]?.threads ?? [];
+  const changes: ChartChange[] = rowChanges(before, chart).map((text) => ({
+    kind: "row" as const,
+    text,
+  }));
+  for (const layer of VOTED) {
+    if (JSON.stringify(layerOf(before, layer)) === JSON.stringify(layerOf(chart, layer))) continue;
+    const thread = threads
+      .map((th) => view.threads[th])
+      .find(
+        (th) => th && th.block === id && layerOfThread(th) === layer && th.state === "accepted",
+      );
+    const by = thread?.winner ? (view.suggestions[thread.winner]?.author ?? null) : null;
+    changes.push({
+      kind: "layer",
+      name: t.chart.layers.names[layer],
+      by,
+      before: layerText(before, layer),
+      after: layerText(chart, layer),
+    });
+  }
+  return changes;
 }

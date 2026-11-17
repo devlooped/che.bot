@@ -1,15 +1,15 @@
-// The local mode only: the scripted panel of a chart run (step 41), played through the real
-// protocol and the real renderer whatever the question, when the run is asked for a chart. It has
-// every state of the chart view:
-// - web data: monthly inflation of the first half of 2025. January, February and April agreed;
-//   March disputed (two models cite a news estimate, one the statistics office) and settled by the
-//   source, so its value changes; May disputed and left as a range (neither source holds up); June
-//   from one model only, whose source the others do not find stating it. Round 1 proposes a title,
-//   a caption and bars instead of lines; round 2 accepts the title and the caption, and the bars end
-//   two against two (a dissent note: round 2 brings nothing new, so the rounds end there).
-// - user data: any CSV. The briefs read the columns from the prompt: three sum the first number
-//   column by the first text column, Gemini averages it. Round 1 proposes an axis title, a caption
-//   and the average; round 2 accepts the first two and rejects the average.
+// The local mode only: the scripted panel of CHART_QUESTION, whose answer has two charts among its
+// paragraphs, played through the real protocol and the real renderer. Every other question gets the
+// prose of scenario.ts, whose drafts propose no chart. It has every state of the chart view:
+// - c1, monthly inflation of the first half of 2025, proposed by the four drafts. January, February
+//   and April agreed; March disputed (two models cite a news estimate, one the statistics office) and
+//   settled by the source, so its value changes; May disputed and left as a range (neither source
+//   holds up); June from one model only, whose source the others do not find stating it. Round 1
+//   proposes a title, a caption and bars instead of lines; round 2 accepts the title and the
+//   caption, and the bars end two against two (a dissent note: round 2 brings nothing new, so the
+//   rounds end there).
+// - c2, monthly growth of registered wages, proposed by Grok and ChatGPT alike: every row agreed.
+// - Claude proposes a chart of the dollar that nobody else makes: it is declined.
 import type { ModelId } from "@chebot/protocol";
 import type { FakeOutcome, FoundSource, GenerateRequest } from "@chebot/providers";
 
@@ -58,10 +58,21 @@ const JUN_REM = src(
   "Los analistas que participan del REM esperan para junio una inflación de 1,6%.",
 );
 
+const RIPTE = src(
+  "https://www.argentina.gob.ar/trabajo/seguridadsocial/ripte",
+  "Remuneración imponible promedio de los trabajadores estables (RIPTE)",
+  "El RIPTE subió 2,0% en enero, 2,1% en febrero y 2,9% en marzo de 2025.",
+);
+const DOLAR = src(
+  "https://www.bcra.gob.ar/PublicacionesEstadisticas/Tipo_de_cambio",
+  "Tipo de cambio de referencia (BCRA)",
+  "El tipo de cambio de referencia subió 1,1% en enero de 2025.",
+);
+
 const FOUND: Record<ModelId, FoundSource[]> = {
-  grok: [ENE, FEB, MAR, ABR, MAY_CONSULTORA],
-  claude: [ENE, FEB, MAR_DIARIO, MAY_CABA],
-  openai: [ENE, FEB, MAR_DIARIO, ABR],
+  grok: [ENE, FEB, MAR, ABR, MAY_CONSULTORA, RIPTE],
+  claude: [ENE, FEB, MAR_DIARIO, MAY_CABA, DOLAR],
+  openai: [ENE, FEB, MAR_DIARIO, ABR, RIPTE],
   gemini: [ENE, JUN_REM],
 };
 
@@ -94,6 +105,48 @@ const ROWS: Record<ModelId, ReturnType<typeof row>[]> = {
   ],
   gemini: [row("Enero de 2025", "2.2", ENE), row("2025-06", "1.6", JUN_REM)],
 };
+
+const WAGES = [
+  row("2025-01", "2.0", RIPTE),
+  row("2025-02", "2.1", RIPTE),
+  row("2025-03", "2.9", RIPTE),
+];
+
+const brief = (
+  measure: string,
+  dimension: string,
+  mark: string,
+  rows: ReturnType<typeof row>[],
+) => ({
+  question: `¿Cómo varió cada mes: ${measure.toLowerCase()}?`,
+  dimension,
+  measure,
+  mark,
+  rows,
+});
+
+/** The charts each draft proposes. */
+const CHARTS: Record<ModelId, ReturnType<typeof brief>[]> = {
+  grok: [
+    brief("Inflación mensual (%)", "Mes", "line", ROWS.grok),
+    brief("Variación del salario registrado (%)", "Mes", "bar", WAGES),
+  ],
+  claude: [
+    brief("Inflación mensual (%)", "Mes", "line", ROWS.claude),
+    brief("Variación del dólar oficial (%)", "Mes", "line", [row("2025-01", "1.1", DOLAR)]),
+  ],
+  openai: [
+    brief("Inflación mensual (%)", "Mes", "line", ROWS.openai),
+    brief("Variación del salario registrado (%)", "Mes", "bar", WAGES),
+  ],
+  gemini: [brief("Inflación mensual (%)", "Mes", "line", ROWS.gemini)],
+};
+
+/** The text every draft writes: the figures are in the charts. */
+const CLAIMS = [
+  "En el primer semestre de 2025 la inflación mensual bajó: pasó de más de 3 % en marzo a menos de 2 % en mayo y junio.",
+  "En el primer trimestre los salarios registrados subieron a un ritmo parecido al de los precios.",
+];
 
 /** What each model says of each value it checks, by row and value (the value as the prompt writes it). */
 const CHECKS: Record<ModelId, Record<string, Record<string, [string, string]>>> = {
@@ -134,6 +187,7 @@ const patch = (
   reason: string,
   kind = "misleading",
 ) => ({
+  chart: "c1",
   layer,
   path,
   value,
@@ -184,84 +238,46 @@ const WEB_ROUND2: Record<ModelId, unknown[]> = {
   gemini: [vote("t1", "s1"), vote("t2", "keep")],
 };
 
-/** The columns of an upload, as the prompts list them ("- ventas (number): 6 values; ..."). */
-function columnsOf(prompt: string): { name: string; type: string }[] {
-  return [...prompt.matchAll(/^- (.+?) \((number|date|text)\): /gm)].map((m) => ({
-    name: m[1] ?? "",
-    type: m[2] ?? "",
-  }));
-}
-
-/** The plan of every brief for an upload: a measure summed (or averaged) by a dimension. */
-function planOf(prompt: string, op: "sum" | "mean") {
-  const columns = columnsOf(prompt);
-  const measure = columns.find((c) => c.type === "number")?.name ?? columns[0]?.name ?? "";
-  const dimension =
-    columns.find((c) => c.type === "text")?.name ??
-    columns.find((c) => c.type === "date")?.name ??
-    columns.find((c) => c.name !== measure)?.name ??
-    measure;
-  const as = op === "sum" ? "total" : "promedio";
-  return {
-    measure,
-    dimension,
-    as,
-    transform: JSON.stringify([{ aggregate: [{ op, field: measure, as }], groupby: [dimension] }]),
-  };
-}
-
-/** The value ids of the rows to check in a round prompt, leaving out the model's own: row → value → id. */
+/** The value ids of the rows to check in a round prompt, leaving out the model's own: chart and row → value → id. */
 function valueIds(prompt: string): Map<string, Map<string, string>> {
   const out = new Map<string, Map<string, string>>();
-  for (const block of prompt.split(/^### row /m).slice(1)) {
+  for (const block of prompt.split(/^### chart /m).slice(1)) {
+    const head = /^(c\d+), row (.*)$/m.exec(block);
+    if (!head) continue;
     const ids = new Map<string, string>();
     for (const m of block.matchAll(/^- (v\d+): ([-\d.]+)(.*)$/gm))
       if (!(m[3] ?? "").startsWith(" (yours")) ids.set(m[2] ?? "", m[1] ?? "");
-    out.set(block.slice(0, block.indexOf("\n")).trim(), ids);
+    out.set(`${head[1]}|${(head[2] ?? "").trim()}`, ids);
   }
   return out;
 }
 
 function checksOf(model: ModelId, prompt: string) {
-  const checks: { row: string; value: string; verdict: string; reason: string }[] = [];
-  for (const [rowKey, ids] of valueIds(prompt)) {
+  const checks: { chart: string; row: string; value: string; verdict: string; reason: string }[] =
+    [];
+  for (const [at, ids] of valueIds(prompt)) {
+    const [chart = "", rowKey = ""] = at.split("|");
     for (const [value, id] of ids) {
       const said = CHECKS[model][rowKey]?.[value];
-      if (said) checks.push({ row: rowKey, value: id, verdict: said[0], reason: said[1] });
+      if (said) checks.push({ chart, row: rowKey, value: id, verdict: said[0], reason: said[1] });
     }
   }
   return checks;
 }
 
-/** The chart runs of this isolate by question, and whether each charts an upload: the moments call says only the question. */
-const chartQuestions = new Map<string, boolean>();
-
-function questionOf(prompt: string): string {
-  return (/^Question:\s*([\s\S]*?)(?:\n\n|$)/.exec(prompt)?.[1] ?? "").trim();
-}
-
-/** Plain moments of a chart run for the facts the reducer passes; none for the rest. */
-function chartMoments(prompt: string, upload: boolean): string[] {
+/** Plain moments of the run with charts for the facts the reducer passes. */
+function chartMoments(prompt: string): string[] {
   const out: string[] = [];
   const said = (text: string) => {
     if (!out.includes(text) && out.length < 3) out.push(text);
   };
-  if (upload) {
-    if (/prepared the data of the chart alone/.test(prompt))
-      said("Cada uno pensó por su cuenta cómo graficar tu tabla, sin ver los números.");
-    if (/merged into one chart/.test(prompt))
-      said("Juntamos los planes de los cuatro en un solo gráfico de tus datos.");
-    if (/was accepted/.test(prompt))
-      said("Se aceptaron el nombre del eje que propuso Grok y la explicación de ChatGPT.");
-    if (/found no support/.test(prompt))
-      said("Gemini quería el promedio en vez de la suma; nadie más lo apoyó.");
-    return out;
-  }
-  if (/prepared the data of the chart alone/.test(prompt))
-    said("Cada uno buscó los datos por su cuenta, con la fuente de cada número.");
-  if (/merged into one chart/.test(prompt))
+  if (/finished its own answer/.test(prompt))
+    said("Cada uno respondió por su cuenta y buscó los números, con la fuente de cada uno.");
+  if (/proposed a chart of Variación del dólar/.test(prompt))
+    said("Claude propuso un gráfico del dólar, pero nadie más lo armó: queda afuera.");
+  if (/merged into a chart of Inflación/.test(prompt))
     said(
-      "Juntamos los datos en un gráfico: en tres meses no coinciden y hay que revisar las fuentes.",
+      "La respuesta suma dos gráficos: en el de inflación tres meses no coinciden y hay que revisar las fuentes.",
     );
   if (/settled the value of 2025-03/.test(prompt))
     said("El INDEC confirmó el dato de marzo: fue 3,7 %, no 3,3 % como decía una nota.");
@@ -278,172 +294,113 @@ function chartMoments(prompt: string, upload: boolean): string[] {
   return out;
 }
 
+/** Whether a call belongs to the run of CHART_QUESTION (the e2e tests add a suffix to it). */
+export function isChartQuestion(prompt: string): boolean {
+  return prompt.includes(CHART_QUESTION);
+}
+
 /**
- * The scripted outcome of a call of a chart run, or null when the call is not one (the prose
- * script answers it). `out` wraps an output with the usage, cost and delay of the call.
+ * The scripted outcome of a call of the run of CHART_QUESTION, or null when the call is not of it
+ * (the prose script answers it). `out` wraps an output with the usage, cost and delay of the call.
  */
 export function respondChart(
   req: GenerateRequest<unknown>,
   out: (output: unknown, extra?: { sources?: FoundSource[]; costUsd?: number }) => FakeOutcome,
 ): FakeOutcome | null {
+  if (!isChartQuestion(req.prompt)) return null;
   const [kind = "", n, seatRaw] = req.callKey.split(":");
   const seat = seatRaw as ModelId;
-  const upload = /uploaded data/i.test(req.prompt) || /uploaded data/i.test(req.system);
   switch (kind) {
-    case "brief": {
-      chartQuestions.set(questionOf(req.prompt), upload);
-      if (upload) {
-        const plan = planOf(req.prompt, seat === "gemini" ? "mean" : "sum");
-        return out({
-          question: `¿Cuánto suma ${plan.measure} en cada ${plan.dimension}?`,
-          dimension: plan.dimension,
-          measures: [plan.as],
-          mark: "bar",
-          transform: plan.transform,
-        });
-      }
+    case "draft":
       return out(
         {
-          question: "¿Cuánto subieron los precios cada mes de 2025?",
-          dimension: "Mes",
-          measure: "Inflación mensual (%)",
-          mark: "line",
-          rows: ROWS[seat],
+          answer: CLAIMS.join("\n\n"),
+          claims: CLAIMS.map((text) => ({ text, confidence: "high", sources: [] })),
+          charts: CHARTS[seat],
         },
         { sources: FOUND[seat], costUsd: 0.05 },
       );
+    case "merge": {
+      const ids = [...req.prompt.matchAll(/^- (\w+) \[\w+\] (.*)$/gm)];
+      return out({
+        paragraphs: CLAIMS.map((text) => ({
+          text,
+          claims: ids.filter((m) => m[2] === text).map((m) => m[1] ?? ""),
+        })),
+        conflicts: [],
+      });
     }
-    case "chart-merge":
+    case "chart-merge": {
+      const proposals = [...req.prompt.matchAll(/^## Proposal (\w+)\n(?:.*\n){2}measure: (.*)$/gm)];
+      const rows = [...req.prompt.matchAll(/^- ([\w.]+): (.*)$/gm)];
+      const measures = [...new Set(proposals.map((m) => m[2] ?? ""))];
       return out(
         {
-          question: "¿Cuánto subieron los precios cada mes del primer semestre de 2025?",
-          dimension: "Mes",
-          measure: "Inflación mensual (%)",
-          drafts: [...req.prompt.matchAll(/^## Draft (\w)$/gm)].map((m) => ({
-            draft: m[1],
-            measure: "same",
-          })),
-          keys: [...req.prompt.matchAll(/^- (\w+): (.*)$/gm)].map((m) => ({
-            row: m[1],
-            key: /enero/i.test(m[2] ?? "") ? "2025-01" : m[2],
-          })),
+          charts: measures
+            .map((measure) => {
+              const ids = proposals.filter((m) => m[2] === measure).map((m) => m[1] ?? "");
+              return {
+                question: measure.startsWith("Inflación")
+                  ? "¿Cuánto subieron los precios cada mes del primer semestre de 2025?"
+                  : `¿Cuánto varió cada mes: ${measure.toLowerCase()}?`,
+                dimension: "Mes",
+                measure,
+                briefs: ids,
+                keys: rows
+                  .filter((m) => ids.some((id) => (m[1] ?? "").startsWith(`${id}.`)))
+                  .map((m) => ({
+                    row: m[1] ?? "",
+                    key: /enero/i.test(m[2] ?? "") ? "2025-01" : (m[2] ?? ""),
+                  })),
+              };
+            })
+            .sort((a, b) => b.briefs.length - a.briefs.length),
         },
         { costUsd: 0.001 },
       );
-    case "spec": {
-      if (upload) {
-        const plan = planOf(req.prompt, "sum");
-        return out({
-          spec: JSON.stringify({
-            mark: "bar",
-            encoding: {
-              x: { field: plan.dimension, type: "nominal", sort: "-y", title: plan.dimension },
-              y: { field: "total", type: "quantitative", title: `Total de ${plan.measure}` },
-            },
-          }),
-          title: `${plan.measure.charAt(0).toUpperCase()}${plan.measure.slice(1)} por ${plan.dimension}`,
-          caption: `La suma de ${plan.measure} de cada ${plan.dimension}, calculada con tu tabla.`,
-        });
-      }
-      return out({
-        spec: JSON.stringify({
-          mark: "line",
-          encoding: {
-            x: { field: "key", type: "temporal", title: "Mes", timeUnit: "yearmonth" },
-            y: { field: "value", type: "quantitative", title: "Inflación mensual (%)" },
-          },
-        }),
-        title: "Inflación mensual de 2025",
-        caption: "La inflación de cada mes según el INDEC.",
-      });
     }
+    case "spec":
+      return out(
+        n === "c1"
+          ? {
+              spec: JSON.stringify({
+                mark: "line",
+                encoding: {
+                  x: { field: "key", type: "temporal", title: "Mes", timeUnit: "yearmonth" },
+                  y: { field: "value", type: "quantitative", title: "Inflación mensual (%)" },
+                },
+              }),
+              title: "Inflación mensual de 2025",
+              caption: "La inflación de cada mes según el INDEC.",
+              after: "p1",
+            }
+          : {
+              spec: JSON.stringify({
+                mark: "bar",
+                encoding: {
+                  x: { field: "key", type: "ordinal", title: "Mes" },
+                  y: { field: "value", type: "quantitative", title: "Variación mensual (%)" },
+                },
+              }),
+              title: "Salario registrado: variación mensual",
+              caption:
+                "La variación de cada mes del RIPTE, el salario promedio de los trabajadores estables.",
+              after: "p2",
+            },
+      );
     case "round": {
-      if (!/shared chart/.test(req.system)) return null;
-      if (upload) {
-        const plan = planOf(req.prompt, "mean");
-        if (n === "1") {
-          const R1: Record<ModelId, unknown[]> = {
-            grok: [
-              patch(
-                "encoding",
-                "encoding.y.title",
-                `"Suma de ${plan.measure}"`,
-                "El eje tiene que decir que es una suma.",
-              ),
-            ],
-            claude: [],
-            openai: [
-              patch(
-                "caption",
-                "",
-                `Cada barra es la suma de ${plan.measure} de una ${plan.dimension}, calculada con todas las filas de tu tabla.`,
-                "La explicación tiene que decir cómo se calculó cada barra.",
-                "missing",
-              ),
-            ],
-            gemini: [
-              patch(
-                "transform",
-                "",
-                JSON.stringify([
-                  {
-                    aggregate: [{ op: "mean", field: plan.measure, as: "total" }],
-                    groupby: [plan.dimension],
-                  },
-                ]),
-                "Con el promedio no pesa cuántas filas tiene cada una.",
-                "misleading",
-              ),
-            ],
-          };
-          return out({ patches: R1[seat], checks: [] });
-        }
-        const R2: Record<ModelId, unknown[]> = {
-          grok: [
-            vote("t2", "s2"),
-            vote("t3", "keep", "La pregunta es cuánto suma, no el promedio."),
-          ],
-          claude: [vote("t1", "s1"), vote("t2", "s2"), vote("t3", "keep")],
-          openai: [vote("t1", "s1"), vote("t3", "keep")],
-          gemini: [vote("t1", "s1"), vote("t2", "s2")],
-        };
-        return out(
-          n === "2" ? { votes: R2[seat], patches: [], checks: [] } : { votes: [], checks: [] },
-        );
-      }
       const checks = checksOf(seat, req.prompt);
-      if (n === "1") return out({ patches: WEB_ROUND1[seat], checks });
-      if (n === "2") return out({ votes: WEB_ROUND2[seat], patches: [], checks });
+      if (n === "1") return out({ suggestions: [], patches: WEB_ROUND1[seat], checks });
+      if (n === "2") return out({ votes: WEB_ROUND2[seat], suggestions: [], patches: [], checks });
       return out({ votes: [], checks });
     }
-    case "moments": {
-      const chart = chartQuestions.get(questionOf(req.prompt));
-      if (chart === undefined) return null;
-      return out({ sentences: chartMoments(req.prompt, chart) });
-    }
+    case "moments":
+      return out({ sentences: chartMoments(req.prompt) });
     default:
       return null;
   }
 }
 
-/** A question for the chart of web data (the e2e tests ask it with "Quiero un gráfico"). */
-export const CHART_QUESTION = "¿Cuánto fue la inflación de cada mes del primer semestre de 2025?";
-
-/** A question for the chart of an upload, and an upload for it (the e2e tests choose it as a file). */
-export const UPLOAD_QUESTION = "¿Cuánto vendió cada sucursal en el primer trimestre?";
-
-export const SAMPLE_CSV = [
-  "sucursal;mes;ventas",
-  "Centro;2025-01;1520000",
-  "Centro;2025-02;1384500",
-  "Centro;2025-03;1610250",
-  "Palermo;2025-01;1104000",
-  "Palermo;2025-02;1187300",
-  "Palermo;2025-03;1250900",
-  "Belgrano;2025-01;845600",
-  "Belgrano;2025-02;902100",
-  "Belgrano;2025-03;931400",
-  "Caballito;2025-01;712800",
-  "Caballito;2025-02;698450",
-  "Caballito;2025-03;760300",
-].join("\n");
+/** The question whose answer has charts. */
+export const CHART_QUESTION =
+  "¿Cuánto fue la inflación de cada mes del primer semestre de 2025, y cómo le fue al salario?";

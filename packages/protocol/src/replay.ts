@@ -1,9 +1,7 @@
 import type { ChartBrief, ChartRender, Dispute, DroppedPatch } from "./chart-run.ts";
-import type { Dataset } from "./csv.ts";
 import type { EventOf, RunEvent } from "./events.ts";
 import {
   type Abstention,
-  type ChartOrigin,
   type Claim,
   type Draft,
   type Flags,
@@ -52,11 +50,12 @@ export interface RunView {
   abstentions: Abstention[];
   spentUsd: number | null;
   lastBatch: number;
-  /** A chart run: where its data comes from and the upload; null for a prose run. */
-  chart: { origin: ChartOrigin; dataset: Dataset | null } | null;
+  /** The charts the drafts proposed. */
   briefs: ChartBrief[];
-  /** Who wrote the spec, and whether the writer's spec or the plain one of code was used. */
-  written: Omit<EventOf<"chart.written">, "key" | "batch" | "type"> | null;
+  /** The proposed measures the answer does not chart, and why. */
+  declined: Omit<EventOf<"chart.declined">, "key" | "batch" | "type">[];
+  /** By chart: who wrote its spec, and whether the writer's spec or the plain one of code was used. */
+  written: Record<string, Omit<EventOf<"chart.written">, "key" | "batch" | "type">>;
   disputes: Record<string, Dispute>;
   renders: ChartRender[];
   droppedPatches: DroppedPatch[];
@@ -108,9 +107,9 @@ export function emptyView(): RunView {
     abstentions: [],
     spentUsd: null,
     lastBatch: 0,
-    chart: null,
     briefs: [],
-    written: null,
+    declined: [],
+    written: {},
     disputes: {},
     renders: [],
     droppedPatches: [],
@@ -175,7 +174,6 @@ function applyEvent(view: RunView, e: RunEvent) {
       view.mode = e.mode;
       view.models = e.models;
       view.status = "running";
-      view.chart = e.chart ? clone(e.chart) : null;
       break;
     }
     case "stage.changed":
@@ -192,6 +190,7 @@ function applyEvent(view: RunView, e: RunEvent) {
     case "draft.completed":
       view.drafts.push({ model: e.model, answer: e.answer, claims: e.claims.map((c) => c.id) });
       for (const c of e.claims) view.claims[c.id] = c;
+      view.briefs.push(...clone(e.charts ?? []));
       view.sources.push(...e.sources);
       for (const id of e.alsoFound ?? []) foundAgain(view.sources, id, e.model);
       break;
@@ -286,13 +285,16 @@ function applyEvent(view: RunView, e: RunEvent) {
       view.status = "failed";
       view.spentUsd = e.spentUsd;
       break;
-    case "brief.completed":
-      view.briefs.push(clone(e.brief));
-      view.sources.push(...e.sources);
-      for (const id of e.alsoFound ?? []) foundAgain(view.sources, id, e.model);
+    case "chart.declined":
+      view.declined.push({
+        measure: e.measure,
+        briefs: [...e.briefs],
+        models: [...e.models],
+        why: e.why,
+      });
       break;
     case "chart.written":
-      view.written = {
+      view.written[e.block] = {
         block: e.block,
         writer: e.writer,
         used: e.used,
@@ -315,7 +317,9 @@ function applyEvent(view: RunView, e: RunEvent) {
       break;
     case "rows.checked":
       for (const c of e.checks) {
-        const d = Object.values(view.disputes).find((x) => x.state === "open" && x.row === c.row);
+        const d = Object.values(view.disputes).find(
+          (x) => x.state === "open" && x.block === c.block && x.row === c.row,
+        );
         if (!d) continue;
         const checks = d.checks[c.value] ?? {};
         checks[e.model] = c.verdict;
@@ -334,6 +338,7 @@ function applyEvent(view: RunView, e: RunEvent) {
         round: e.round,
         model: e.model,
         index: e.index,
+        block: e.block,
         layer: e.layer,
         path: e.path,
         why: e.why,

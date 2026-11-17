@@ -1,20 +1,25 @@
 import type { z } from "zod";
 import {
-  briefCalls,
-  CHART_ROUND_KIND,
-  type ChartInput,
-  type ChartRunState,
-  chartMergeCalls,
-  chartRoundCalls,
-  createChartState,
+  CHART_LIMITS,
+  type ChartsState,
+  carryRenders,
+  chartIds,
+  chartMergeCall,
+  chartsProposed,
+  createChartsState,
   type DataCandidate,
+  declineLoneBriefs,
   disputesAwaitChecks,
+  disputeView,
   gateCall,
+  hasCharts,
   hasOpenDisputes,
+  needsRender,
+  openDisputes,
   placeDataPatches,
   type RowSettlement,
+  readBriefs,
   readChartRound,
-  reduceBriefs,
   reduceChartMerge,
   reduceGate,
   reduceSeedRender,
@@ -26,6 +31,7 @@ import {
   specCalls,
   versionRenderCall,
   versionToRender,
+  visibleDisputes,
 } from "./chart-run.ts";
 import { type CallKind, type ConfigOverrides, type RunConfig, resolveConfig } from "./config.ts";
 import type { Cut, FailureReason, RunEvent } from "./events.ts";
@@ -129,7 +135,7 @@ export type Phase =
   | "edit"
   | "edit_check"
   | "finish"
-  // chart runs
+  // charts
   | "spec"
   | "seed"
   | "gate"
@@ -222,8 +228,8 @@ export interface RunState {
   counters: { suggestion: number; thread: number; paragraph: number; source: number };
   dropped: DroppedSuggestion[];
   /**
-   * Round results waiting for the render gate (`gate`, chart runs) and then for the duplicate check
-   * of the utility model.
+   * Round results waiting for the render gate (`gate`, patches on charts) and then for the
+   * duplicate check of the utility model.
    */
   pending: {
     round: 1 | 2;
@@ -241,8 +247,8 @@ export interface RunState {
   moments: { batch: number; text: string; origin: "model" | "template" }[];
   flags: Flags;
   abstentions: Abstention[];
-  /** A chart run (phase 4): its briefs, disputes and renders; null for a prose run. */
-  chart: ChartRunState | null;
+  /** The charts: what the drafts proposed, the charts of the answer, their disputes and renders. */
+  charts: ChartsState;
 }
 
 export interface CreateRunInput {
@@ -251,8 +257,6 @@ export interface CreateRunInput {
   mode: Mode;
   models: ModelSnapshot;
   config?: ConfigOverrides;
-  /** Present: a chart run, on the uploaded dataset or on data from the web. */
-  chart?: ChartInput | null;
 }
 
 /** A new run, at the drafting stage, and its `run.started` event. */
@@ -272,9 +276,6 @@ export function createRun(
     models: input.models,
     budgetUsd: config.budgetUsd,
     deadlineAt,
-    chart: input.chart
-      ? { origin: input.chart.dataset ? "user" : "web", dataset: input.chart.dataset }
-      : null,
   };
   const state: RunState = {
     v: 1,
@@ -320,7 +321,7 @@ export function createRun(
       quorumLost: false,
     },
     abstentions: [],
-    chart: createChartState(input.chart),
+    charts: createChartsState(),
   };
   return { state, events: [started] };
 }
@@ -366,27 +367,13 @@ function stepAt(state: RunState, now: number): CallsStep {
         state,
         "merging",
         "spec",
-        specCalls(state, kit, fits(state, { chart_spec: 1 })),
+        specCalls(state, kit, fits(state, { chart_spec: chartIds(state).length })),
         null,
       );
     case "seed":
       return step(state, "merging", "seed", [seedRenderCall(state, kit)], null);
     case "merge":
-      if (state.chart)
-        return step(
-          state,
-          "merging",
-          "merge",
-          fits(state, { chart_merge: 1 }) ? chartMergeCalls(state, kit) : [],
-          null,
-        );
-      return step(
-        state,
-        "merging",
-        "merge",
-        fits(state, { merge: 1 }) ? [mergeCall(state)] : [],
-        null,
-      );
+      return step(state, "merging", "merge", mergeCalls(state), null);
     case "round":
       return roundStep(state, next.round, now);
     case "close":
@@ -410,7 +397,8 @@ function step(
     id: `${state.stepNo}:${phase}`,
     stage,
     phase,
-    batch: stage === state.stage ? state.batch : state.batch + 1,
+    // the settle of the charts closes a stage of its own: its events and moments are a new batch
+    batch: stage === state.stage && phase !== "settle" ? state.batch : state.batch + 1,
     cut,
     calls,
   };
@@ -426,17 +414,11 @@ function call(
 ): Call {
   const t = state.config.callTimeoutMs;
   const timeoutMs =
-    kind === "draft" || kind === "brief_web"
+    kind === "draft"
       ? t.draft
       : kind === "merge" || kind === "chart_merge" || kind === "chart_spec"
         ? t.merge
-        : kind === "round1" ||
-            kind === "round2" ||
-            kind === "round3" ||
-            kind === "brief_user" ||
-            kind === "chart_round1" ||
-            kind === "chart_round2" ||
-            kind === "chart_round3"
+        : kind === "round1" || kind === "round2" || kind === "round3"
           ? t.round
           : kind === "editor"
             ? t.editor
@@ -470,14 +452,14 @@ function inTime(state: RunState, now: number, timeoutMs: number): boolean {
 }
 
 function draftStep(state: RunState): CallsStep {
-  if (state.chart) {
-    const kind = state.chart.origin === "web" ? "brief_web" : "brief_user";
-    if (!fits(state, { [kind]: MODELS.length })) return finishStep(state, "budget");
-    return step(state, "drafting", "draft", briefCalls(state, kit), null);
-  }
   if (!fits(state, { draft: MODELS.length })) return finishStep(state, "budget");
   const maxResults = state.config.searchResultsPerDraft;
-  const prompt = draftPrompt({ question: state.question, maxResults });
+  const prompt = draftPrompt({
+    question: state.question,
+    maxResults,
+    maxCharts: CHART_LIMITS.charts,
+    maxRows: CHART_LIMITS.rowsPerBrief,
+  });
   return step(
     state,
     "drafting",
@@ -485,6 +467,18 @@ function draftStep(state: RunState): CallsStep {
     MODELS.map((m) => call(state, `draft:0:${m}`, m, "draft", prompt, { maxResults })),
     null,
   );
+}
+
+/**
+ * The merge of the text and, when two drafts or more proposed charts, the grouping of the charts:
+ * each only if it fits the budget (a merge left out is built by code, a grouping by the measures).
+ */
+function mergeCalls(state: RunState): Call[] {
+  const charts = chartsProposed(state);
+  return [
+    ...(fits(state, { merge: 1 }) ? [mergeCall(state)] : []),
+    ...(charts && fits(state, { merge: 1, chart_merge: 1 }) ? [chartMergeCall(state, kit)] : []),
+  ];
 }
 
 function mergeCall(state: RunState): Call {
@@ -514,15 +508,10 @@ function draftLabel(runId: string, model: ModelId): string {
 const ROUND_KIND = { 1: "round1", 2: "round2", 3: "round3" } as const;
 
 function roundStep(state: RunState, round: 1 | 2 | 3, now: number): CallsStep {
-  const kind = state.chart ? CHART_ROUND_KIND[round] : ROUND_KIND[round];
+  const kind = ROUND_KIND[round];
   if (!inTime(state, now, state.config.callTimeoutMs.round))
     return closeStep(state, "deadline", now);
   if (!fits(state, { [kind]: MODELS.length })) return closeStep(state, "budget", now);
-  if (state.chart) {
-    const threads = (voter: ModelId) =>
-      votableThreads(state, round).map((id) => threadView(state, id, voter));
-    return step(state, `round${round}`, "round", chartRoundCalls(state, round, kit, threads), null);
-  }
   const calls = MODELS.map((m) =>
     call(state, `round:${round}:${m}`, m, kind, roundPromptFor(state, m, round)),
   );
@@ -551,6 +540,17 @@ function roundPromptFor(state: RunState, voter: ModelId, round: 1 | 2 | 3) {
   const locked = Object.values(state.threads)
     .filter((t) => t.state === "open" && t.lockKey === t.block)
     .map((t) => t.block);
+  const charts = hasCharts(state)
+    ? {
+        locked: [
+          ...Object.values(state.threads)
+            .filter((t) => t.state === "open" && t.lockKey.includes("/"))
+            .map((t) => t.lockKey),
+          ...openDisputes(state).map((d) => d.lockKey),
+        ],
+        disputes: visibleDisputes(state, round).map((d) => disputeView(state, d, voter)),
+      }
+    : null;
   return roundPrompt({
     question: state.question,
     round,
@@ -559,6 +559,7 @@ function roundPromptFor(state: RunState, voter: ModelId, round: 1 | 2 | 3) {
     sources: state.sources,
     threads: round === 1 ? [] : threads,
     locked: round === 3 ? [] : locked,
+    charts,
   });
 }
 
@@ -662,7 +663,7 @@ function dedupeStep(state: RunState, now: number): CallsStep {
 
 function momentsStep(state: RunState, now: number): CallsStep {
   const stage = state.stage ?? "drafting";
-  const facts = momentFacts(state.recent, state.suggestions, { chart: state.chart !== null });
+  const facts = momentFacts(state.recent, state.suggestions);
   const useModel =
     state.config.moments === "model" &&
     facts.length > 0 &&
@@ -679,7 +680,7 @@ function momentsStep(state: RunState, now: number): CallsStep {
             question: state.question,
             language: state.config.interfaceLanguage,
             facts,
-            chart: state.chart !== null,
+            charts: hasCharts(state),
           }),
         ),
       ]
@@ -689,16 +690,23 @@ function momentsStep(state: RunState, now: number): CallsStep {
 
 /**
  * The end of the rounds: open threads are resolved for good and accepted changes applied; then
- * the editor pass if a suggestion was accepted in the run and the budget and the deadline leave
- * room for it, else done (the accepted changes are applied either way).
+ * the editor pass if a suggestion on the text was accepted in the run and the budget and the
+ * deadline leave room for it, else done (the accepted changes are applied either way). With
+ * charts, what is still open is settled first, in a step of its own, so that the last version of
+ * each chart is rendered and the editor reads the charts as they end.
  */
 function closeStep(state: RunState, cut: Cut | null, now: number): CallsStep {
-  // A chart run has no editor pass: its last threads and disputes are settled, the last version
-  // rendered, then the run ends.
-  if (state.chart) return step(state, state.stage ?? "done", "settle", [], cut);
+  if (
+    hasCharts(state) &&
+    (hasOpenDisputes(state) || Object.values(state.threads).some((t) => t.state === "open"))
+  )
+    return step(state, state.stage ?? "done", "settle", [], cut);
   const preview = clone(state);
   resolveAndApply(preview, { final: true, round: 4 }, []);
-  const accepted = Object.values(preview.threads).some((t) => t.state === "accepted");
+  const charts = new Set(chartIds(state));
+  const accepted = Object.values(preview.threads).some(
+    (t) => t.state === "accepted" && !charts.has(t.block),
+  );
   if (!accepted) return finishStep(state, cut);
   if (!fits(state, { editor: 1, editor_check: 1 })) return finishStep(state, cut ?? "budget");
   if (!inTime(state, now, state.config.callTimeoutMs.editor + state.config.callTimeoutMs.utility))
@@ -881,7 +889,7 @@ export function reduce(
       const before = events.length;
       resolveAndApply(run, { final: true, round: 4 }, events);
       run.momentsDue = events.length > before;
-      run.next = { phase: "finish" };
+      run.next = { phase: "close" };
       break;
     }
   }
@@ -968,12 +976,6 @@ function valid(kind: CallKind, output: unknown): boolean {
 }
 
 function reduceDrafts(run: RunState, outputs: Map<string, Output>, events: RunEvent[]) {
-  if (run.chart) {
-    if (!reduceBriefs(run, outputs, events)) return fail(run, "no_drafts", events);
-    run.flags.fewDrafts = run.chart.briefs.length < run.config.quorum;
-    run.next = { phase: "merge" };
-    return;
-  }
   // Sources and the URLs of claims are matched by their normalized form (see normalizeUrl).
   const urls = new Map<string, string>();
   for (const s of run.sources) {
@@ -984,14 +986,14 @@ function reduceDrafts(run: RunState, outputs: Map<string, Output>, events: RunEv
     const out = outputs.get(`draft:0:${model}`);
     if (!out) continue;
     const draft = out.output as OutputOf<"draft">;
-    const found = new Set<string>();
+    const found = new Map<string, string>(); // normalized URL → the excerpt of the search
     const added: Source[] = [];
     const again: string[] = [];
     for (const f of out.sources) {
       const url = f.url.trim();
       const key = normalizeUrl(url);
       if (!key) continue;
-      found.add(key);
+      found.set(key, f.quote);
       const known = urls.get(key);
       if (known) {
         if (foundAgain(run.sources, known, model)) again.push(known);
@@ -1031,6 +1033,8 @@ function reduceDrafts(run: RunState, outputs: Map<string, Output>, events: RunEv
       });
     }
     for (const c of claims) run.claims[c.id] = c;
+    const charts = readBriefs({ model, label, charts: draft.charts, found, urls });
+    run.charts.briefs.push(...charts);
     run.drafts.push({ model, answer: draft.answer.trim(), claims: claims.map((c) => c.id) });
     events.push({
       key: `draft.completed:${model}`,
@@ -1039,17 +1043,23 @@ function reduceDrafts(run: RunState, outputs: Map<string, Output>, events: RunEv
       model,
       answer: draft.answer.trim(),
       claims,
+      charts: clone(charts),
       sources: added,
       ...(again.length > 0 && { alsoFound: again }),
     });
   }
   if (run.drafts.length === 0) return fail(run, "no_drafts", events);
   run.flags.fewDrafts = run.drafts.length < run.config.quorum;
+  declineLoneBriefs(run, events);
   run.next = { phase: "merge" };
 }
 
+/**
+ * The seeded document. Without charts it is the merge of the text, and the rounds run on its
+ * contested paragraphs. With charts the paragraphs wait for the specs, and the document is seeded
+ * once the charts are rendered among them (see `reduceSeedRender`).
+ */
 function reduceMerge(run: RunState, outputs: Map<string, Output>, events: RunEvent[]) {
-  if (run.chart) return reduceChartMerge(run, outputs, events);
   const out = outputs.get("merge:0");
   const seed = seedDocument({
     drafts: run.drafts,
@@ -1060,6 +1070,14 @@ function reduceMerge(run: RunState, outputs: Map<string, Output>, events: RunEve
   run.counters.paragraph = seed.nextParagraph;
   run.conflicts = seed.conflicts;
   run.flags.mergeFallback = seed.fallback;
+  if (chartsProposed(run)) {
+    const grouped = outputs.get("chart-merge:0")?.output as OutputOf<"chart_merge"> | undefined;
+    reduceChartMerge(run, grouped, events);
+    if (hasCharts(run)) {
+      run.next = { phase: "spec" };
+      return;
+    }
+  }
   events.push({
     key: "document.seeded",
     batch: run.batch,
@@ -1106,16 +1124,7 @@ function reduceRound(
       events.push(...cast.events);
       summary.changedPositions += cast.changedPositions;
     }
-    if (run.chart) {
-      const read = readChartRound(run, {
-        model,
-        round,
-        output: out.output as Partial<OutputOf<"chart_round2">>,
-        events,
-      });
-      candidates.push(...read.candidates);
-      data.push(...read.data);
-    } else if (round < 3 && output.suggestions) {
+    if (round < 3 && output.suggestions) {
       const checked = checkSuggestions({
         model,
         round: round as 1 | 2,
@@ -1127,21 +1136,16 @@ function reduceRound(
       candidates.push(...checked.candidates);
       run.dropped.push(...checked.dropped);
     }
+    if (hasCharts(run)) {
+      const read = readChartRound(run, { model, round, output, events });
+      candidates.push(...read.candidates);
+      data.push(...read.data);
+    }
   }
   if (round === 3) return completeRound(run, summary, events);
-  if (run.chart) {
-    const pending = { round: round as 1 | 2, candidates, pairs: [], summary, data };
-    if (candidates.some((c) => c.op === "patch" && c.layer !== "caption"))
-      run.pending = { ...pending, gate: true };
-    else afterGate(run, pending, candidates, events);
-    return;
-  }
-  const pairs = duplicatePairs(run, candidates);
-  if (pairsToAsk(pairs).length > 0) {
-    run.pending = { round: round as 1 | 2, candidates, pairs, summary };
-    return;
-  }
-  place(run, round as 1 | 2, candidates, pairs, {}, summary, events);
+  const pending = { round: round as 1 | 2, candidates, pairs: [], summary, data };
+  if (candidates.some(needsRender)) run.pending = { ...pending, gate: true };
+  else afterGate(run, pending, candidates, events);
 }
 
 function reduceGateStep(run: RunState, outputs: Map<string, Output>, events: RunEvent[]) {
@@ -1153,9 +1157,9 @@ function reduceGateStep(run: RunState, outputs: Map<string, Output>, events: Run
 }
 
 /**
- * A chart round after its render gate: the data patches open disputes, and the patches that
- * rendered are placed. Patches are duplicates only when code says so (the same path and value), so
- * no duplicate check of the utility model is needed.
+ * A round after its render gate: the data patches open disputes; then the suggestions that may be
+ * duplicates go to the utility model, and the candidates are placed. Patches are duplicates only
+ * when code says so (the same path and value): they never need the utility model.
  */
 function afterGate(
   run: RunState,
@@ -1170,6 +1174,10 @@ function afterGate(
     events,
   );
   const pairs = duplicatePairs(run, candidates);
+  if (pairsToAsk(pairs).length > 0) {
+    run.pending = { round: pending.round, candidates, pairs, summary: pending.summary };
+    return;
+  }
   place(run, pending.round, candidates, pairs, {}, pending.summary, events);
 }
 
@@ -1223,7 +1231,7 @@ function completeRound(run: RunState, summary: RoundSummary, events: RunEvent[])
   run.rounds.push(summary);
   const quorumLost = summary.answered.length < run.config.quorum;
   if (quorumLost) run.flags.quorumLost = true;
-  // A chart run goes on while a dispute waits for the checks of the next round.
+  // The rounds go on while a dispute of a chart waits for the checks of the next round.
   const awaiting = disputesAwaitChecks(run, round);
   const noThreads = Object.keys(run.threads).length === 0 && !awaiting;
   const noProgress =
@@ -1257,6 +1265,7 @@ function resolveAndApply(
     cause: "round",
     threads: resolved.accepted,
   });
+  carryRenders(run, events);
 }
 
 function reduceEdit(run: RunState, s: CallsStep, outputs: Map<string, Output>, events: RunEvent[]) {
@@ -1314,6 +1323,7 @@ function reduceEditCheck(run: RunState, outputs: Map<string, Output>, events: Ru
       cause: "edit",
       threads: [],
     });
+    carryRenders(run, events);
   }
   thenFinish(run);
 }
@@ -1326,9 +1336,7 @@ function reduceMoments(run: RunState, outputs: Map<string, Output>, events: RunE
     .slice(0, 3);
   const origin = phrased.length > 0 ? "model" : "template";
   const texts =
-    phrased.length > 0
-      ? phrased
-      : templateMoments(run.recent, { chart: run.chart !== null, suggestions: run.suggestions });
+    phrased.length > 0 ? phrased : templateMoments(run.recent, { suggestions: run.suggestions });
   texts.forEach((text, i) => {
     run.moments.push({ batch: run.batch, text, origin });
     events.push({

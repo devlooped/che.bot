@@ -1,10 +1,4 @@
-import {
-  type ChartInput,
-  type CsvError,
-  CsvParseError,
-  parseCsv,
-  type QuestionClass,
-} from "@chebot/protocol";
+import type { QuestionClass } from "@chebot/protocol";
 import { ProviderError } from "@chebot/providers";
 import { deps } from "./deps.ts";
 import type { Env } from "./env.ts";
@@ -35,31 +29,6 @@ export function questionOf(body: unknown): { question: string } | { error: strin
   if (trimmed.length > MAX_QUESTION_CHARS)
     return { error: `A question has at most ${MAX_QUESTION_CHARS} characters.` };
   return { question: trimmed };
-}
-
-/**
- * The chart of a request body: absent for a prose run; `{ chart: {} }` asks for a chart of data
- * from the web, `{ chart: { csv } }` for a chart of the uploaded CSV, parsed here by code (its
- * limits are `CSV_LIMITS`), so that a bad file is refused before anything is paid. A refused file
- * says why in `reason` ("csv_" and the `CsvError`), which the browser words for the user.
- */
-export function chartOf(
-  body: unknown,
-): { chart: ChartInput | null } | { error: string; reason?: `csv_${CsvError}` } {
-  const chart = (body as { chart?: unknown } | null)?.chart;
-  if (chart === undefined || chart === null || chart === false) return { chart: null };
-  if (chart === true) return { chart: { dataset: null } };
-  if (typeof chart !== "object" || Array.isArray(chart)) return { error: "chart is an object." };
-  const csv = (chart as { csv?: unknown }).csv;
-  if (csv === undefined || csv === null) return { chart: { dataset: null } };
-  if (typeof csv !== "string") return { error: "chart.csv is the text of a CSV file." };
-  try {
-    return { chart: { dataset: parseCsv(csv) } };
-  } catch (error) {
-    if (error instanceof CsvParseError)
-      return { error: error.message, reason: `csv_${error.code}` };
-    throw error;
-  }
 }
 
 /**
@@ -110,7 +79,6 @@ export async function quoteQuestion(
   env: Env,
   owner: string,
   question: string,
-  chart: ChartInput | null = null,
 ): Promise<Quote & { costUsd: number }> {
   const classification = await classifyQuestion(env, question);
   const price = await priceOf(env.DB, classification.class);
@@ -123,7 +91,6 @@ export async function quoteQuestion(
     probability: classification.probability,
     amount: price.amount,
     currency: price.currency,
-    chart,
     classify: classification.cost,
   });
   return {

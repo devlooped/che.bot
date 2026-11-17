@@ -1,19 +1,10 @@
 import { MODELS, type ModelId, type Source } from "@chebot/protocol";
-import { useMemo, useRef, useState } from "react";
-import type { DrawnRow } from "../chart/embed.ts";
+import { useRef, useState } from "react";
 import { t } from "../i18n/index.ts";
-import {
-  type ChartView,
-  cellText,
-  drawnColumns,
-  formatNumber,
-  type RowView,
-  type ValueView,
-} from "../view/chart.ts";
+import type { ChartView, RowView, ValueView } from "../view/chart.ts";
 import { ChartCanvas } from "./ChartCanvas.tsx";
 import { LayerSheet } from "./Discussion.tsx";
 import { ModelMark, Tally, Votes, WithMarks } from "./ModelMark.tsx";
-import { Notes } from "./RunDetails.tsx";
 
 function SourceLink({ source }: { source: Source }) {
   return (
@@ -51,11 +42,19 @@ function verdictText(v: ValueView): string {
   }
 }
 
+/** The anchor of the note `n` of a chart: the notes of every chart of the answer are told apart. */
+const noteId = (chart: string, n: number) => `nota-${chart}-${n}`;
+
 /** The note of a row: what happened to its value, each value given with its source and check. */
-function RowNote({ row }: { row: RowView }) {
+function RowNote({ chart, row }: { chart: string; row: RowView }) {
   if (row.note === null) return null;
   return (
-    <div className="row-note" id={`nota-${row.note}`} data-testid="row-note" data-kind={row.kind}>
+    <div
+      className="row-note"
+      id={noteId(chart, row.note)}
+      data-testid="row-note"
+      data-kind={row.kind}
+    >
       <p className="row-note-head">
         <strong>{t.chart.note(row.note)}.</strong>{" "}
         {row.noteText && <WithMarks text={row.noteText} />}
@@ -86,15 +85,17 @@ function RowNote({ row }: { row: RowView }) {
   );
 }
 
-/** The data of a web chart: every row with its value, its source and the words that state it. */
+/** The data of a chart: every row with its value, its source and the words that state it. */
 function DataTable({ chart }: { chart: ChartView }) {
+  const title = `${chart.id}-data-title`;
   return (
-    <section className="chart-data" aria-labelledby="chart-data-title">
-      <h3 id="chart-data-title" className="chart-subtitle">
+    // named with the title of its chart too: every chart of the answer has a section of data
+    <section className="chart-data" aria-labelledby={`${title} ${chart.id}-title`}>
+      <h4 id={title} className="chart-subtitle">
         {t.chart.dataTitle}
-      </h3>
+      </h4>
       <p className="fine">{t.chart.dataLede}</p>
-      <table className="chart-table" aria-labelledby="chart-data-title">
+      <table className="chart-table" aria-labelledby={title}>
         <thead>
           <tr>
             <th scope="col">{chart.dimension}</th>
@@ -106,7 +107,7 @@ function DataTable({ chart }: { chart: ChartView }) {
         </thead>
         <tbody>
           {chart.rows.map((row) => (
-            <RowLines key={row.key} row={row} />
+            <RowLines key={row.key} chart={chart.id} row={row} />
           ))}
         </tbody>
       </table>
@@ -114,14 +115,14 @@ function DataTable({ chart }: { chart: ChartView }) {
   );
 }
 
-function RowLines({ row }: { row: RowView }) {
+function RowLines({ chart, row }: { chart: string; row: RowView }) {
   return (
     <>
       <tr className={`chart-row kind-${row.kind}`} data-testid="chart-row" data-kind={row.kind}>
         <th scope="row">
           <span className="row-label">{row.label}</span>
           {row.note !== null && (
-            <a className="note-tag" href={`#nota-${row.note}`}>
+            <a className="note-tag" href={`#${noteId(chart, row.note)}`}>
               {t.chart.note(row.note)}
             </a>
           )}
@@ -139,7 +140,7 @@ function RowLines({ row }: { row: RowView }) {
       {row.note !== null && (
         <tr className="note-line">
           <td colSpan={3}>
-            <RowNote row={row} />
+            <RowNote chart={chart} row={row} />
           </td>
         </tr>
       )}
@@ -154,11 +155,12 @@ function Layers({ chart }: { chart: ChartView }) {
   if (chart.layers.length === 0 && chart.dissent.length === 0) return null;
   const opened = chart.layers.find((l) => l.layer === open) ?? null;
   const o = t.chart.layers.outcome;
+  const title = `${chart.id}-layers-title`;
   return (
-    <section className="chart-layers" aria-labelledby="chart-layers-title">
-      <h3 id="chart-layers-title" className="chart-subtitle">
+    <section className="chart-layers" aria-labelledby={`${title} ${chart.id}-title`}>
+      <h4 id={title} className="chart-subtitle">
         {t.chart.layers.title}
-      </h3>
+      </h4>
       <p className="fine">{t.chart.layers.lede}</p>
       <ul className="layer-list">
         {chart.layers.map((l) => {
@@ -233,137 +235,29 @@ function Layers({ chart }: { chart: ChartView }) {
   );
 }
 
-/** A chart of the user's table: where its numbers come from, the drawn values and the upload. */
-function FromTable({ chart, drawn }: { chart: ChartView; drawn: DrawnRow[] }) {
-  const columns = useMemo(() => drawnColumns(chart.chart), [chart.chart]);
-  const shown = columns.filter((c) => drawn.some((r) => c.field in r));
-  const upload = chart.upload;
-  return (
-    <section className="chart-data" aria-labelledby="chart-data-title">
-      <div className="from-table" data-testid="from-table">
-        <p>
-          <strong>{t.chart.user.fromTable}</strong>
-        </p>
-        <p>{t.chart.user.calculation(chart.calculation)}</p>
-        {upload && (
-          <p className="fine">{t.chart.user.table(upload.rows.length, upload.columns.length)}</p>
-        )}
-      </div>
-      <h3 id="chart-data-title" className="chart-subtitle">
-        {t.chart.user.drawnTitle}
-      </h3>
-      <p className="fine">{t.chart.user.drawnLede}</p>
-      {shown.length > 0 && (
-        <div className="table-scroll">
-          <table className="chart-table chart-table-plain" aria-labelledby="chart-data-title">
-            <thead>
-              <tr>
-                {shown.map((c, i) => (
-                  <th key={c.field} scope="col" className={i > 0 ? "num" : undefined}>
-                    {c.title}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {drawn.map((r, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: the drawn rows have no key of their own
-                <tr key={i} data-testid="drawn-row">
-                  {shown.map((c, j) =>
-                    j === 0 ? (
-                      <th key={c.field} scope="row">
-                        {cellText(r[c.field], c.temporal)}
-                      </th>
-                    ) : (
-                      <td key={c.field} className="num">
-                        {cellText(r[c.field], c.temporal)}
-                      </td>
-                    ),
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {upload && (
-        <details className="upload">
-          <summary>{t.chart.user.showUpload(upload.rows.length)}</summary>
-          <div className="table-scroll">
-            <table className="chart-table chart-table-plain">
-              <thead>
-                <tr>
-                  {upload.columns.map((c) => (
-                    <th key={c.name} scope="col">
-                      {c.name}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {upload.rows.map((r, i) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: the uploaded rows are in their order
-                  <tr key={i}>
-                    {upload.columns.map((c) => (
-                      <td key={c.name} className={c.type === "number" ? "num" : undefined}>
-                        {typeof r[c.name] === "number"
-                          ? formatNumber(r[c.name] as number)
-                          : String(r[c.name] ?? "")}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </details>
-      )}
-    </section>
-  );
-}
-
 /**
- * The answer of a chart run (step 41): the chart of the current version with its title and its
- * explanation, the data under it with a source for every web number, a note on every corrected,
- * disputed or unconfirmed point, and the discussions of the layers the models voted on.
+ * A chart of the answer, in its place among the paragraphs (step 41): the chart of the current
+ * version with its title and its explanation, the data under it with a source for every number, a
+ * note on every corrected, disputed or unconfirmed point, and the discussions of the layers the
+ * models voted on.
  */
-export function ChartDocument({
-  chart,
-  final,
-  notes,
-}: {
-  chart: ChartView;
-  final: boolean;
-  notes: readonly string[];
-}) {
-  const [drawn, setDrawn] = useState<DrawnRow[]>([]);
-  const web = chart.origin === "web";
+export function ChartBlock({ chart }: { chart: ChartView }) {
   return (
-    <section className="answer chart-answer" aria-labelledby="answer-title">
-      <h2 id="answer-title" className="section-title">
-        {t.answer.title}
-      </h2>
-      {!final && <p className="muted">{t.answer.draftNote}</p>}
-      <Notes notes={notes} />
+    <div className="chart-block" data-testid="chart-block" data-chart={chart.id}>
       <figure className="chart-figure">
-        <h3 className="chart-title" data-testid="chart-title">
+        <h3 id={`${chart.id}-title`} className="chart-title" data-testid="chart-title">
           {chart.title}
         </h3>
-        <ChartCanvas
-          spec={chart.spec}
-          data={chart.data}
-          label={chart.label}
-          onDrawn={web ? undefined : setDrawn}
-        />
+        <ChartCanvas spec={chart.spec} data={chart.data} label={chart.label} />
         {chart.caption && (
           <figcaption className="chart-caption" data-testid="chart-caption">
             {chart.caption}
           </figcaption>
         )}
       </figure>
-      {web && chart.notes.length > 0 && <p className="legend">{t.chart.legend}</p>}
-      {web ? <DataTable chart={chart} /> : <FromTable chart={chart} drawn={drawn} />}
+      {chart.notes.length > 0 && <p className="legend">{t.chart.legend}</p>}
+      <DataTable chart={chart} />
       <Layers chart={chart} />
-    </section>
+    </div>
   );
 }

@@ -1,5 +1,4 @@
 import {
-  carriesData,
   chartSpec,
   checkPatch,
   defaultLayers,
@@ -11,71 +10,50 @@ import {
   readValue,
   sameValue,
   temporalKeys,
-  transformFields,
-  transformProblem,
 } from "./chart.ts";
-import { type Dataset, describeDataset } from "./csv.ts";
 import type { RunEvent } from "./events.ts";
 import {
   CHART_LAYERS,
   type Chart,
   type ChartLayer,
-  type ChartOrigin,
-  foundAgain,
   MODELS,
   type ModelId,
   type Row,
   type RowStatus,
   type Snapshot,
-  type Source,
 } from "./model.ts";
 import {
-  briefUserPrompt,
-  briefWebPrompt,
   chartMergePrompt,
-  chartRoundPrompt,
   chartSpecPrompt,
   type DisputeView,
   type MergeBrief,
 } from "./prompts/chart.ts";
-import type { ThreadView } from "./prompts/round.ts";
 import type { Call, RunState } from "./reducer.ts";
-import type { OutputOf, PatchOutput } from "./schemas.ts";
+import type { ChartBriefOutput, OutputOf, PatchOutput } from "./schemas.ts";
 import type { Candidate } from "./threads.ts";
 import { normalizeUrl } from "./urls.ts";
-import {
-  byModelOrder,
-  clone,
-  hash,
-  isOneSentence,
-  normalizeText,
-  seededShuffle,
-  uniqueSorted,
-} from "./util.ts";
+import { byModelOrder, clone, hash, isOneSentence, normalizeText, uniqueSorted } from "./util.ts";
 
-// The chart path of a run (phase 4). Data first, design second:
-//   drafting  brief:0:<model>   4 briefs (web: rows with citations found by search in that call)
-//   merging   chart-merge:0     web only: the utility model aligns labels; code compares the values
-//             spec:0:<writer>   one model writes the Vega-Lite spec (chosen like the editor)
-//             render:seed       the render gate on the writer's spec and on the plain one of code
-//   round1-3  round:<n>:<model> patches on the layers, votes, and checks of the sources of the rows
-//             render:gate:<n>   every patch is rendered before it reaches a vote
-//             render:v<n>       every new version of the chart is rendered (its SVG)
-// There is no editor pass: the caption is a layer, settled in the rounds like the others.
+// The charts of a run. Data first, design second:
+//   drafting  draft:0:<model>         each draft may propose up to 3 charts, every value with its
+//                                     citation, found by the search of that call
+//   merging   chart-merge:0           beside the merge of the text: the utility model groups the
+//                                     proposals by measure and aligns the labels of their rows; code
+//                                     compares the values. A measure two drafts or more proposed
+//                                     becomes a chart (c1, c2, c3); the others are declined
+//             spec:<chart>:<writer>   one model per chart writes its Vega-Lite spec and places it
+//             render:seed             the render gate on every writer's spec and on the plain one
+//   round1-3  round:<n>:<model>       patches on the layers and checks of the sources of the rows,
+//                                     in the same call as the suggestions on the text
+//             render:gate:<n>         every patch is rendered before it reaches a vote
+//             render:v<n>             every chart a new version changed is rendered (its SVG)
+// A chart has no editor pass: its caption is a layer, settled in the rounds like the others.
 
-/** What makes a run a chart run: the request says so, with the uploaded data or none (web data). */
-export interface ChartInput {
-  /** The upload, parsed by `parseCsv` before the run starts; null: the models find the data on the web. */
-  dataset: Dataset | null;
-}
-
-/** The limits of a chart run. */
-export const CHART_LIMITS = { rowsPerBrief: 24, rows: 40 };
-
-export const CHART_ID = "c1";
+/** The limits of the charts of a run. */
+export const CHART_LIMITS = { charts: 3, rowsPerBrief: 24, rows: 40 };
 
 export interface BriefRow {
-  id: string; // "B3": the label of the brief and the row number, anonymized
+  id: string; // "A1.3": the brief and the row number, anonymized
   key: string;
   value: number;
   source: string; // Source id
@@ -91,18 +69,20 @@ export type BriefRowDrop =
   | "duplicate_key"
   | "empty_key";
 
+/** A chart a draft proposed: one measure along one dimension, every value with its citation. */
 export interface ChartBrief {
+  id: string; // "A1": the letter of the draft (anonymized) and the number of the chart in it
   model: ModelId;
-  label: string;
   question: string;
   dimension: string;
-  measures: string[];
+  measure: string;
   mark: string;
-  /** User data: the transform the brief proposed, null when it was not allowed or not JSON. */
-  transform: unknown[] | null;
   rows: BriefRow[];
   dropped: { key: string; why: BriefRowDrop }[];
 }
+
+/** Why a measure the drafts proposed is not drawn: one draft only, or beyond the cap of charts. */
+export type DeclineReason = "one_draft" | "over_cap";
 
 export type Verdict = "holds" | "fails" | "unclear";
 
@@ -116,12 +96,12 @@ export interface DisputeValue {
 }
 
 /**
- * A row of web data that the sources settle: a value given by one model only, or different values
- * for one row. Every model checks the sources of the values it did not give, in the round after the
+ * A row whose value the sources settle: a value given by one model only, or different values for
+ * one row. Every model checks the sources of the values it did not give, in the round after the
  * dispute opened; the dispute is settled at that round's boundary (see `settleDisputes`).
  */
 export interface Dispute {
-  id: string; // "d1"
+  id: string; // "d1": unique in the run, whatever the chart
   block: string;
   row: string;
   lockKey: string; // "c1/data/2026-03"
@@ -146,9 +126,16 @@ export interface DroppedPatch {
   round: 1 | 2;
   model: ModelId;
   index: number;
+  block: string;
   layer: ChartLayer;
   path: string;
-  why: PatchDropReason | DropReasonOfData | "over_cap" | "style" | "reason_not_one_sentence";
+  why:
+    | PatchDropReason
+    | DropReasonOfData
+    | "over_cap"
+    | "style"
+    | "reason_not_one_sentence"
+    | "unknown_chart";
   detail: string;
 }
 
@@ -167,13 +154,16 @@ export interface ChartLayers {
   caption: string;
 }
 
-export interface ChartRunState {
-  origin: ChartOrigin;
-  dataset: Dataset | null;
-  briefs: ChartBrief[];
+/** One chart of the answer while it is written: the merged data, its writer and its place. */
+export interface ChartPlan {
+  id: string; // "c1"
+  /** The briefs whose rows it draws. */
+  briefs: string[];
   writer: ModelId | null;
-  /** The chart agreed by the merge, before the spec: data, brief, transform, a plain encoding. */
-  base: Chart | null;
+  /** The chart agreed by the merge, before the spec: data, brief, a plain encoding. */
+  base: Chart;
+  /** The paragraph it follows, as its writer placed it; null: after the first paragraph. */
+  after: string | null;
   /** The two candidates of the seed render: the writer's layers and the plain ones of code. */
   seed: {
     writer: ChartLayers | null;
@@ -181,6 +171,13 @@ export interface ChartRunState {
     why: string | null;
     stripped: string[];
   } | null;
+}
+
+export interface ChartsState {
+  /** Every chart the drafts proposed, in model order. */
+  briefs: ChartBrief[];
+  /** The charts of the answer by block id (c1, c2, c3): empty when the answer has none. */
+  plans: Record<string, ChartPlan>;
   disputes: Record<string, Dispute>;
   renders: ChartRender[];
   dropped: DroppedPatch[];
@@ -192,6 +189,7 @@ export interface ChartRunState {
 /** A data patch that passed its checks: a new value for a row, with its citation. */
 export interface DataCandidate {
   model: ModelId;
+  block: string;
   row: string;
   value: number;
   source: string;
@@ -199,15 +197,10 @@ export interface DataCandidate {
   reason: string;
 }
 
-export function createChartState(input: ChartInput | null | undefined): ChartRunState | null {
-  if (!input) return null;
+export function createChartsState(): ChartsState {
   return {
-    origin: input.dataset ? "user" : "web",
-    dataset: input.dataset ? clone(input.dataset) : null,
     briefs: [],
-    writer: null,
-    base: null,
-    seed: null,
+    plans: {},
     disputes: {},
     renders: [],
     dropped: [],
@@ -216,7 +209,16 @@ export function createChartState(input: ChartInput | null | undefined): ChartRun
   };
 }
 
-/** The helpers of the reducer the chart path uses (passed in, so that the modules stay acyclic). */
+/** The ids of the charts of the answer, in order. */
+export function chartIds(state: RunState): string[] {
+  return Object.keys(state.charts.plans).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
+}
+
+export function hasCharts(state: RunState): boolean {
+  return chartIds(state).length > 0;
+}
+
+/** The helpers of the reducer the charts use (passed in, so that the modules stay acyclic). */
 export interface StepKit {
   call(
     state: RunState,
@@ -228,181 +230,123 @@ export interface StepKit {
   ): Call;
 }
 
-function chartOf(state: RunState): ChartRunState {
-  if (!state.chart) throw new Error("not a chart run");
-  return state.chart;
+function chartIn(snapshot: Snapshot | undefined, block: string): Chart | null {
+  const b = snapshot?.blocks[block];
+  return b?.kind === "chart" ? b : null;
 }
 
-function label(runId: string, model: ModelId): string {
-  return "ABCD"[seededShuffle(MODELS, `${runId}|drafts`).indexOf(model)] ?? "X";
+/** The charts of a version, in the order of the document. */
+export function chartsOf(snapshot: Snapshot): Chart[] {
+  return snapshot.order.flatMap((id) => {
+    const b = snapshot.blocks[id];
+    return b?.kind === "chart" ? [b] : [];
+  });
 }
 
 // ---------------------------------------------------------------------------------------------
-// Drafting: the briefs
+// Drafting: the charts each draft proposes
 
-export function briefCalls(state: RunState, kit: StepKit): Call[] {
-  const chart = chartOf(state);
-  if (chart.origin === "web") {
-    const maxResults = state.config.searchResultsPerDraft;
-    const prompt = briefWebPrompt({
-      question: state.question,
-      maxResults,
-      maxRows: CHART_LIMITS.rowsPerBrief,
-    });
-    return MODELS.map((m) =>
-      kit.call(state, `brief:0:${m}`, m, "brief_web", prompt, { maxResults }),
-    );
-  }
-  const dataset = chart.dataset as Dataset;
-  const prompt = briefUserPrompt({
-    question: state.question,
-    columns: describeDataset(dataset),
-    rows: dataset.rows.length,
-  });
-  return MODELS.map((m) => kit.call(state, `brief:0:${m}`, m, "brief_user", prompt));
-}
-
-interface Output {
-  call: Call;
-  output: unknown;
-  sources: { url: string; title: string; quote: string }[];
-}
-
-export function reduceBriefs(
-  run: RunState,
-  outputs: Map<string, Output>,
-  events: RunEvent[],
-): boolean {
-  const chart = chartOf(run);
-  const urls = new Map<string, string>();
-  for (const s of run.sources) {
-    const key = normalizeUrl(s.url);
-    if (key && !urls.has(key)) urls.set(key, s.id);
-  }
-  const columns = new Set(chart.dataset?.columns.map((c) => c.name) ?? []);
-  for (const model of MODELS) {
-    const out = outputs.get(`brief:0:${model}`);
-    if (!out) continue;
-    const lbl = label(run.id, model);
-    const added: Source[] = [];
-    const again: string[] = [];
-    let brief: ChartBrief;
-    if (chart.origin === "web") {
-      const o = out.output as OutputOf<"brief_web">;
-      const found = new Map<string, string>(); // normalized URL → the excerpt of the search
-      for (const f of out.sources) {
-        const key = normalizeUrl(f.url.trim());
-        if (!key) continue;
-        found.set(key, f.quote);
-        const known = urls.get(key);
-        if (known) {
-          if (foundAgain(run.sources, known, model)) again.push(known);
-          continue;
-        }
-        const source: Source = {
-          id: `src${++run.counters.source}`,
-          url: f.url.trim(),
-          title: f.title,
-          quote: f.quote,
-          foundBy: model,
-        };
-        urls.set(key, source.id);
-        run.sources.push(source);
-        added.push(source);
+/**
+ * The charts of one draft. A row counts only if the search of that call returned its source
+ * (`found`: normalized URL → the excerpt of the search); its source id is the run's (`urls`).
+ */
+export function readBriefs(input: {
+  model: ModelId;
+  label: string;
+  charts: readonly ChartBriefOutput[];
+  found: ReadonlyMap<string, string>;
+  urls: ReadonlyMap<string, string>;
+}): ChartBrief[] {
+  const briefs: ChartBrief[] = [];
+  for (const o of input.charts.slice(0, CHART_LIMITS.charts)) {
+    const id = `${input.label}${briefs.length + 1}`;
+    const rows: BriefRow[] = [];
+    const dropped: ChartBrief["dropped"] = [];
+    const keys = new Set<string>();
+    for (const [i, r] of o.rows.entries()) {
+      const key = r.key.trim();
+      const drop = (why: BriefRowDrop) => dropped.push({ key, why });
+      if (i >= CHART_LIMITS.rowsPerBrief) {
+        drop("over_cap");
+        continue;
       }
-      const rows: BriefRow[] = [];
-      const dropped: ChartBrief["dropped"] = [];
-      const keys = new Set<string>();
-      for (const [i, r] of o.rows.entries()) {
-        const key = r.key.trim();
-        const drop = (why: BriefRowDrop) => dropped.push({ key, why });
-        if (i >= CHART_LIMITS.rowsPerBrief) {
-          drop("over_cap");
-          continue;
-        }
-        if (key === "") {
-          drop("empty_key");
-          continue;
-        }
-        const value = readModelNumber(r.value);
-        if (value === null) {
-          drop("not_a_number");
-          continue;
-        }
-        // a row counts only if the search of this call returned its source
-        const url = normalizeUrl(r.source.trim());
-        if (!url || !found.has(url)) {
-          drop("no_citation");
-          continue;
-        }
-        const canonical = normalizeKey(key);
-        if (keys.has(canonical)) {
-          drop("duplicate_key");
-          continue;
-        }
-        keys.add(canonical);
-        const quote = r.quote.trim();
-        rows.push({
-          id: `${lbl}${rows.length + 1}`,
-          key,
-          value,
-          source: urls.get(url) as string,
-          quote,
-          stated: quoteStates(value, quote) || quoteStates(value, found.get(url) ?? ""),
-        });
+      if (key === "") {
+        drop("empty_key");
+        continue;
       }
-      brief = {
-        model,
-        label: lbl,
-        question: o.question.trim(),
-        dimension: o.dimension.trim(),
-        measures: [o.measure.trim()],
-        mark: o.mark,
-        transform: [],
-        rows,
-        dropped,
-      };
-    } else {
-      const o = out.output as OutputOf<"brief_user">;
-      const raw = readValue(o.transform);
-      const transform: unknown[] | null =
-        Array.isArray(raw) &&
-        !carriesData(raw) &&
-        transformProblem(raw, {
-          data: { origin: "user", columns: chart.dataset?.columns ?? [], rows: [] },
-        }) === null
-          ? raw
-          : null;
-      // the brief may name the columns and the fields its own transform makes
-      const fields = transformFields(transform ?? []);
-      const known = (name: string) =>
-        name !== "" && (columns.has(name) || fields.names.has(name) || fields.open);
-      brief = {
-        model,
-        label: lbl,
-        question: o.question.trim(),
-        dimension: known(o.dimension.trim()) ? o.dimension.trim() : "",
-        measures: o.measures.map((m) => m.trim()).filter(known),
-        mark: o.mark,
-        transform,
-        rows: [],
-        dropped: [],
-      };
+      const value = readModelNumber(r.value);
+      if (value === null) {
+        drop("not_a_number");
+        continue;
+      }
+      const url = normalizeUrl(r.source.trim());
+      const source = url ? input.urls.get(url) : undefined;
+      if (!url || !input.found.has(url) || !source) {
+        drop("no_citation");
+        continue;
+      }
+      const canonical = normalizeKey(key);
+      if (keys.has(canonical)) {
+        drop("duplicate_key");
+        continue;
+      }
+      keys.add(canonical);
+      const quote = r.quote.trim();
+      rows.push({
+        id: `${id}.${rows.length + 1}`,
+        key,
+        value,
+        source,
+        quote,
+        stated: quoteStates(value, quote) || quoteStates(value, input.found.get(url) ?? ""),
+      });
     }
-    chart.briefs.push(brief);
-    events.push({
-      key: `brief.completed:${model}`,
-      batch: run.batch,
-      type: "brief.completed",
-      model,
-      brief: clone(brief),
-      sources: added,
-      ...(again.length > 0 && { alsoFound: again }),
+    briefs.push({
+      id,
+      model: input.model,
+      question: o.question.trim(),
+      dimension: o.dimension.trim(),
+      measure: o.measure.trim(),
+      mark: o.mark,
+      rows,
+      dropped,
     });
   }
-  if (chart.briefs.length === 0) return false;
-  if (chart.origin === "web" && chart.briefs.every((b) => b.rows.length === 0)) return false;
-  return true;
+  return briefs;
+}
+
+/** The briefs with data: the only ones a chart can come from. */
+function briefsWithRows(state: RunState): ChartBrief[] {
+  return state.charts.briefs.filter((b) => b.rows.length > 0);
+}
+
+/** Whether the merge groups the proposed charts: at least 2 drafts proposed one with data. */
+export function chartsProposed(state: RunState): boolean {
+  return new Set(briefsWithRows(state).map((b) => b.model)).size >= 2;
+}
+
+/** The charts of a single draft, which no other draft can agree on: declined after the drafts. */
+export function declineLoneBriefs(run: RunState, events: RunEvent[]) {
+  if (chartsProposed(run)) return;
+  for (const b of briefsWithRows(run))
+    decline(run, events, { measure: b.measure, briefs: [b.id], models: [b.model] }, "one_draft");
+}
+
+function decline(
+  run: RunState,
+  events: RunEvent[],
+  group: { measure: string; briefs: string[]; models: ModelId[] },
+  why: DeclineReason,
+) {
+  events.push({
+    key: `chart.declined:${group.briefs.join("+")}`,
+    batch: run.batch,
+    type: "chart.declined",
+    measure: group.measure,
+    briefs: [...group.briefs],
+    models: uniqueSorted(group.models, byModelOrder),
+    why,
+  });
 }
 
 /** The code's notion of the same row label: lower case, no accents, collapsed whitespace. */
@@ -411,29 +355,25 @@ export function normalizeKey(key: string): string {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Merging: labels by the utility model (web), everything else by code
+// Merging: groups and labels by the utility model, everything else by code
 
-export function chartMergeCalls(state: RunState, kit: StepKit): Call[] {
-  const chart = chartOf(state);
-  if (chart.origin !== "web") return [];
-  const briefs: MergeBrief[] = chart.briefs
+export function chartMergeCall(state: RunState, kit: StepKit): Call {
+  const briefs: MergeBrief[] = briefsWithRows(state)
     .map((b) => ({
-      label: b.label,
+      id: b.id,
       question: b.question,
       dimension: b.dimension,
-      measure: b.measures[0] ?? "",
+      measure: b.measure,
       rows: b.rows.map((r) => ({ id: r.id, key: r.key })),
     }))
-    .sort((a, b) => (a.label < b.label ? -1 : 1));
-  return [
-    kit.call(
-      state,
-      "chart-merge:0",
-      "utility",
-      "chart_merge",
-      chartMergePrompt({ question: state.question, briefs }),
-    ),
-  ];
+    .sort((a, b) => (a.id < b.id ? -1 : 1));
+  return kit.call(
+    state,
+    "chart-merge:0",
+    "utility",
+    "chart_merge",
+    chartMergePrompt({ question: state.question, briefs }),
+  );
 }
 
 function majority<T>(
@@ -453,174 +393,174 @@ function majority<T>(
   return [...counts.values()].sort((a, b) => b.n - a.n || a.first - b.first)[0]?.value;
 }
 
+interface Group {
+  question: string;
+  dimension: string;
+  measure: string;
+  briefs: ChartBrief[];
+  keys: Map<string, string>; // row id → the aligned label
+  order: number;
+}
+
 /**
- * The merge of a chart run. Web data: rows are matched by label (the utility model's alignment, or
- * the normalized label when it gave none); rows of a draft whose measure is not the agreed one are
- * left out; values of one row from several models are compared by code (`sameValue`): the same
- * value from two models is support, different values are kept as alternatives and open a dispute,
- * and a value from one model opens one too (its source is checked). User data: the dimension, the
- * measures, the transform and the mark most briefs chose (ties by model order).
+ * The groups of the proposed charts: the utility model's (a brief in one group only, the first
+ * that names it), or one group per measure written the same way when it gave none. A brief in no
+ * group is a group of its own. A draft counts once per group: its first brief there.
  */
-export function reduceChartMerge(run: RunState, outputs: Map<string, Output>, events: RunEvent[]) {
-  const chart = chartOf(run);
-  const briefs = chart.briefs;
+function groupsOf(run: RunState, merge: OutputOf<"chart_merge"> | undefined): Group[] {
+  const briefs = briefsWithRows(run);
+  const byId = new Map(briefs.map((b) => [b.id, b]));
+  const placed = new Set<string>();
+  const groups: Group[] = [];
+  const add = (g: Omit<Group, "order" | "briefs">, ids: readonly string[]) => {
+    const list: ChartBrief[] = [];
+    for (const raw of ids) {
+      const b = byId.get(raw.trim());
+      if (!b || placed.has(b.id) || list.some((x) => x.model === b.model)) continue;
+      placed.add(b.id);
+      list.push(b);
+    }
+    if (list.length > 0) groups.push({ ...g, briefs: list, order: groups.length });
+  };
+  for (const c of merge?.charts ?? []) {
+    const keys = new Map<string, string>();
+    for (const k of c.keys) if (!keys.has(k.row.trim())) keys.set(k.row.trim(), k.key.trim());
+    add(
+      {
+        question: c.question.trim(),
+        dimension: c.dimension.trim(),
+        measure: c.measure.trim(),
+        keys,
+      },
+      c.briefs,
+    );
+  }
+  for (const b of briefs) {
+    if (placed.has(b.id)) continue;
+    // without the utility model, the briefs of one measure written the same way go together
+    const same = merge
+      ? [b]
+      : briefs.filter(
+          (x) => !placed.has(x.id) && normalizeKey(x.measure) === normalizeKey(b.measure),
+        );
+    add(
+      { question: b.question, dimension: b.dimension, measure: b.measure, keys: new Map() },
+      same.map((x) => x.id),
+    );
+  }
+  return groups;
+}
+
+/**
+ * The charts of the answer. Each group of two drafts or more is a chart, the most supported first,
+ * at most `CHART_LIMITS.charts`; the others are declined. In a chart, rows are matched by label (the
+ * utility model's alignment, or the normalized label when it gave none); values of one row from
+ * several models are compared by code (`sameValue`): the same value from two models is support,
+ * different values are kept as alternatives and open a dispute, and a value from one model opens
+ * one too (its source is checked).
+ */
+export function reduceChartMerge(
+  run: RunState,
+  merge: OutputOf<"chart_merge"> | undefined,
+  events: RunEvent[],
+) {
+  const groups = groupsOf(run, merge);
+  const qualifying = groups
+    .filter((g) => g.briefs.length >= 2)
+    .sort((a, b) => b.briefs.length - a.briefs.length || a.order - b.order);
+  const kept = qualifying.slice(0, CHART_LIMITS.charts);
+  for (const g of groups) {
+    if (kept.includes(g)) continue;
+    decline(
+      run,
+      events,
+      {
+        measure: g.measure,
+        briefs: g.briefs.map((b) => b.id),
+        models: g.briefs.map((b) => b.model),
+      },
+      g.briefs.length >= 2 ? "over_cap" : "one_draft",
+    );
+  }
+  kept.forEach((g, i) => {
+    const id = `c${i + 1}`;
+    const base = baseChart(run, id, g, events);
+    run.charts.plans[id] = {
+      id,
+      briefs: g.briefs.map((b) => b.id),
+      writer: null,
+      base,
+      after: null,
+      seed: null,
+    };
+  });
+  chooseWriters(run);
+}
+
+function baseChart(run: RunState, id: string, g: Group, events: RunEvent[]): Chart {
+  const rowsByLabel = new Map<
+    string,
+    { label: string; order: number; entries: { model: ModelId; row: BriefRow }[] }
+  >();
+  let order = 0;
+  for (const b of g.briefs) {
+    for (const r of b.rows) {
+      const lbl = g.keys.get(r.id) || r.key;
+      const k = normalizeKey(lbl);
+      let entry = rowsByLabel.get(k);
+      if (!entry) {
+        entry = { label: lbl, order: order++, entries: [] };
+        rowsByLabel.set(k, entry);
+      }
+      if (!entry.entries.some((e) => e.model === b.model))
+        entry.entries.push({ model: b.model, row: r });
+    }
+  }
+  let list = [...rowsByLabel.values()];
+  const rowOf = (e: (typeof list)[number]) => buildRow(e.label, e.entries);
+  let rows = list.map(rowOf);
+  if (temporalKeys(rows)) {
+    list = list.sort((a, b) => (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
+    rows = list.map(rowOf);
+  }
+  rows = rows.slice(0, CHART_LIMITS.rows);
+  const pick = (field: (b: ChartBrief) => string) =>
+    majority(
+      g.briefs.map((b) => ({ model: b.model, value: field(b) })),
+      normalizeText,
+    ) ?? "";
   const mark =
     majority(
-      briefs.map((b) => ({ model: b.model, value: b.mark })),
+      g.briefs.map((b) => ({ model: b.model, value: b.mark })),
       (v) => v,
     ) ?? "bar";
-  const merge = outputs.get("chart-merge:0")?.output as OutputOf<"chart_merge"> | undefined;
-  let base: Chart;
-  if (chart.origin === "web") {
-    const excluded = new Set(
-      (merge?.drafts ?? []).filter((d) => d.measure === "different").map((d) => d.draft.trim()),
-    );
-    // never leave out every draft
-    if (briefs.every((b) => excluded.has(b.label))) excluded.clear();
-    const aligned = new Map<string, string>();
-    for (const k of merge?.keys ?? [])
-      if (!aligned.has(k.row.trim())) aligned.set(k.row.trim(), k.key.trim());
-    const groups = new Map<
-      string,
-      { label: string; order: number; entries: { model: ModelId; row: BriefRow }[] }
-    >();
-    let order = 0;
-    for (const b of briefs) {
-      if (excluded.has(b.label)) continue;
-      for (const r of b.rows) {
-        const lbl = aligned.get(r.id) || r.key;
-        const k = normalizeKey(lbl);
-        let g = groups.get(k);
-        if (!g) {
-          g = { label: lbl, order: order++, entries: [] };
-          groups.set(k, g);
-        }
-        if (!g.entries.some((e) => e.model === b.model)) g.entries.push({ model: b.model, row: r });
-      }
-    }
-    let list = [...groups.values()];
-    const rowsOf = (g: (typeof list)[number]) => buildRow(g.label, g.entries);
-    let rows = list.map(rowsOf);
-    if (temporalKeys(rows)) {
-      list = list.sort((a, b) => (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
-      rows = list.map(rowsOf);
-    }
-    rows = rows.slice(0, CHART_LIMITS.rows);
-    const kept = briefs.filter((b) => !excluded.has(b.label));
-    const question =
-      merge?.question.trim() ||
-      majority(
-        kept.map((b) => ({ model: b.model, value: b.question })),
-        normalizeText,
-      ) ||
-      run.question;
-    const dimension =
-      merge?.dimension.trim() ||
-      majority(
-        kept.map((b) => ({ model: b.model, value: b.dimension })),
-        normalizeText,
-      ) ||
-      "";
-    const measure =
-      merge?.measure.trim() ||
-      majority(
-        kept.map((b) => ({ model: b.model, value: b.measures[0] ?? "" })),
-        normalizeText,
-      ) ||
-      "";
-    base = {
-      kind: "chart",
-      id: CHART_ID,
-      brief: { question, measures: [measure], dimensions: [dimension] },
-      data: { origin: "web", columns: [], rows },
-      transform: [],
-      encoding: {},
-      mark,
-      title: "",
-      caption: "",
-    };
-    for (const row of rows) {
-      if (row.status !== "single" && row.status !== "disputed") continue;
-      const dispute = openDispute(run, row, 0);
-      events.push({
-        key: `dispute.opened:${dispute.id}`,
-        batch: run.batch,
-        type: "dispute.opened",
-        dispute: clone(dispute),
-      });
-    }
-  } else {
-    const dataset = chart.dataset as Dataset;
-    const base0 = baseBrief(briefs);
-    const dimension = base0?.dimension ?? dataset.columns[0]?.name ?? "";
-    const measures =
-      base0?.measures ??
-      dataset.columns
-        .filter((c) => c.type === "number")
-        .map((c) => c.name)
-        .slice(0, 1);
-    const transform = base0?.transform ?? [];
-    const question = base0?.question || run.question;
-    base = {
-      kind: "chart",
-      id: CHART_ID,
-      brief: { question, measures, dimensions: [dimension] },
-      data: {
-        origin: "user",
-        columns: clone(dataset.columns),
-        rows: dataset.rows.map((values, i) => ({
-          key: `r${i + 1}`,
-          values: { ...values },
-          source: "upload",
-          quote: "",
-          support: [],
-          status: "upload" as const,
-          alternatives: [],
-        })),
-      },
-      transform: clone(transform),
-      encoding: {},
-      mark,
-      title: "",
-      caption: "",
-    };
+  const base: Chart = {
+    kind: "chart",
+    id,
+    brief: {
+      question: g.question || pick((b) => b.question) || run.question,
+      measures: [g.measure || pick((b) => b.measure)],
+      dimensions: [g.dimension || pick((b) => b.dimension)],
+    },
+    data: { rows },
+    transform: [],
+    encoding: {},
+    mark,
+    title: "",
+    caption: "",
+  };
+  base.encoding = defaultLayers(base, mark).encoding;
+  for (const row of rows) {
+    if (row.status !== "single" && row.status !== "disputed") continue;
+    const dispute = openDispute(run, id, row, 0);
+    events.push({
+      key: `dispute.opened:${dispute.id}`,
+      batch: run.batch,
+      type: "dispute.opened",
+      dispute: clone(dispute),
+    });
   }
-  const plain = defaultLayers(base, base.mark);
-  base.encoding = plain.encoding;
-  chart.base = base;
-  chart.writer = chooseWriter(run);
-  run.next = { phase: "spec" };
-}
-
-/** The ops of a transform, in order: what two briefs that compute the same thing share. */
-function shapeOf(transform: readonly unknown[]): string {
-  return transform
-    .map((t) => (t && typeof t === "object" ? (Object.keys(t).find((k) => k !== "as") ?? "") : ""))
-    .join(">");
-}
-
-/**
- * User data: the brief the merge keeps whole, so that its dimension, measures and transform fit
- * together. Among the briefs with a dimension, measures and an allowed transform, the one that
- * shares the most with the others: the dimension most chose and the shape of transform most chose
- * (the same ops in the same order: field names differ between models). Ties by model order.
- */
-function baseBrief(briefs: readonly ChartBrief[]): ChartBrief | null {
-  const valid = briefs.filter((b) => b.dimension !== "" && b.measures.length > 0 && b.transform);
-  if (valid.length === 0) return null;
-  const dimension = majority(
-    valid.map((b) => ({ model: b.model, value: b.dimension })),
-    (v) => v,
-  );
-  const shape = majority(
-    valid.map((b) => ({ model: b.model, value: shapeOf(b.transform ?? []) })),
-    (v) => v,
-  );
-  const score = (b: ChartBrief) =>
-    Number(b.dimension === dimension) + Number(shapeOf(b.transform ?? []) === shape);
-  return (
-    [...valid].sort((a, b) => score(b) - score(a) || byModelOrder(a.model, b.model))[0] ?? null
-  );
+  return base;
 }
 
 function buildRow(label: string, entries: readonly { model: ModelId; row: BriefRow }[]): Row {
@@ -658,9 +598,13 @@ function buildRow(label: string, entries: readonly { model: ModelId; row: BriefR
   };
 }
 
-function openDispute(run: RunState, row: Row, round: Dispute["openedRound"]): Dispute {
-  const chart = chartOf(run);
-  const id = `d${++chart.counters.dispute}`;
+function openDispute(
+  run: RunState,
+  block: string,
+  row: Row,
+  round: Dispute["openedRound"],
+): Dispute {
+  const id = `d${++run.charts.counters.dispute}`;
   const values: DisputeValue[] = [row, ...row.alternatives].map((v, i) => ({
     id: `v${i + 1}`,
     value: v.values.value as number,
@@ -671,16 +615,16 @@ function openDispute(run: RunState, row: Row, round: Dispute["openedRound"]): Di
   }));
   const dispute: Dispute = {
     id,
-    block: CHART_ID,
+    block,
     row: row.key,
-    lockKey: `${CHART_ID}/data/${row.key}`,
+    lockKey: `${block}/data/${row.key}`,
     openedRound: round,
     values,
     checks: {},
     state: "open",
     winner: null,
   };
-  chart.disputes[id] = dispute;
+  run.charts.disputes[id] = dispute;
   return dispute;
 }
 
@@ -690,83 +634,90 @@ function stated(run: RunState, value: number, quote: string, source: string): bo
 }
 
 /**
- * The writer of the spec, chosen like the editor: the model whose brief is closest to the agreed
- * one (web: the most rows whose value is the row's agreed value; user: the most of dimension,
- * measures, transform and mark agreed), ties by a rotation seeded by the run id.
+ * The writer of each chart's spec, chosen like the editor: among the models whose brief the chart
+ * draws, the one that gave the most of its agreed values, ties by a rotation seeded by the run id.
+ * A model writes one spec while another model of the chart is free.
  */
-export function chooseWriter(run: RunState): ModelId | null {
-  const chart = chartOf(run);
-  const base = chart.base;
-  if (!base || chart.briefs.length === 0) return null;
+export function chooseWriters(run: RunState) {
   const start = hash(run.id) % MODELS.length;
   const rotation = [...MODELS.slice(start), ...MODELS.slice(0, start)];
-  const briefed = new Set(chart.briefs.map((b) => b.model));
-  const score = (m: ModelId): number => {
-    const b = chart.briefs.find((x) => x.model === m);
-    if (!b) return -1;
-    if (base.data.origin === "web")
-      return base.data.rows.filter((r) => r.support.includes(m)).length;
-    return (
-      Number(b.dimension === base.brief.dimensions[0]) +
-      Number(
-        JSON.stringify([...b.measures].sort()) === JSON.stringify([...base.brief.measures].sort()),
-      ) +
-      Number(JSON.stringify(b.transform) === JSON.stringify(base.transform)) +
-      Number(b.mark === base.mark)
+  const busy = new Set<ModelId>();
+  for (const id of chartIds(run)) {
+    const plan = run.charts.plans[id] as ChartPlan;
+    const briefed = new Set(
+      run.charts.briefs.filter((b) => plan.briefs.includes(b.id)).map((b) => b.model),
     );
-  };
-  let best: ModelId | null = null;
-  for (const m of rotation)
-    if (briefed.has(m) && (best === null || score(m) > score(best))) best = m;
-  return best;
+    const score = (m: ModelId) => plan.base.data.rows.filter((r) => r.support.includes(m)).length;
+    const pickFrom = (free: boolean) => {
+      let best: ModelId | null = null;
+      for (const m of rotation)
+        if (briefed.has(m) && (!free || !busy.has(m)) && (best === null || score(m) > score(best)))
+          best = m;
+      return best;
+    };
+    plan.writer = pickFrom(true) ?? pickFrom(false);
+    if (plan.writer) busy.add(plan.writer);
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
-// The spec and the seed render
+// The specs and the seed render
 
 export function specCalls(state: RunState, kit: StepKit, affordable: boolean): Call[] {
-  const chart = chartOf(state);
-  if (!chart.base || !chart.writer || !affordable) return [];
-  const columns = chart.dataset ? describeDataset(chart.dataset) : null;
-  return [
-    kit.call(
-      state,
-      `spec:0:${chart.writer}`,
-      chart.writer,
-      "chart_spec",
-      chartSpecPrompt({ question: state.question, chart: chart.base, columns }),
-    ),
-  ];
+  if (!affordable) return [];
+  const document = state.snapshots[0];
+  return chartIds(state).flatMap((id) => {
+    const plan = state.charts.plans[id] as ChartPlan;
+    if (!plan.writer || !document) return [];
+    return [
+      kit.call(
+        state,
+        `spec:${id}:${plan.writer}`,
+        plan.writer,
+        "chart_spec",
+        chartSpecPrompt({ question: state.question, chart: plan.base, document }),
+      ),
+    ];
+  });
 }
 
 export function reduceSpec(run: RunState, outputs: Map<string, Output>) {
-  const chart = chartOf(run);
-  const base = chart.base as Chart;
-  const out = chart.writer
-    ? (outputs.get(`spec:0:${chart.writer}`)?.output as OutputOf<"chart_spec"> | undefined)
-    : undefined;
-  const title = out?.title.trim().slice(0, 120) || base.brief.question;
-  const caption = out?.caption.trim().slice(0, 600) ?? "";
-  const plain: ChartLayers = {
-    mark: base.mark,
-    encoding: clone(base.encoding),
-    transform: clone(base.transform),
-    title,
-    caption,
-  };
-  let writer: ChartLayers | null = null;
-  let why: string | null = out ? null : "no spec";
-  let stripped: string[] = [];
-  if (out) {
-    const layers = layersFromSpec(out.spec, base);
-    if (layers.ok) {
-      // the transform is the one the briefs agreed on; the writer's is used only when there is none
-      const transform = base.transform.length > 0 ? clone(base.transform) : layers.transform;
-      writer = { mark: layers.mark, encoding: layers.encoding, transform, title, caption };
-      stripped = layers.stripped;
-    } else why = `${layers.why}: ${layers.detail}`;
+  const document = run.snapshots[0];
+  for (const id of chartIds(run)) {
+    const plan = run.charts.plans[id] as ChartPlan;
+    const base = plan.base;
+    const out = plan.writer
+      ? (outputs.get(`spec:${id}:${plan.writer}`)?.output as OutputOf<"chart_spec"> | undefined)
+      : undefined;
+    const title = out?.title.trim().slice(0, 120) || base.brief.question;
+    const caption = out?.caption.trim().slice(0, 600) ?? "";
+    const plain: ChartLayers = {
+      mark: base.mark,
+      encoding: clone(base.encoding),
+      transform: [],
+      title,
+      caption,
+    };
+    let writer: ChartLayers | null = null;
+    let why: string | null = out ? null : "no spec";
+    let stripped: string[] = [];
+    if (out) {
+      const layers = layersFromSpec(out.spec);
+      if (layers.ok) {
+        writer = {
+          mark: layers.mark,
+          encoding: layers.encoding,
+          transform: layers.transform,
+          title,
+          caption,
+        };
+        stripped = layers.stripped;
+      } else why = `${layers.why}: ${layers.detail}`;
+    }
+    const after = out?.after.trim() ?? "";
+    plan.after = document?.blocks[after]?.kind === "paragraph" ? after : null;
+    plan.seed = { writer, plain, why, stripped };
   }
-  chart.seed = { writer, plain, why, stripped };
   run.next = { phase: "seed" };
 }
 
@@ -775,13 +726,16 @@ export function withLayers(chart: Chart, layers: ChartLayers): Chart {
 }
 
 export function seedRenderCall(state: RunState, kit: StepKit): Call {
-  const chart = chartOf(state);
-  const base = chart.base as Chart;
-  const seed = chart.seed as NonNullable<ChartRunState["seed"]>;
-  const specs = [
-    ...(seed.writer ? [{ id: "writer", spec: chartSpec(withLayers(base, seed.writer)) }] : []),
-    { id: "plain", spec: chartSpec(withLayers(base, seed.plain)) },
-  ];
+  const specs = chartIds(state).flatMap((id) => {
+    const plan = state.charts.plans[id] as ChartPlan;
+    const seed = plan.seed as NonNullable<ChartPlan["seed"]>;
+    return [
+      ...(seed.writer
+        ? [{ id: `${id}:writer`, spec: chartSpec(withLayers(plan.base, seed.writer)) }]
+        : []),
+      { id: `${id}:plain`, spec: chartSpec(withLayers(plan.base, seed.plain)) },
+    ];
+  });
   return renderCall(state, kit, "render:seed", specs);
 }
 
@@ -796,6 +750,11 @@ export function renderCall(
   return c;
 }
 
+interface Output {
+  call: Call;
+  output: unknown;
+}
+
 type RenderResults = Map<string, { ok: boolean; error: string }>;
 
 function renderResults(outputs: Map<string, Output>, key: string): RenderResults {
@@ -807,49 +766,64 @@ function renderResults(outputs: Map<string, Output>, key: string): RenderResults
   return results;
 }
 
-/** Seeds the document: the writer's chart if it renders, else the plain one; its render is version 1's. */
+/**
+ * Seeds the document: the paragraphs of the merge with each chart after the paragraph its writer
+ * named (after the first paragraph when it named none). A chart is the writer's if it renders,
+ * else the plain one of code; its render is version 1's.
+ */
 export function reduceSeedRender(run: RunState, outputs: Map<string, Output>, events: RunEvent[]) {
-  const chart = chartOf(run);
-  const base = chart.base as Chart;
-  const seed = chart.seed as NonNullable<ChartRunState["seed"]>;
+  const prose = run.snapshots[0] ?? { version: 1, order: [], blocks: {} };
   const results = renderResults(outputs, "render:seed");
-  const writerOk = seed.writer !== null && results.get("writer")?.ok === true;
-  const used = writerOk ? "writer" : "plain";
-  const layers = writerOk ? (seed.writer as ChartLayers) : seed.plain;
-  const block = withLayers(base, layers);
-  const snapshot: Snapshot = { version: 1, order: [block.id], blocks: { [block.id]: block } };
+  const ids = chartIds(run);
+  const blocks: Snapshot["blocks"] = { ...prose.blocks };
+  const used: Record<string, "writer" | "plain"> = {};
+  for (const id of ids) {
+    const plan = run.charts.plans[id] as ChartPlan;
+    const seed = plan.seed as NonNullable<ChartPlan["seed"]>;
+    const writerOk = seed.writer !== null && results.get(`${id}:writer`)?.ok === true;
+    used[id] = writerOk ? "writer" : "plain";
+    blocks[id] = withLayers(plan.base, writerOk ? (seed.writer as ChartLayers) : seed.plain);
+    const why =
+      seed.writer && !writerOk
+        ? `render_failed: ${results.get(`${id}:writer`)?.error || "no render"}`
+        : seed.why;
+    events.push({
+      key: `chart.written:${id}`,
+      batch: run.batch,
+      type: "chart.written",
+      block: id,
+      writer: plan.writer,
+      used: used[id],
+      why: why ?? null,
+      stripped: seed.stripped,
+    });
+  }
+  const first = prose.order[0] ?? null;
+  const placeOf = (id: string) => run.charts.plans[id]?.after ?? first;
+  const order: string[] = ids.filter((id) => placeOf(id) === null);
+  for (const p of prose.order) order.push(p, ...ids.filter((id) => placeOf(id) === p));
+  const snapshot: Snapshot = { version: 1, order, blocks };
   run.snapshots = [snapshot];
-  const why =
-    seed.writer && !writerOk
-      ? `render_failed: ${results.get("writer")?.error || "no render"}`
-      : seed.why;
-  events.push({
-    key: `chart.written:${block.id}`,
-    batch: run.batch,
-    type: "chart.written",
-    block: block.id,
-    writer: chart.writer,
-    used,
-    why: why ?? null,
-    stripped: seed.stripped,
-  });
   events.push({
     key: "document.seeded",
     batch: run.batch,
     type: "document.seeded",
     snapshot,
-    conflicts: [],
+    conflicts: run.conflicts,
     flags: { ...run.flags },
   });
-  recordRender(run, events, {
-    version: 1,
-    block: block.id,
-    call: "render:seed",
-    result: used,
-    ok: results.get(used)?.ok === true,
-    error: results.get(used)?.ok === true ? null : results.get(used)?.error || "no render",
-  });
-  chart.seed = null;
+  for (const id of ids) {
+    const r = results.get(`${id}:${used[id]}`);
+    recordRender(run, events, {
+      version: 1,
+      block: id,
+      call: "render:seed",
+      result: `${id}:${used[id]}`,
+      ok: r?.ok === true,
+      error: r?.ok === true ? null : r?.error || "no render",
+    });
+    (run.charts.plans[id] as ChartPlan).seed = null;
+  }
   run.momentsDue = true;
   // without rounds, the close still settles what no round checked and renders that version
   run.next =
@@ -859,9 +833,9 @@ export function reduceSeedRender(run: RunState, outputs: Map<string, Output>, ev
 }
 
 function recordRender(run: RunState, events: RunEvent[], render: ChartRender) {
-  chartOf(run).renders.push(render);
+  run.charts.renders.push(render);
   events.push({
-    key: `chart.rendered:${render.version}`,
+    key: `chart.rendered:${render.block}:${render.version}`,
     batch: run.batch,
     type: "chart.rendered",
     ...render,
@@ -871,60 +845,20 @@ function recordRender(run: RunState, events: RunEvent[], render: ChartRender) {
 // ---------------------------------------------------------------------------------------------
 // The rounds
 
-export const CHART_ROUND_KIND = {
-  1: "chart_round1",
-  2: "chart_round2",
-  3: "chart_round3",
-} as const;
-
-export function chartRoundCalls(
-  state: RunState,
-  round: 1 | 2 | 3,
-  kit: StepKit,
-  threads: (voter: ModelId) => ThreadView[],
-): Call[] {
-  const chart = chartOf(state);
-  const snapshot = state.snapshots.at(-1) as Snapshot;
-  const block = snapshot.blocks[CHART_ID] as Chart;
-  const columns = chart.dataset ? describeDataset(chart.dataset) : null;
-  const locked = Object.values(state.threads)
-    .filter((t) => t.state === "open")
-    .map((t) => t.lockKey);
-  const disputes = visibleDisputes(state, round);
-  return MODELS.map((m) =>
-    kit.call(
-      state,
-      `round:${round}:${m}`,
-      m,
-      CHART_ROUND_KIND[round],
-      chartRoundPrompt({
-        question: state.question,
-        round,
-        cap: round === 1 ? state.config.caps.round1 : state.config.caps.round2,
-        chart: block,
-        columns,
-        sources: state.sources,
-        threads: round === 1 ? [] : threads(m),
-        locked: round === 3 ? [] : [...locked, ...openDisputes(state).map((d) => d.lockKey)],
-        disputes: disputes.map((d) => disputeView(state, d, m)),
-      }),
-    ),
-  );
-}
-
 /** The disputes a round checks: open, and opened before it. */
-function visibleDisputes(state: RunState, round: number): Dispute[] {
-  return Object.values(chartOf(state).disputes)
+export function visibleDisputes(state: RunState, round: number): Dispute[] {
+  return Object.values(state.charts.disputes)
     .filter((d) => d.state === "open" && d.openedRound < round)
     .sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)));
 }
 
-function openDisputes(state: RunState): Dispute[] {
-  return state.chart ? Object.values(state.chart.disputes).filter((d) => d.state === "open") : [];
+export function openDisputes(state: RunState): Dispute[] {
+  return Object.values(state.charts.disputes).filter((d) => d.state === "open");
 }
 
-function disputeView(state: RunState, d: Dispute, model: ModelId): DisputeView {
+export function disputeView(state: RunState, d: Dispute, model: ModelId): DisputeView {
   return {
+    chart: d.block,
     row: d.row,
     values: d.values.map((v) => {
       const s = state.sources.find((x) => x.id === v.source);
@@ -941,18 +875,21 @@ function disputeView(state: RunState, d: Dispute, model: ModelId): DisputeView {
   };
 }
 
-/** What one model's chart round brought: its layer patches, its data patches, its checks. */
+/**
+ * What one model's round brought to the charts: its layer patches, its data patches (at most the
+ * cap of the round across all charts, extras cut in order) and its checks of the sources.
+ */
 export function readChartRound(
   run: RunState,
   input: {
     model: ModelId;
     round: 1 | 2 | 3;
-    output: Partial<OutputOf<"chart_round2">>;
+    output: Partial<OutputOf<"round2">>;
     events: RunEvent[];
   },
 ): { candidates: Candidate[]; data: DataCandidate[] } {
   const { model, round } = input;
-  const block = run.snapshots.at(-1)?.blocks[CHART_ID] as Chart;
+  const snapshot = run.snapshots.at(-1);
   const candidates: Candidate[] = [];
   const data: DataCandidate[] = [];
   if (round < 3 && input.output.patches) {
@@ -960,11 +897,13 @@ export function readChartRound(
     const locks = new Set<string>();
     const known = new Set(run.sources.map((s) => s.id));
     for (const [index, p] of input.output.patches.entries()) {
+      const id = p.chart.trim();
       const drop = (why: DroppedPatch["why"], detail = "") =>
         dropPatch(run, input.events, {
           round: round as 1 | 2,
           model,
           index,
+          block: id,
           layer: p.layer,
           path: p.path,
           why,
@@ -982,18 +921,23 @@ export function readChartRound(
         drop("reason_not_one_sentence");
         continue;
       }
+      const block = chartIn(snapshot, id);
+      if (!block) {
+        drop("unknown_chart", "A patch names a chart of the answer.");
+        continue;
+      }
       if (p.layer === "data") {
         const checked = checkDataPatch(run, block, p, known);
         if ("why" in checked) {
           drop(checked.why, checked.detail);
           continue;
         }
-        if (locks.has(`data/${checked.row}`)) {
+        if (locks.has(`${id}/data/${checked.row}`)) {
           drop("row_in_dispute", "one patch per row");
           continue;
         }
-        locks.add(`data/${checked.row}`);
-        data.push({ ...checked, model, reason: p.reason.trim() });
+        locks.add(`${id}/data/${checked.row}`);
+        data.push({ ...checked, model, block: id, reason: p.reason.trim() });
         continue;
       }
       const checked = checkPatch(block, { layer: p.layer, path: p.path, value: p.value });
@@ -1001,15 +945,15 @@ export function readChartRound(
         drop(checked.why, checked.detail);
         continue;
       }
-      if (locks.has(p.layer)) {
+      if (locks.has(`${id}/${p.layer}`)) {
         drop("same_layer", "one patch per layer and round");
         continue;
       }
-      locks.add(p.layer);
+      locks.add(`${id}/${p.layer}`);
       candidates.push({
         model,
         index,
-        block: CHART_ID,
+        block: id,
         op: "patch",
         layer: p.layer,
         path: p.path.trim(),
@@ -1021,9 +965,17 @@ export function readChartRound(
     }
   }
   const visible = visibleDisputes(run, round);
-  const recorded: { row: string; value: string; verdict: Verdict; reason: string }[] = [];
+  const recorded: {
+    block: string;
+    row: string;
+    value: string;
+    verdict: Verdict;
+    reason: string;
+  }[] = [];
   for (const c of input.output.checks ?? []) {
-    const dispute = visible.find((d) => normalizeKey(d.row) === normalizeKey(c.row));
+    const dispute = visible.find(
+      (d) => d.block === c.chart.trim() && normalizeKey(d.row) === normalizeKey(c.row),
+    );
     const value = dispute?.values.find((v) => v.id === c.value.trim());
     if (!dispute || !value || value.support.includes(model)) continue;
     const checks = dispute.checks[value.id] ?? {};
@@ -1031,6 +983,7 @@ export function readChartRound(
     checks[model] = c.verdict;
     dispute.checks[value.id] = checks;
     recorded.push({
+      block: dispute.block,
       row: dispute.row,
       value: value.id,
       verdict: c.verdict,
@@ -1050,17 +1003,17 @@ export function readChartRound(
 }
 
 /**
- * The checks of a data patch of web data: a number, one source of the run, a quote that states the
- * number, and a row that is not in dispute. It never sets the value: it opens a dispute.
+ * The checks of a data patch: a number, one source of the run, a quote that states the number, and
+ * a row that is not in dispute. It never sets the value: it opens a dispute.
  */
 function checkDataPatch(
   run: RunState,
   block: Chart,
   p: PatchOutput,
   known: ReadonlySet<string>,
-): Omit<DataCandidate, "model" | "reason"> | { why: DroppedPatch["why"]; detail: string } {
-  if (block.data.origin === "user")
-    return { why: "user_data", detail: "The data of an upload is not the models' to change." };
+):
+  | Omit<DataCandidate, "model" | "block" | "reason">
+  | { why: DroppedPatch["why"]; detail: string } {
   const value = readModelNumber(readValueText(p.value));
   if (value === null) return { why: "not_a_number", detail: p.value };
   const source = p.sources.map((s) => s.trim()).find((s) => known.has(s));
@@ -1072,7 +1025,11 @@ function checkDataPatch(
   if (key === "") return { why: "unknown_path", detail: "A data patch names its row." };
   const row = block.data.rows.find((r) => normalizeKey(r.key) === normalizeKey(key));
   const rowKey = row?.key ?? key;
-  if (openDisputes(run).some((d) => normalizeKey(d.row) === normalizeKey(rowKey)))
+  if (
+    openDisputes(run).some(
+      (d) => d.block === block.id && normalizeKey(d.row) === normalizeKey(rowKey),
+    )
+  )
     return { why: "row_in_dispute", detail: "The row is being checked." };
   if (
     row &&
@@ -1089,11 +1046,11 @@ function readValueText(text: string): string {
   return typeof v === "number" ? String(v) : typeof v === "string" ? v : text;
 }
 
-/** The layer patches that need the render gate: everything but the caption, which is not drawn. */
 function layerOrder(c: Candidate): number {
   return CHART_LAYERS.indexOf(c.layer as ChartLayer);
 }
 
+/** The layer patches that need the render gate: everything but the caption, which is not drawn. */
 export function needsRender(c: Candidate): boolean {
   return c.op === "patch" && c.layer !== "caption";
 }
@@ -1104,16 +1061,20 @@ export function gateCall(
   round: 1 | 2,
   candidates: readonly Candidate[],
 ): Call {
-  const block = state.snapshots.at(-1)?.blocks[CHART_ID] as Chart;
+  const snapshot = state.snapshots.at(-1);
   const apply = (chart: Chart, c: Candidate) =>
     patchChart(chart, c.layer as ChartLayer, c.path ?? "", JSON.parse(c.text));
   const specs = candidates.flatMap((c, i) => {
-    if (!needsRender(c)) return [];
-    const own = candidates.filter((o) => o.model === c.model && o !== c && needsRender(o));
+    const block = chartIn(snapshot, c.block);
+    if (!needsRender(c) || !block) return [];
+    const own = candidates.filter(
+      (o) => o.model === c.model && o.block === c.block && o !== c && needsRender(o),
+    );
     const together = [c, ...own].sort((a, b) => layerOrder(a) - layerOrder(b));
     return [
       { id: `p${i}`, spec: chartSpec(apply(block, c)) },
-      // with the author's other patches of the round (a new transform and the encoding of its fields)
+      // with the author's other patches of the chart in the round (a new transform and the
+      // encoding of its fields)
       ...(own.length > 0 ? [{ id: `p${i}+`, spec: chartSpec(together.reduce(apply, block)) }] : []),
     ];
   });
@@ -1140,6 +1101,7 @@ export function reduceGate(
       round,
       model: c.model,
       index: c.index ?? i,
+      block: c.block,
       layer: c.layer as ChartLayer,
       path: c.path ?? "",
       why: "render_failed",
@@ -1151,7 +1113,7 @@ export function reduceGate(
 
 /** A patch dropped by its checks or by the render gate: kept in the state, and an event. */
 function dropPatch(run: RunState, events: RunEvent[], dropped: DroppedPatch) {
-  chartOf(run).dropped.push(dropped);
+  run.charts.dropped.push(dropped);
   events.push({
     key: `patch.dropped:${dropped.round}:${dropped.model}:${dropped.index}`,
     batch: run.batch,
@@ -1167,13 +1129,17 @@ export function placeDataPatches(
   data: readonly DataCandidate[],
   events: RunEvent[],
 ): number {
-  const block = run.snapshots.at(-1)?.blocks[CHART_ID] as Chart;
+  const snapshot = run.snapshots.at(-1);
   const byRow = new Map<string, DataCandidate[]>();
-  for (const d of data)
-    byRow.set(normalizeKey(d.row), [...(byRow.get(normalizeKey(d.row)) ?? []), d]);
+  for (const d of data) {
+    const k = `${d.block}/${normalizeKey(d.row)}`;
+    byRow.set(k, [...(byRow.get(k) ?? []), d]);
+  }
   let opened = 0;
   for (const list of byRow.values()) {
     const first = list[0] as DataCandidate;
+    const block = chartIn(snapshot, first.block);
+    if (!block) continue;
     const existing = block.data.rows.find((r) => normalizeKey(r.key) === normalizeKey(first.row));
     const base: Row = existing
       ? clone(existing)
@@ -1208,7 +1174,12 @@ export function placeDataPatches(
     }
     const [main, ...rest] = values;
     if (!main) continue;
-    const dispute = openDispute(run, { ...base, ...main, alternatives: rest } as Row, round);
+    const dispute = openDispute(
+      run,
+      block.id,
+      { ...base, ...main, alternatives: rest } as Row,
+      round,
+    );
     opened++;
     events.push({
       key: `dispute.opened:${dispute.id}`,
@@ -1220,7 +1191,7 @@ export function placeDataPatches(
   return opened;
 }
 
-/** Whether the chart run has a dispute opened in this round, which the next round checks. */
+/** Whether a dispute opened in this round waits for the checks of the next round. */
 export function disputesAwaitChecks(state: RunState, round: number): boolean {
   return openDisputes(state).some((d) => d.openedRound >= round);
 }
@@ -1284,9 +1255,8 @@ export function settleDisputes(
   input: { final: boolean; round: number },
   events: RunEvent[],
 ): RowSettlement[] {
-  if (!run.chart) return [];
   const out: RowSettlement[] = [];
-  const due = Object.values(run.chart.disputes)
+  const due = Object.values(run.charts.disputes)
     .filter((d) => d.state === "open" && (input.final || d.openedRound < input.round))
     .sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)));
   for (const d of due) {
@@ -1307,6 +1277,7 @@ export function settleDisputes(
       batch: run.batch,
       type: "dispute.settled",
       dispute: d.id,
+      block: d.block,
       row: d.row,
       state,
       winner: d.winner,
@@ -1356,62 +1327,104 @@ export function settleRows(chart: Chart, settlements: readonly RowSettlement[]):
 // ---------------------------------------------------------------------------------------------
 // The render of each version
 
-/** The latest version of the chart, when it has no render yet. */
-export function versionToRender(state: RunState): Snapshot | null {
-  if (!state.chart) return null;
-  const last = state.snapshots.at(-1);
-  if (!last?.blocks[CHART_ID]) return null;
-  return state.chart.renders.some((r) => r.version === last.version) ? null : last;
-}
-
-export function versionRenderCall(state: RunState, kit: StepKit, snapshot: Snapshot): Call {
-  return renderCall(state, kit, `render:v${snapshot.version}`, [
-    { id: `v${snapshot.version}`, spec: chartSpec(snapshot.blocks[CHART_ID] as Chart) },
-  ]);
+function rendered(state: RunState, block: string, version: number): ChartRender | undefined {
+  return state.charts.renders.findLast((r) => r.block === block && r.version === version);
 }
 
 /**
- * Records the render of a version. A version that does not render (two patches that render alone
- * but not together) is followed by a version with the chart of the last version that rendered,
- * whose render it reuses.
+ * After a new version: a chart it left as it was keeps the render of the version before, without
+ * a render call (the edit of a paragraph, a change to another chart).
+ */
+export function carryRenders(run: RunState, events: RunEvent[]) {
+  const last = run.snapshots.at(-1);
+  const before = run.snapshots.at(-2);
+  if (!last || !before) return;
+  for (const chart of chartsOf(last)) {
+    if (rendered(run, chart.id, last.version)) continue;
+    const previous = chartIn(before, chart.id);
+    const render = rendered(run, chart.id, before.version);
+    if (!previous || !render || JSON.stringify(previous) !== JSON.stringify(chart)) continue;
+    recordRender(run, events, { ...render, version: last.version });
+  }
+}
+
+/** The latest version, when one of its charts has no render yet, and those charts. */
+export function versionToRender(state: RunState): { snapshot: Snapshot; blocks: string[] } | null {
+  const last = state.snapshots.at(-1);
+  if (!last || !hasCharts(state)) return null;
+  const blocks = chartsOf(last)
+    .filter((c) => !rendered(state, c.id, last.version))
+    .map((c) => c.id);
+  return blocks.length > 0 ? { snapshot: last, blocks } : null;
+}
+
+export function versionRenderCall(
+  state: RunState,
+  kit: StepKit,
+  pending: { snapshot: Snapshot; blocks: string[] },
+): Call {
+  return renderCall(
+    state,
+    kit,
+    `render:v${pending.snapshot.version}`,
+    pending.blocks.map((id) => ({ id, spec: chartSpec(pending.snapshot.blocks[id] as Chart) })),
+  );
+}
+
+/**
+ * Records the render of each chart of a version. A chart that does not render (two patches that
+ * render alone but not together) gets back the layers of its last version that rendered, in a new
+ * version.
  */
 export function reduceVersionRender(
   run: RunState,
   outputs: Map<string, Output>,
   events: RunEvent[],
 ) {
-  const chart = chartOf(run);
   const snapshot = run.snapshots.at(-1) as Snapshot;
   const key = `render:v${snapshot.version}`;
-  const r = renderResults(outputs, key).get(`v${snapshot.version}`);
-  recordRender(run, events, {
-    version: snapshot.version,
-    block: CHART_ID,
-    call: key,
-    result: `v${snapshot.version}`,
-    ok: r?.ok === true,
-    error: r?.ok ? null : r?.error || "no render",
-  });
-  if (r?.ok || chart.reverts.includes(snapshot.version)) return;
-  const good = [...chart.renders].reverse().find((x) => x.ok && x.version < snapshot.version);
-  const source = good ? run.snapshots.find((s) => s.version === good.version) : undefined;
-  if (!good || !source) return;
-  const block = clone(source.blocks[CHART_ID] as Chart);
-  // keep the rows as they were settled: only the layers that are drawn go back
-  block.data = clone((snapshot.blocks[CHART_ID] as Chart).data);
-  const reverted: Snapshot = {
+  const results = renderResults(outputs, key);
+  const reverted: Snapshot["blocks"] = {};
+  for (const chart of chartsOf(snapshot)) {
+    if (rendered(run, chart.id, snapshot.version)) continue;
+    const r = results.get(chart.id);
+    recordRender(run, events, {
+      version: snapshot.version,
+      block: chart.id,
+      call: key,
+      result: chart.id,
+      ok: r?.ok === true,
+      error: r?.ok ? null : r?.error || "no render",
+    });
+    if (r?.ok || run.charts.reverts.includes(snapshot.version)) continue;
+    const good = run.charts.renders.findLast(
+      (x) => x.block === chart.id && x.ok && x.version < snapshot.version,
+    );
+    const source = good
+      ? chartIn(
+          run.snapshots.find((s) => s.version === good.version),
+          chart.id,
+        )
+      : null;
+    if (!source) continue;
+    // keep the rows as they were settled: only the layers that are drawn go back
+    reverted[chart.id] = { ...clone(source), data: clone(chart.data) };
+  }
+  if (Object.keys(reverted).length === 0) return;
+  const next: Snapshot = {
     version: snapshot.version + 1,
     order: [...snapshot.order],
-    blocks: { ...snapshot.blocks, [CHART_ID]: block },
+    blocks: { ...snapshot.blocks, ...reverted },
   };
-  run.snapshots.push(reverted);
-  chart.reverts.push(reverted.version);
+  run.snapshots.push(next);
+  run.charts.reverts.push(next.version);
   events.push({
-    key: `snapshot.created:${reverted.version}`,
+    key: `snapshot.created:${next.version}`,
     batch: run.batch,
     type: "snapshot.created",
-    snapshot: reverted,
+    snapshot: next,
     cause: "render",
     threads: [],
   });
+  carryRenders(run, events);
 }

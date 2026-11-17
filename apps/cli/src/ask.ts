@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { chartRenderer } from "@chebot/charts";
@@ -7,14 +7,12 @@ import { type CallLedger, type ChartRenderer, type Driven, drive, startRun } fro
 import {
   type Answer,
   type ChartAnswer,
-  CsvParseError,
-  type Dataset,
+  chartIds,
   type LoggedEvent,
   MODEL_NAMES,
   type Mode,
   type ModelId,
   type OutputOf,
-  parseCsv,
   type RunState,
   selectAnswer,
   selectChart,
@@ -33,12 +31,11 @@ import {
 } from "@chebot/providers";
 import { fileLedger } from "./file-ledger.ts";
 
-export const ASK_USAGE = `Usage: pnpm cli ask "<question>" [--chart [--csv <file>]] [--mode quick|thorough] [--max-usd <n>] [--out <dir>]
+export const ASK_USAGE = `Usage: pnpm cli ask "<question>" [--mode quick|thorough] [--max-usd <n>] [--out <dir>]
 
-  Every question runs the full process; its class (simple or complex) only sets the price.
-  --chart    answer with a chart: the models find the data on the web, each value with its citation
-  --csv      a chart of this file's data (implies --chart): the models agree on the transform and
-             the chart, code computes every number from the file
+  Every question runs the full process; its class (simple or complex) only sets the price. The
+  answer is text, with up to 3 charts when two drafts or more chart the same figures (found on the
+  web, each value with its citation).
   --mode     thorough (the default: drafts, merge and the rounds) or quick (stops after the
              merge; it exists for the evaluation)
   --max-usd  the budget of the question in USD (default: the config's)
@@ -49,8 +46,6 @@ export interface AskArgs {
   mode: Mode;
   maxUsd: number | null;
   out: string;
-  /** A chart run; `csv` is the path of the uploaded data, null for data from the web. */
-  chart?: { csv: string | null };
 }
 
 export function parseAskArgs(argv: string[]): AskArgs | { error: string } {
@@ -72,14 +67,7 @@ export function parseAskArgs(argv: string[]): AskArgs | { error: string } {
     if (!Number.isFinite(maxUsd) || maxUsd <= 0)
       return { error: `--max-usd is a positive number of USD, not ${values["max-usd"]}.` };
   }
-  const csv = values.csv ?? null;
-  return {
-    question,
-    mode,
-    maxUsd,
-    out: values.out ?? ".runs",
-    ...(values.chart || csv !== null ? { chart: { csv } } : {}),
-  };
+  return { question, mode, maxUsd, out: values.out ?? ".runs" };
 }
 
 function parse(argv: string[]) {
@@ -90,8 +78,6 @@ function parse(argv: string[]) {
       mode: { type: "string" },
       "max-usd": { type: "string" },
       out: { type: "string" },
-      chart: { type: "boolean" },
-      csv: { type: "string" },
     },
   });
 }
@@ -107,7 +93,7 @@ export interface AskDeps {
   runId: () => string;
   /** Progress lines, for stderr. */
   progress: (line: string) => void;
-  /** The render gate of chart runs; defaults to Vega in interpreter mode (@chebot/charts). */
+  /** The render gate of the charts; defaults to Vega in interpreter mode (@chebot/charts). */
   renderer?: ChartRenderer;
 }
 
@@ -139,17 +125,6 @@ export async function ask(args: AskArgs, deps: AskDeps): Promise<AskResult> {
   const elapsed = () => `${((deps.now() - started) / 1000).toFixed(1).padStart(5)}s`;
   const say = (line: string) => deps.progress(`[${elapsed()}] ${line}`);
 
-  let dataset: Dataset | null = null;
-  if (args.chart?.csv) {
-    try {
-      dataset = parseCsv(readFileSync(args.chart.csv, "utf8"));
-    } catch (error) {
-      const why =
-        error instanceof CsvParseError || error instanceof Error ? error.message : String(error);
-      return { code: 2, message: `The CSV cannot be used: ${why}` };
-    }
-  }
-
   say("reading the model catalog");
   const models: ModelSnapshot = resolveModels([], await deps.catalog());
 
@@ -180,15 +155,11 @@ export async function ask(args: AskArgs, deps: AskDeps): Promise<AskResult> {
       mode,
       models,
       ...(args.maxUsd !== null ? { config: { budgetUsd: args.maxUsd } } : {}),
-      ...(args.chart ? { chart: { dataset } } : {}),
     },
     deps.now(),
   );
   for (const e of run.log) appendFileSync(eventsFile, `${JSON.stringify(e)}\n`);
-  const kind = args.chart
-    ? `, a chart of ${dataset ? "the uploaded data" : "data from the web"}`
-    : "";
-  say(`run ${id}, ${mode} mode${kind}, budget US$${run.state.config.budgetUsd}`);
+  say(`run ${id}, ${mode} mode, budget US$${run.state.config.budgetUsd}`);
   /** The SVG of every render result, by "<call>#<result>". */
   const svgs = new Map<string, string>();
 
@@ -220,7 +191,7 @@ export async function ask(args: AskArgs, deps: AskDeps): Promise<AskResult> {
   });
 
   writeJsonLines(join(dir, "calls.jsonl"), driven.calls);
-  const chart = driven.state.chart ? writeChart(driven.state, dir, svgs) : null;
+  const charts = writeCharts(driven.state, dir, svgs);
   const wallMs = deps.now() - started;
   writeFileSync(
     join(dir, "run.json"),
@@ -233,7 +204,7 @@ export async function ask(args: AskArgs, deps: AskDeps): Promise<AskResult> {
     mode,
     wallMs,
     dir,
-    chart,
+    charts,
   });
   return {
     code: driven.state.status === "completed" ? 0 : 1,
@@ -245,37 +216,41 @@ export async function ask(args: AskArgs, deps: AskDeps): Promise<AskResult> {
   };
 }
 
-/** The chart of a chart run, from the run state. */
-export function chartAnswer(state: RunState, version?: number): ChartAnswer | null {
-  if (!state.chart) return null;
+/** A chart of the answer (`block`, such as c1), from the run state. */
+export function chartAnswer(state: RunState, block: string, version?: number): ChartAnswer | null {
   return selectChart(
-    { ...state, disputes: state.chart.disputes, renders: state.chart.renders },
+    { ...state, disputes: state.charts.disputes, renders: state.charts.renders },
+    block,
     version,
   );
 }
 
 /**
- * Writes the chart next to the logs: chart.vl.json (the Vega-Lite spec of the last version, data
- * and theme included), rows.json (the rows with their sources and disputes) and chart-v<N>.svg (the
- * render of every version).
+ * Writes each chart of the answer next to the logs: chart-<id>.vl.json (the Vega-Lite spec of the
+ * last version, data and theme included), rows-<id>.json (the rows with their sources and disputes)
+ * and chart-<id>-v<N>.svg (the render of every version).
  */
-function writeChart(
+function writeCharts(
   state: RunState,
   dir: string,
   svgs: ReadonlyMap<string, string>,
-): ChartAnswer | null {
-  const answer = chartAnswer(state);
-  if (!answer) return null;
-  writeFileSync(join(dir, "chart.vl.json"), `${JSON.stringify(answer.spec, null, 2)}\n`);
-  writeFileSync(
-    join(dir, "rows.json"),
-    `${JSON.stringify({ origin: answer.origin, brief: answer.brief, rows: answer.rows }, null, 2)}\n`,
-  );
-  for (const r of state.chart?.renders ?? []) {
-    const svg = svgs.get(`${r.call}#${r.result}`);
-    if (r.ok && svg) writeFileSync(join(dir, `chart-v${r.version}.svg`), svg);
+): ChartAnswer[] {
+  const answers: ChartAnswer[] = [];
+  for (const id of chartIds(state)) {
+    const answer = chartAnswer(state, id);
+    if (!answer) continue;
+    answers.push(answer);
+    writeFileSync(join(dir, `chart-${id}.vl.json`), `${JSON.stringify(answer.spec, null, 2)}\n`);
+    writeFileSync(
+      join(dir, `rows-${id}.json`),
+      `${JSON.stringify({ brief: answer.brief, rows: answer.rows }, null, 2)}\n`,
+    );
+    for (const r of state.charts.renders.filter((x) => x.block === id)) {
+      const svg = svgs.get(`${r.call}#${r.result}`);
+      if (r.ok && svg) writeFileSync(join(dir, `chart-${id}-v${r.version}.svg`), svg);
+    }
   }
-  return answer;
+  return answers;
 }
 
 function writeJsonLines(file: string, rows: readonly unknown[]) {
@@ -296,7 +271,7 @@ export function report(input: {
   mode: Mode;
   wallMs: number;
   dir: string;
-  chart?: ChartAnswer | null;
+  charts?: readonly ChartAnswer[];
 }): string {
   const { state, classification } = input;
   const out: string[] = [];
@@ -312,8 +287,8 @@ export function report(input: {
   out.push(`Status: ${state.status}${state.failure ? ` (${state.failure})` : ""}`);
   out.push("");
 
-  const answer: Answer | null = state.chart ? null : selectAnswer(state);
-  if (input.chart) out.push(...chartReport(state, input.chart));
+  const answer: Answer | null = selectAnswer(state);
+  const charts = new Set(chartIds(state));
   if (answer) {
     out.push(`Answer (version ${answer.version})`);
     for (const p of answer.paragraphs) {
@@ -326,9 +301,10 @@ export function report(input: {
       out.push(indent(p.text, "    "));
     }
     out.push("");
-    if (answer.dissent.length > 0) {
+    const dissent = answer.dissent.filter((d) => !charts.has(d.block));
+    if (dissent.length > 0) {
       out.push("Dissent notes");
-      for (const d of answer.dissent) {
+      for (const d of dissent) {
         const who = [d.author, ...d.coAuthors];
         const text = d.op === "delete" ? "delete the paragraph" : `${d.op}: "${d.text}"`;
         out.push(
@@ -344,6 +320,12 @@ export function report(input: {
       out.push("");
     }
   }
+  for (const chart of input.charts ?? []) out.push(...chartReport(state, chart));
+  const drawn = new Set(Object.values(state.charts.plans).flatMap((p) => p.briefs));
+  const declined = state.charts.briefs
+    .filter((b) => !drawn.has(b.id))
+    .map((b) => `${MODEL_NAMES[b.model]} ${b.measure}`);
+  if (declined.length > 0) out.push(`Charts proposed and not drawn: ${declined.join("; ")}`, "");
 
   if (state.moments.length > 0) {
     out.push("Moments");
@@ -384,67 +366,59 @@ export function report(input: {
 /** The printed chart: the brief, the rows with their sources, the disagreements. */
 function chartReport(state: RunState, chart: ChartAnswer): string[] {
   const out: string[] = [];
-  const run = state.chart;
-  out.push(
-    `Chart (version ${chart.version}, data from ${chart.origin === "user" ? "the upload" : "the web"})`,
-  );
+  const id = chart.block;
+  const plan = state.charts.plans[id];
+  out.push(`Chart ${id} (version ${chart.version})`);
   out.push(`  title: ${chart.title}`);
   out.push(`  question: ${chart.brief.question}`);
   out.push(
     `  dimension: ${chart.brief.dimensions.join(", ")}; measures: ${chart.brief.measures.join(", ")}`,
   );
-  const written = run?.writer ? `${MODEL_NAMES[run.writer]} wrote the spec` : "no writer";
+  const written = plan?.writer ? `${MODEL_NAMES[plan.writer]} wrote the spec` : "no writer";
   out.push(
     `  ${written}; ${chart.render?.ok ? "it renders" : `it does not render: ${chart.render?.error ?? "no render"}`}`,
   );
   out.push(indent(`caption: ${chart.caption}`, "  "));
   out.push("");
-  if (chart.origin === "web") {
-    out.push("Rows");
-    for (const r of chart.rows) {
-      const v = r.values.value;
-      const range =
-        r.status === "unsettled"
-          ? ` (range ${[v, ...r.alternatives.map((a) => a.value)].join(" to ")})`
-          : "";
+  out.push("Rows");
+  for (const r of chart.rows) {
+    const v = r.values.value;
+    const range =
+      r.status === "unsettled"
+        ? ` (range ${[v, ...r.alternatives.map((a) => a.value)].join(" to ")})`
+        : "";
+    out.push(
+      `  ${r.key.padEnd(12)} ${String(v).padStart(12)} ${r.status}${range}, ${names(r.support)}`,
+    );
+    out.push(
+      `    ${r.source?.id ?? "?"} ${r.source?.url ?? "no source"}${r.quote ? ` "${r.quote}"` : ""}`,
+    );
+    for (const a of r.alternatives)
       out.push(
-        `  ${r.key.padEnd(12)} ${String(v).padStart(12)} ${r.status}${range}, ${names(r.support)}`,
+        `    also ${a.value} by ${names(a.support)}: ${a.source?.url ?? "no source"} "${a.quote}"`,
       );
-      out.push(
-        `    ${r.source?.id ?? "?"} ${r.source?.url ?? "no source"}${r.quote ? ` "${r.quote}"` : ""}`,
-      );
-      for (const a of r.alternatives)
-        out.push(
-          `    also ${a.value} by ${names(a.support)}: ${a.source?.url ?? "no source"} "${a.quote}"`,
-        );
+  }
+  out.push("");
+  const dropped = state.charts.briefs
+    .filter((b) => plan?.briefs.includes(b.id))
+    .flatMap((b) => b.dropped.map((d) => `${MODEL_NAMES[b.model]} ${d.key} (${d.why})`));
+  if (dropped.length) out.push(`Rows dropped from the drafts: ${dropped.join("; ")}`, "");
+  const disputes = Object.values(state.charts.disputes).filter((d) => d.block === id);
+  if (disputes.length > 0) {
+    out.push("Disputes, settled by source");
+    for (const d of disputes) {
+      const values = chart.rows
+        .find((r) => r.key === d.row)
+        ?.dispute?.values.filter((v) => d.values.some((x) => x.id === v.id));
+      const detail = (values ?? [])
+        .map(
+          (v) =>
+            `${v.id} ${v.value} holds ${v.holds}/${v.checkers}${v.stated ? "" : ", quote does not state it"}`,
+        )
+        .join("; ");
+      out.push(`  ${d.id} ${d.row}: ${d.state}${d.winner ? ` (${d.winner})` : ""}; ${detail}`);
     }
     out.push("");
-    const dropped = (run?.briefs ?? []).flatMap((b) =>
-      b.dropped.map((d) => `${MODEL_NAMES[b.model]} ${d.key} (${d.why})`),
-    );
-    if (dropped.length) out.push(`Rows dropped from the briefs: ${dropped.join("; ")}`, "");
-    const disputes = Object.values(run?.disputes ?? {});
-    if (disputes.length > 0) {
-      out.push("Disputes, settled by source");
-      for (const d of disputes) {
-        const values = chart.rows
-          .find((r) => r.key === d.row)
-          ?.dispute?.values.filter((v) => d.values.some((x) => x.id === v.id));
-        const detail = (values ?? [])
-          .map(
-            (v) =>
-              `${v.id} ${v.value} holds ${v.holds}/${v.checkers}${v.stated ? "" : ", quote does not state it"}`,
-          )
-          .join("; ");
-        out.push(`  ${d.id} ${d.row}: ${d.state}${d.winner ? ` (${d.winner})` : ""}; ${detail}`);
-      }
-      out.push("");
-    }
-  } else {
-    out.push(
-      `Rows: ${chart.rows.length} uploaded rows; transform ${JSON.stringify(chart.spec.transform ?? [])}`,
-      "",
-    );
   }
   if (chart.dissent.length > 0) {
     out.push("Dissent on the chart");
@@ -456,7 +430,9 @@ function chartReport(state: RunState, chart: ChartAnswer): string[] {
     }
     out.push("");
   }
-  const accepted = Object.values(state.threads).filter((t) => t.state === "accepted");
+  const accepted = Object.values(state.threads).filter(
+    (t) => t.state === "accepted" && t.block === id,
+  );
   if (accepted.length > 0) {
     out.push("Accepted patches");
     for (const t of accepted) {
@@ -467,15 +443,19 @@ function chartReport(state: RunState, chart: ChartAnswer): string[] {
     }
     out.push("");
   }
-  if ((run?.dropped.length ?? 0) > 0) {
+  const patches = state.charts.dropped.filter((d) => d.block === id);
+  if (patches.length > 0) {
     out.push("Dropped patches");
-    for (const d of run?.dropped ?? [])
+    for (const d of patches)
       out.push(
         `  ${MODEL_NAMES[d.model]} round ${d.round} ${d.layer} ${d.path || '""'}: ${d.why}${d.detail ? ` (${d.detail})` : ""}`,
       );
     out.push("");
   }
-  out.push("Files: chart.vl.json, rows.json and chart-v<N>.svg, with the logs", "");
+  out.push(
+    `Files: chart-${id}.vl.json, rows-${id}.json and chart-${id}-v<N>.svg, with the logs`,
+    "",
+  );
   return out;
 }
 

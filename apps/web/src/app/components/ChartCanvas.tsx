@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { Drawing, DrawnRow } from "../chart/embed.ts";
+import type { Drawing } from "../chart/embed.ts";
 import type { Datum } from "../chart/spec.ts";
 import { t } from "../i18n/index.ts";
 
@@ -20,26 +20,21 @@ interface Painter {
 /**
  * The drawing of a version of a chart (step 41). Vega is loaded on the first chart of the page (a
  * chunk of its own: text answers never download it). A new version moves the marks to their new
- * values (see chart/embed.ts); `onDrawn` receives the rows the drawing computed, for the table of
- * an upload. The figure has a label and nothing inside it is read: the table under it is its text.
+ * values (see chart/embed.ts). The figure has a label and nothing inside it is read: the table under it is its text.
  */
 export function ChartCanvas({
   spec,
   data,
   label,
-  onDrawn,
 }: {
   spec: (height: number) => Record<string, unknown>;
   data: readonly Datum[];
   label: string;
-  onDrawn?: (rows: DrawnRow[]) => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const painter = useRef<Painter | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [size, setSize] = useState({ width: 0, height: 260 });
-  const onDrawnRef = useRef(onDrawn);
-  onDrawnRef.current = onDrawn;
 
   // The drawing takes the width of its box, and a height for it (a phone gets a lower chart).
   useEffect(() => {
@@ -87,7 +82,6 @@ export function ChartCanvas({
     const done = () => {
       if (!p.alive || !p.drawing) return;
       setState("ready");
-      onDrawnRef.current?.(p.drawing.drawn());
     };
     const failed = (error: unknown) => {
       console.error("The chart could not be drawn.", error);

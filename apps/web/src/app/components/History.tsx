@@ -1,8 +1,13 @@
 import type { RunView } from "@chebot/protocol";
-import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
+import { type CSSProperties, Fragment, type ReactNode, useMemo, useState } from "react";
 import { t } from "../i18n/index.ts";
-import { type ChartChange, chartHistoryOf, chartViewOf } from "../view/chart.ts";
-import { type HistoryParagraph, historyOf } from "../view/history.ts";
+import { type ChartChange, chartViewOf } from "../view/chart.ts";
+import {
+  type HistoryChart,
+  type HistoryParagraph,
+  type HistoryStep,
+  historyOf,
+} from "../view/history.ts";
 import { ChartCanvas } from "./ChartCanvas.tsx";
 import { Fold } from "./Fold.tsx";
 import { ModelMark, WithMarks } from "./ModelMark.tsx";
@@ -145,20 +150,27 @@ function Change({ change }: { change: ChartChange }) {
   );
 }
 
-/** The chart at one step of the history, and what changed in that step. */
+/** A chart at one step of the history, and what changed in it in that step. */
 function ChartStep({
   view,
+  id,
   version,
   changes,
 }: {
   view: RunView;
+  id: string;
   version: number;
   changes: readonly ChartChange[];
 }) {
-  const chart = useMemo(() => chartViewOf(view, version), [view, version]);
+  const chart = useMemo(() => chartViewOf(view, id, version), [view, id, version]);
   if (!chart) return null;
   return (
-    <div className="history-chart" data-testid="history-chart" data-version={version}>
+    <div
+      className="history-chart"
+      data-testid="history-chart"
+      data-chart={id}
+      data-version={version}
+    >
       <p className="history-chart-title">{chart.title}</p>
       <ChartCanvas spec={chart.spec} data={chart.data} label={chart.label} />
       {chart.caption && <p className="chart-caption">{chart.caption}</p>}
@@ -176,35 +188,41 @@ function ChartStep({
   );
 }
 
+/** A step of the answer: its paragraphs, and each chart in its place among them. */
+function Doc({ view, step }: { view: RunView; step: HistoryStep }) {
+  const charts = (after: string | null) =>
+    step.charts
+      .filter((c) => c.after === after)
+      .map((c: HistoryChart) => (
+        <ChartStep key={c.id} view={view} id={c.id} version={step.version} changes={c.changes} />
+      ));
+  return (
+    <div className="history-doc">
+      {charts(null)}
+      {step.paragraphs.map((p) => (
+        <Fragment key={p.id}>
+          <Paragraph p={p} />
+          {charts(p.id)}
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
 /**
- * The history slider (steps 32 and 41). A text answer: the text at each step of the run, from the
- * merged answers to the final wording, with what each step changed marked in the ink of the model
- * that proposed it. A chart: the chart at each step, whose marks move to the values of that step,
- * with the rows the sources settled and the layers the votes changed.
+ * The history slider (steps 32 and 41): the answer at each step of the run, from the merged answers
+ * to the final wording. In the text, what each step changed is marked in the ink of the model that
+ * proposed it; each chart is drawn as it was at that step, its marks moving to the values of the
+ * step, with the rows the sources settled and the layers the votes changed.
  */
 export function History({ view }: { view: RunView }) {
-  const prose = useMemo(() => (view.chart ? [] : historyOf(view)), [view]);
-  const chart = useMemo(() => (view.chart ? chartHistoryOf(view) : []), [view]);
-  if (view.chart)
-    return (
-      <Steps texts={t.chart.history} steps={chart}>
-        {(at) => {
-          const step = chart[at];
-          return step ? (
-            <ChartStep view={view} version={step.version} changes={step.changes} />
-          ) : null;
-        }}
-      </Steps>
-    );
+  const steps = useMemo(() => historyOf(view), [view]);
   return (
-    <Steps texts={t.history} steps={prose}>
-      {(at) => (
-        <div className="history-doc">
-          {prose[at]?.paragraphs.map((p) => (
-            <Paragraph key={p.id} p={p} />
-          ))}
-        </div>
-      )}
+    <Steps texts={t.history} steps={steps}>
+      {(at) => {
+        const step = steps[at];
+        return step ? <Doc view={view} step={step} /> : null;
+      }}
     </Steps>
   );
 }

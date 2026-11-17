@@ -5,8 +5,9 @@
 // a changed position, an accepted change and one left without agreement, a model that does not
 // answer in the last round, the editor's pass, and moments phrased by the utility model.
 //
-// A marker in the question plays the states around that run (see MARKERS). A run asked for a chart
-// plays the scripted chart run of chart-scenario.ts instead.
+// A marker in the question plays the states around that run (see MARKERS). Its drafts propose no
+// chart. CHART_QUESTION plays the scripted run of chart-scenario.ts instead, whose answer has two
+// charts among its paragraphs.
 import type { ModelId } from "@chebot/protocol";
 import type { FakeOutcome, FakeScript, FoundSource, GenerateRequest } from "@chebot/providers";
 import { respondChart } from "./chart-scenario.ts";
@@ -289,7 +290,6 @@ const DELAY: Record<string, number | Record<ModelId, number>> = {
   round: { grok: 1100, claude: 1500, openai: 1300, gemini: 1700 },
   dedupe: 400,
   edit: 1200,
-  brief: { grok: 1800, claude: 2600, openai: 2200, gemini: 3200 },
   "chart-merge": 1200,
   spec: 1500,
   "edit-check": 500,
@@ -356,6 +356,7 @@ export function respond(req: GenerateRequest<unknown>): FakeOutcome {
         {
           answer: ANSWERS[seat],
           claims: CLAIMS[seat].map((c) => ({ ...c, confidence: "high" })),
+          charts: [],
         },
         // With the budget marker, four drafts leave less than the worst case of a round.
         { sources: FOUND[seat], costUsd: marked(MARKERS.budget) ? 0.7 : 0.05 },
@@ -375,10 +376,10 @@ export function respond(req: GenerateRequest<unknown>): FakeOutcome {
     }
     case "round":
       if (!seat) break;
-      if (n === "1") return out({ suggestions: ROUND1[seat] });
-      if (n === "2") return out(ROUND2[seat]);
+      if (n === "1") return out({ suggestions: ROUND1[seat], patches: [], checks: [] });
+      if (n === "2") return out({ ...ROUND2[seat], patches: [], checks: [] });
       if (seat === "gemini") return { kind: "timeout" };
-      return out({ votes: ROUND3[seat] });
+      return out({ votes: ROUND3[seat], checks: [] });
     case "dedupe": {
       const pairs = [...req.prompt.matchAll(/^## (\S+)$/gm)].map((m) => m[1] ?? "");
       return out({ pairs: pairs.map((pair) => ({ pair, verdict: "different" })) });

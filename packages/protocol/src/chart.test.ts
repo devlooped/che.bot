@@ -4,6 +4,7 @@ import {
   chartSpec,
   checkPatch,
   layersFromSpec,
+  parseNumber,
   patchChart,
   quoteStates,
   readModelNumber,
@@ -11,7 +12,6 @@ import {
   stripTheme,
 } from "./chart.ts";
 import { type RowSettlement, settleRows } from "./chart-run.ts";
-import { type CsvParseError, describeDataset, parseCsv, parseNumber } from "./csv.ts";
 import type { Chart, Row, Snapshot } from "./model.ts";
 import { apply, type Change, lockKey } from "./threads.ts";
 
@@ -30,7 +30,7 @@ const web = (rows: Row[] = [webRow("2026-01", 2.2), webRow("2026-02", 2.4)]): Ch
   kind: "chart",
   id: "c1",
   brief: { question: "q", measures: ["Inflación (%)"], dimensions: ["Mes"] },
-  data: { origin: "web", columns: [], rows },
+  data: { rows },
   transform: [],
   encoding: {
     x: { field: "key", type: "temporal" },
@@ -41,68 +41,7 @@ const web = (rows: Row[] = [webRow("2026-01", 2.2), webRow("2026-02", 2.4)]): Ch
   caption: "Según el INDEC.",
 });
 
-const user = (): Chart => ({
-  ...web([]),
-  data: {
-    origin: "user",
-    columns: [
-      { name: "region", type: "text" },
-      { name: "ventas", type: "number" },
-    ],
-    rows: [
-      {
-        key: "r1",
-        values: { region: "Norte", ventas: 10 },
-        source: "upload",
-        quote: "",
-        support: [],
-        status: "upload",
-        alternatives: [],
-      },
-    ],
-  },
-  encoding: {
-    x: { field: "region", type: "nominal" },
-    y: { field: "ventas", type: "quantitative" },
-  },
-  mark: "bar",
-});
-
-describe("CSV uploads are parsed by code", () => {
-  test("columns, types, empty cells, quoted fields and either separator", () => {
-    const d = parseCsv('región;mes;ventas.total\nNorte;2026-01;"1.200,5"\nSur;2026-02;\n');
-    expect(d.columns).toEqual([
-      { name: "región", type: "text" },
-      { name: "mes", type: "date" },
-      { name: "ventas_total", type: "number" },
-    ]);
-    expect(d.rows).toEqual([
-      { región: "Norte", mes: "2026-01", ventas_total: 1200.5 },
-      { región: "Sur", mes: "2026-02", ventas_total: null },
-    ]);
-    expect(parseCsv('a,b,a\n"x, ""y""",2,3').rows).toEqual([{ a: 'x, "y"', b: 2, a_2: 3 }]);
-  });
-
-  test("limits: size, rows, columns, ragged rows, unterminated quotes", () => {
-    const fail = (text: string) => {
-      try {
-        parseCsv(text);
-      } catch (e) {
-        return (e as CsvParseError).code;
-      }
-      return null;
-    };
-    expect(fail("")).toBe("empty");
-    expect(fail("a,b")).toBe("no_rows");
-    expect(fail("a,b\n1")).toBe("ragged");
-    expect(fail('a\n"x')).toBe("unterminated_quote");
-    expect(fail(`a\n${"1\n".repeat(501)}`)).toBe("too_many_rows");
-    expect(
-      fail(`${Array.from({ length: 13 }, (_, i) => `c${i}`).join(",")}\n${"1,".repeat(12)}1`),
-    ).toBe("too_many_columns");
-    expect(fail(`a\n${"x".repeat(70_000)}`)).toBe("too_large");
-  });
-
+describe("numbers of the web", () => {
   test("numbers as people write them", () => {
     expect(parseNumber("2,7")).toBe(2.7);
     expect(parseNumber("1.234.567")).toBe(1234567);
@@ -116,22 +55,6 @@ describe("CSV uploads are parsed by code", () => {
     expect(readModelNumber("n/d")).toBeNull();
   });
 
-  test("the models are told the columns, types and statistics, not the rows", () => {
-    const [region, ventas] = describeDataset(parseCsv("region,ventas\nNorte,10\nSur,30\nSur,"));
-    expect(region).toMatchObject({ name: "region", type: "text", distinct: 2 });
-    expect(ventas).toMatchObject({
-      type: "number",
-      min: 10,
-      max: 30,
-      sum: 40,
-      mean: 20,
-      empty: 1,
-      examples: [],
-    });
-  });
-});
-
-describe("numbers of the web", () => {
   test("the same value: equal, or equal at the coarser precision when both have decimals", () => {
     expect(sameValue(2.4, 2.4)).toBe(true);
     expect(sameValue(2.7, 2.72)).toBe(true);
@@ -231,10 +154,10 @@ describe("patches on the layers of a chart", () => {
     });
   });
 
-  test("user data: the data layer is refused, and so is anything that carries values", () => {
-    const c = user();
-    expect(checkPatch(c, { layer: "data", path: "r1", value: "1000" })).toMatchObject({
-      why: "user_data",
+  test("a data patch is no layer patch (the sources settle it), and anything that carries values is refused", () => {
+    const c = web();
+    expect(checkPatch(c, { layer: "data", path: "2026-01", value: "1000" })).toMatchObject({
+      why: "unknown_path",
     });
     expect(
       checkPatch(c, { layer: "encoding", path: "encoding.y", value: '{"datum":999}' }),
@@ -258,21 +181,21 @@ describe("patches on the layers of a chart", () => {
       checkPatch(c, {
         layer: "transform",
         path: "",
-        value: '[{"calculate":"datum.ventas * 2","as":"ventas"}]',
+        value: '[{"calculate":"datum.value * 2","as":"value"}]',
       }),
     ).toMatchObject({ why: "transform_not_allowed" });
     expect(
       checkPatch(c, {
         layer: "transform",
         path: "",
-        value: '[{"calculate":"datum.ventas * 2","as":"doble"}]',
+        value: '[{"calculate":"datum.value * 2","as":"doble"}]',
       }),
     ).toMatchObject({ ok: true });
     expect(
       checkPatch(c, {
         layer: "transform",
         path: "",
-        value: '[{"impute":"ventas","key":"region","value":0}]',
+        value: '[{"impute":"value","key":"key","value":0}]',
       }),
     ).toMatchObject({
       why: "transform_not_allowed",
@@ -280,22 +203,20 @@ describe("patches on the layers of a chart", () => {
   });
 
   test("a spec that carries data is refused; its theme is stripped", () => {
-    const c = user();
     expect(
-      layersFromSpec('{"data":{"values":[{"a":1}]},"mark":"bar","encoding":{}}', c),
+      layersFromSpec('{"data":{"values":[{"a":1}]},"mark":"bar","encoding":{}}'),
     ).toMatchObject({
       ok: false,
       why: "inline_data",
     });
     expect(
       layersFromSpec(
-        '{"mark":{"type":"bar","color":"red"},"encoding":{"x":{"field":"region"},"color":{"value":"red"}},"config":{"font":"x"}}',
-        c,
+        '{"mark":{"type":"bar","color":"red"},"encoding":{"x":{"field":"key"},"color":{"value":"red"}},"config":{"font":"x"}}',
       ),
     ).toEqual({
       ok: true,
       mark: "bar",
-      encoding: { x: { field: "region" } },
+      encoding: { x: { field: "key" } },
       transform: [],
       stripped: ["encoding.color.value"],
     });
@@ -330,12 +251,6 @@ describe("the spec of a chart", () => {
       },
     ]);
     expect(spec.config).toMatchObject({ font: expect.stringContaining("Instrument Sans") });
-  });
-
-  test("user data: the uploaded rows as they are", () => {
-    expect((chartSpec(user()).data as { values: unknown[] }).values).toEqual([
-      { region: "Norte", ventas: 10 },
-    ]);
   });
 });
 

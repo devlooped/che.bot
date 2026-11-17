@@ -77,7 +77,6 @@ export function drive(
       mode: input.mode,
       models: input.models ?? SNAPSHOT_MODELS,
       ...(input.config ? { config: input.config } : {}),
-      ...(input.chart ? { chart: input.chart } : {}),
     },
     T0,
   );
@@ -170,6 +169,7 @@ export const scripted: Responder = (call, state) => {
         {
           answer: DRAFT_CLAIMS[m].map((c) => c.text).join("\n\n"),
           claims: DRAFT_CLAIMS[m].map((c) => ({ ...c, confidence: "high" })),
+          charts: [],
         },
         { sources: FOUND[m], costUsd: 0.05 },
       );
@@ -236,7 +236,7 @@ export const scripted: Responder = (call, state) => {
           },
         ],
       };
-      return ok(call, { suggestions: by[seat as ModelId] });
+      return ok(call, { suggestions: by[seat as ModelId], patches: [], checks: [] });
     }
     case "round2": {
       const votes: Record<ModelId, { thread: string; choice: string; reason: string }[]> = {
@@ -284,7 +284,7 @@ export const scripted: Responder = (call, state) => {
         gemini: [],
       };
       const m = seat as ModelId;
-      return ok(call, { votes: votes[m], suggestions: suggestions[m] });
+      return ok(call, { votes: votes[m], suggestions: suggestions[m], patches: [], checks: [] });
     }
     case "round3": {
       const votes: Record<ModelId, { thread: string; choice: string; reason: string }[]> = {
@@ -302,7 +302,7 @@ export const scripted: Responder = (call, state) => {
           { thread: "t5", choice: "keep", reason: "" },
         ],
       };
-      return ok(call, { votes: votes[seat as ModelId] });
+      return ok(call, { votes: votes[seat as ModelId], checks: [] });
     }
     case "dedupe": {
       const pairs = (state.pending?.pairs ?? []).filter((p) => p.decided === null);

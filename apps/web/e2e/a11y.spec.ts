@@ -6,10 +6,8 @@ import {
   finishedRun,
   fromApp,
   newUser,
-  SAMPLE_CSV,
   signIn,
   t,
-  UPLOAD_QUESTION,
   uniqueQuestion,
 } from "./helpers.ts";
 
@@ -98,17 +96,15 @@ test("Mis preguntas, its confirmation, and the admin page", async ({ page }) => 
   expect(await violations(page)).toEqual([]);
 });
 
-test("a chart, its data and notes, a layer's discussion, its history, and a chart of a table", async ({
+test("an answer with charts: their data and notes, a layer's discussion, the history", async ({
   page,
   request,
 }) => {
-  const [web, user] = await Promise.all([
-    finishedRun(request, CHART_QUESTION, {}),
-    finishedRun(request, UPLOAD_QUESTION, { csv: SAMPLE_CSV }),
-  ]);
-  await page.goto(`/r/${web}`);
+  const runId = await finishedRun(request, CHART_QUESTION);
+  await page.goto(`/r/${runId}`);
   await expect(page.getByTestId("stage-line")).toHaveText(DONE);
-  await expect(page.getByTestId("chart").locator("svg").first()).toBeVisible();
+  for (const chart of await page.getByTestId("chart").all())
+    await expect(chart.locator("svg").first()).toBeVisible();
   expect(await violations(page)).toEqual([]);
 
   const layer = page.getByTestId("layer").first();
@@ -120,26 +116,8 @@ test("a chart, its data and notes, a layer's discussion, its history, and a char
   await page.keyboard.press("Escape");
   await expect(layer).toBeFocused();
 
-  await page.locator("summary", { hasText: t.chart.history.title }).click();
-  await expect(page.getByTestId("history-chart").locator("svg").first()).toBeVisible();
+  await page.locator("summary", { hasText: t.history.title }).click();
+  await expect(page.getByTestId("history-chart").first().locator("svg").first()).toBeVisible();
   await page.getByRole("button", { name: t.history.next }).click();
-  expect(await violations(page)).toEqual([]);
-
-  await page.goto(`/r/${user}`);
-  await expect(page.getByTestId("drawn-row").first()).toBeVisible();
-  expect(await violations(page)).toEqual([]);
-});
-
-test("asking for a chart, with a file refused", async ({ page }) => {
-  await signIn(page, newUser());
-  await page.goto("/");
-  await page.getByLabel(t.ask.chart.toggle).check();
-  await page.getByLabel(t.ask.chart.file).check();
-  await page.getByLabel(t.ask.chart.fileLabel).setInputFiles({
-    name: "vacio.csv",
-    mimeType: "text/csv",
-    buffer: Buffer.from("a,b\n"),
-  });
-  await expect(page.getByTestId("file-error")).toBeVisible();
   expect(await violations(page)).toEqual([]);
 });

@@ -86,21 +86,6 @@ export const esAR = {
     generic: "Algo salió mal. Probá de nuevo en un rato.",
     runNotFound: "No encontramos esta pregunta. Puede que la hayan borrado.",
     signInFailed: "No pudimos hacerte entrar. Probá de nuevo.",
-    noFile: "Elegí el archivo con tus datos.",
-    /** Why a CSV file is refused, by the code of the refusal (CsvError of the protocol). */
-    file: {
-      too_large: "El archivo pesa más de 64 KB. Sacale filas o columnas que no hagan falta.",
-      too_many_rows: "El archivo tiene más de 500 filas. Dejá solo las que necesita el gráfico.",
-      too_many_columns:
-        "El archivo tiene más de 12 columnas. Dejá solo las que necesita el gráfico.",
-      ragged:
-        "Algunas filas tienen más o menos columnas que la primera. Revisá que todas tengan las mismas.",
-      unterminated_quote: "Hay unas comillas que se abren y no se cierran. Revisá el archivo.",
-      empty: "El archivo está vacío.",
-      no_rows: "El archivo tiene la fila de los nombres y ninguna fila de datos.",
-      unreadable:
-        "No pudimos leer el archivo. Tiene que ser un CSV: texto con columnas separadas por comas o por punto y coma.",
-    } as Record<string, string>,
   },
 
   ask: {
@@ -115,31 +100,11 @@ export const esAR = {
     publicNote: "Cualquiera que tenga el link de la respuesta la va a poder leer.",
     signInToAsk: "Entrá para preguntar",
     signInLede: "Para preguntar necesitás una cuenta. Leer respuestas compartidas no.",
-    chart: {
-      toggle: "Quiero un gráfico",
-      toggleHint:
-        "Los cuatro arman un gráfico juntos. Cada número va con su fuente, y si no coinciden lo resuelven con las fuentes, no votando.",
-      dataLegend: "¿De dónde salen los datos?",
-      web: "Que los busquen en internet",
-      webHint: "Cada número va con el link de donde sale y las palabras que lo dicen.",
-      file: "De mi tabla (un archivo CSV)",
-      fileHint:
-        "Los números salen solo de tu tabla: los cuatro acuerdan cómo graficarla, pero no escriben ningún número.",
-      fileLabel: "Tu archivo",
-      choose: "Elegir el archivo",
-      noneChosen: "Todavía no elegiste ninguno.",
-      fileLimits:
-        "Hasta 64 KB, 500 filas y 12 columnas. La primera fila lleva los nombres de las columnas, separadas por comas o por punto y coma.",
-      fileReady: (name: string, rows: number, columns: number) =>
-        `${name}: ${rows} ${plural(rows, "fila", "filas")} y ${columns} ${plural(columns, "columna", "columnas")}.`,
-      reading: "Leyendo el archivo…",
-      samePrice: "El precio es el mismo que el de una respuesta en texto.",
-    },
     howTitle: "Cómo funciona",
     how: [
       "Escribís tu pregunta y ves cuánto cuesta.",
       "Pagás con un QR de Mercado Pago.",
-      "Grok, Claude, ChatGPT y Gemini responden por separado y después discuten hasta armar una sola respuesta.",
+      "Grok, Claude, ChatGPT y Gemini responden por separado y después discuten hasta armar una sola respuesta, con gráficos cuando los números se entienden mejor así.",
     ],
   },
 
@@ -157,10 +122,6 @@ export const esAR = {
     adminRun: "Empezar sin pagar",
     adminNote: "Tenés permiso de administración: esta pregunta no se cobra.",
     notPaidYet: "Esta pregunta todavía no se pagó, así que no tiene respuesta.",
-    chart: {
-      web: "Pediste la respuesta como gráfico, con datos de internet.",
-      user: "Pediste la respuesta como gráfico de tu tabla.",
-    },
   },
 
   payment: {
@@ -231,44 +192,25 @@ export const esAR = {
         ? `Listo. Los cuatro coinciden en ${agreed} de ${total} ${plural(total, "parte", "partes")}; ${dissent} ${plural(dissent, "punto quedó", "puntos quedaron")} sin acuerdo.`
         : `Listo. Los cuatro coinciden en ${agreed} de ${total} ${plural(total, "parte", "partes")}.`,
     failed: "No pudimos armar una respuesta esta vez.",
-    chart: {
-      drafting: {
-        web: "Cada uno busca los datos por su cuenta, con la fuente de cada número…",
-        user: "Cada uno piensa por su cuenta cómo graficar tu tabla…",
-      },
-      merging: "Juntando los datos en un solo gráfico…",
-      round1: (open: number) =>
-        open > 0
-          ? `Revisando el gráfico y las fuentes… ${open} ${plural(open, "punto", "puntos")} en discusión`
-          : "Revisando el gráfico y las fuentes…",
-      round2: (open: number) =>
-        open > 0
-          ? `Votando los cambios al gráfico… ${open} ${plural(open, "punto", "puntos")} en discusión`
-          : "Votando los cambios al gráfico…",
-      done: (c: {
-        rows: number;
-        agreed: number;
-        settled: number;
-        ranges: number;
-        lone: number;
-      }) => {
-        const parts = [
-          c.agreed > 0 ? `coinciden en ${c.agreed}` : "",
-          c.settled > 0
-            ? `${c.settled} ${plural(c.settled, "lo resolvió su fuente", "los resolvieron sus fuentes")}`
-            : "",
-          c.ranges > 0 ? `${c.ranges} ${plural(c.ranges, "quedó", "quedaron")} sin acuerdo` : "",
-          c.lone > 0 ? `${c.lone} sin confirmar` : "",
-        ].filter(Boolean);
-        const rows = `${c.rows} ${plural(c.rows, "dato", "datos")}`;
-        return parts.length > 0
-          ? `Listo. De ${rows}, ${list(parts)}.`
-          : `Listo. El gráfico tiene ${rows}.`;
-      },
-      doneUser: (dissent: number) =>
-        dissent > 0
-          ? `Listo. El gráfico está calculado con tu tabla; ${dissent} ${plural(dissent, "punto quedó", "puntos quedaron")} sin acuerdo.`
-          : "Listo. El gráfico está calculado con tu tabla.",
+    /** What the rows of the charts of a finished answer ended as: after the line of the text. */
+    charts: (c: {
+      charts: number;
+      rows: number;
+      agreed: number;
+      settled: number;
+      ranges: number;
+      lone: number;
+    }) => {
+      const parts = [
+        c.agreed > 0 ? `coinciden en ${c.agreed}` : "",
+        c.settled > 0
+          ? `${c.settled} ${plural(c.settled, "lo resolvió su fuente", "los resolvieron sus fuentes")}`
+          : "",
+        c.ranges > 0 ? `${c.ranges} ${plural(c.ranges, "quedó", "quedaron")} sin acuerdo` : "",
+        c.lone > 0 ? `${c.lone} sin confirmar` : "",
+      ].filter(Boolean);
+      const rows = `${c.rows} ${plural(c.rows, "dato", "datos")} ${plural(c.charts, "del gráfico", "de los gráficos")}`;
+      return parts.length > 0 ? `De los ${rows}, ${list(parts)}.` : "";
     },
   },
 
@@ -375,10 +317,9 @@ export const esAR = {
     stages: {
       classify: "Clasificación",
       draft: "Respuestas",
-      brief: "Datos",
       merge: "Unión de las respuestas",
-      "chart-merge": "Unión de los datos",
-      spec: "Gráfico",
+      "chart-merge": "Unión de los gráficos",
+      spec: "Gráficos",
       round: "Rondas",
       dedupe: "Propuestas repetidas",
       moments: "Resúmenes",
@@ -459,7 +400,6 @@ export const esAR = {
       range: "Sin acuerdo",
       lone: "Sin confirmar",
       checking: "En revisión",
-      upload: "De tu tabla",
     },
     notes: {
       corrected: (was: string, now: string) => `Se corrigió: decía ${was} y ahora dice ${now}.`,
@@ -483,18 +423,8 @@ export const esAR = {
         checking: "Se está revisando.",
       },
     },
-    user: {
-      fromTable:
-        "Cada número de este gráfico sale de tu tabla: lo calculó che.bot, y ninguna de las IA escribió un número.",
-      calculation: (text: string) => `El cálculo que acordaron: ${text}.`,
-      table: (rows: number, columns: number) =>
-        `Tu tabla tiene ${rows} ${plural(rows, "fila", "filas")} y ${columns} ${plural(columns, "columna", "columnas")}.`,
-      drawnTitle: "Lo que muestra el gráfico",
-      drawnLede: "Los números que dibuja el gráfico, calculados con tu tabla.",
-      showUpload: (n: number) => `Ver tu tabla (${n} ${plural(n, "fila", "filas")})`,
-    },
     calc: {
-      none: "las filas de tu tabla tal como están, sin cálculos",
+      none: "los datos tal como están, sin cálculos",
       ops: {
         sum: "la suma",
         mean: "el promedio",
@@ -612,19 +542,12 @@ export const esAR = {
       otherPart: "una parte del dibujo",
     },
     history: {
-      title: "Cómo cambió el gráfico",
-      lede: "Mové la barra para ver el gráfico en cada momento: los puntos se mueven a sus valores de ese paso.",
-      slider: "Momento del gráfico",
       changesTitle: "Qué cambió en este paso",
       steps: {
         sources: "Después de revisar las fuentes",
         render: "La última versión que se pudo dibujar",
       },
       what: {
-        merge: (n: number) =>
-          n === 4
-            ? "Los datos de los cuatro, juntos en un solo gráfico."
-            : `Los datos de los ${n} que contestaron, juntos en un solo gráfico.`,
         sources: (n: number) => `Las fuentes resolvieron ${n} ${plural(n, "dato", "datos")}.`,
         both: (n: number, who: string, changes: number) =>
           `Las fuentes resolvieron ${n} ${plural(n, "dato", "datos")} y ${plural(changes, "entró el cambio que propuso", "entraron los cambios que propusieron")} ${who}.`,
@@ -688,9 +611,9 @@ export const esAR = {
   },
 
   history: {
-    title: "Cómo cambió el texto",
-    lede: "Mové la barra para ver el texto en cada momento. Lo que entró en ese paso está subrayado y lo que salió, tachado.",
-    slider: "Momento del texto",
+    title: "Cómo cambió la respuesta",
+    lede: "Mové la barra para ver la respuesta en cada momento. Lo que entró en ese paso está subrayado y lo que salió, tachado; los puntos de cada gráfico se mueven a sus valores de ese paso.",
+    slider: "Momento de la respuesta",
     position: (i: number, n: number) => `Paso ${i} de ${n}`,
     previous: "Anterior",
     next: "Siguiente",

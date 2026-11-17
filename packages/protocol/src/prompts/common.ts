@@ -12,10 +12,32 @@ export const LANGUAGE_RULE =
 export const STRUCTURED_RULE =
   "Return only the structured object requested, with every field present. Leave a list empty rather than inventing content.";
 
-export function renderDocument(snapshot: Snapshot, support = true): string {
+/**
+ * The document as the models read it: each paragraph with its id. A chart stands in its place as a
+ * reference to the charts listed apart (`charts: "ref"`), or as a short summary of what it shows
+ * (`"summary"`, for a reader who does not change it).
+ */
+export function renderDocument(
+  snapshot: Snapshot,
+  support = true,
+  charts: "ref" | "summary" = "ref",
+): string {
   const lines: string[] = [];
   for (const id of snapshot.order) {
     const block = snapshot.blocks[id];
+    if (block?.kind === "chart") {
+      lines.push(
+        charts === "ref"
+          ? `[${id}] (a chart: see "Charts" below)`
+          : `[${id}] (a chart, not yours to change) ${JSON.stringify(block.title)}: ${block.caption}\nData: ${block.data.rows
+              .map(
+                (r) =>
+                  `${r.key} ${r.values.value ?? r.alternatives.map((a) => a.values.value).join("-")}`,
+              )
+              .join("; ")}`,
+      );
+      continue;
+    }
     if (block?.kind !== "paragraph") continue;
     const meta = support
       ? ` (${block.status}, ${block.support.length} of 4${block.sources.length ? `, sources: ${block.sources.join(", ")}` : ""})`

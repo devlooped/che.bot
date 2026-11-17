@@ -63,6 +63,8 @@ describe("schemas stay inside the simple subset", () => {
 
   test("schemaFor looks schemas up by call kind", () => {
     expect(schemaFor("round2")).toBe(SCHEMAS.round2);
-    expect(schemaFor("draft").safeParse({ answer: "x", claims: [] }).success).toBe(true);
+    expect(schemaFor("draft").safeParse({ answer: "x", claims: [], charts: [] }).success).toBe(
+      true,
+    );
   });
 });

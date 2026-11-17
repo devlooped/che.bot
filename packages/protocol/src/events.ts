@@ -1,8 +1,13 @@
-import type { ChartBrief, ChartRender, Dispute, DroppedPatch, Verdict } from "./chart-run.ts";
-import type { Dataset } from "./csv.ts";
+import type {
+  ChartBrief,
+  ChartRender,
+  DeclineReason,
+  Dispute,
+  DroppedPatch,
+  Verdict,
+} from "./chart-run.ts";
 import type {
   AbstainReason,
-  ChartOrigin,
   Claim,
   Flags,
   Mode,
@@ -46,8 +51,6 @@ export type RunEvent = { key: string; batch: number } & (
       models: ModelSnapshot;
       budgetUsd: number;
       deadlineAt: number;
-      /** A chart run: where its data comes from, and the upload (parsed by code) for user data. */
-      chart: { origin: ChartOrigin; dataset: Dataset | null } | null;
     }
   | { type: "stage.changed"; stage: Stage; from: Stage | null; cut: Cut | null }
   | {
@@ -63,6 +66,8 @@ export type RunEvent = { key: string; batch: number } & (
       model: ModelId;
       answer: string;
       claims: Claim[];
+      /** The charts the draft proposed, each value with its citation (empty when none). */
+      charts: ChartBrief[];
       /** The sources this model found first. */
       sources: Source[];
       /** The ids of earlier sources this model found too (absent when none). */
@@ -106,15 +111,14 @@ export type RunEvent = { key: string; batch: number } & (
       cause: "round" | "edit" | "render";
       threads: string[];
     }
-  // chart runs
+  // charts
   | {
-      type: "brief.completed";
-      model: ModelId;
-      brief: ChartBrief;
-      /** The sources this model found first. */
-      sources: Source[];
-      /** The ids of earlier sources this model found too (absent when none). */
-      alsoFound?: string[];
+      /** A measure the drafts proposed to chart that the answer does not draw, and why. */
+      type: "chart.declined";
+      measure: string;
+      briefs: string[];
+      models: ModelId[];
+      why: DeclineReason;
     }
   | {
       type: "chart.written";
@@ -132,11 +136,12 @@ export type RunEvent = { key: string; batch: number } & (
       type: "rows.checked";
       model: ModelId;
       round: 1 | 2 | 3;
-      checks: { row: string; value: string; verdict: Verdict; reason: string }[];
+      checks: { block: string; row: string; value: string; verdict: Verdict; reason: string }[];
     }
   | {
       type: "dispute.settled";
       dispute: string;
+      block: string;
       row: string;
       state: Exclude<Dispute["state"], "open">;
       winner: string | null;

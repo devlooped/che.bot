@@ -47,7 +47,7 @@ export interface Paragraph {
   sources: string[]; // Source ids
   claims: string[]; // the draft claims the paragraph carries; empty for text added by a suggestion
 }
-export type Block = Paragraph | Chart; // Chart: phase 4
+export type Block = Paragraph | Chart;
 
 export interface Snapshot {
   version: number;
@@ -160,25 +160,16 @@ export interface Flags {
   quorumLost: boolean; // a round answered by fewer models than the quorum ended the rounds
 }
 
-export type ChartOrigin = "user" | "web";
 export type CellValue = number | string | null;
 
 /**
- * How a row of a chart was settled. User data: "upload" (the uploaded row, never typed by a model).
- * Web data: "agreed" (two models or more gave the same value, each with a citation), "single" (one
- * model; its source is checked in the rounds), "disputed" (models gave different values: the
- * alternatives are checked in the rounds), then "held" (exactly one value's source held up),
- * "unverified" (a single value whose source did not hold up: drawn, and marked) or "unsettled"
- * (no single value held up: drawn as a range of the alternatives, with their sources).
+ * How a row of a chart was settled: "agreed" (two models or more gave the same value, each with a
+ * citation), "single" (one model; its source is checked in the rounds), "disputed" (models gave
+ * different values: the alternatives are checked in the rounds), then "held" (exactly one value's
+ * source held up), "unverified" (a single value whose source did not hold up: drawn, and marked) or
+ * "unsettled" (no single value held up: drawn as a range of the alternatives, with their sources).
  */
-export type RowStatus =
-  | "upload"
-  | "agreed"
-  | "single"
-  | "disputed"
-  | "held"
-  | "unverified"
-  | "unsettled";
+export type RowStatus = "agreed" | "single" | "disputed" | "held" | "unverified" | "unsettled";
 
 /** A value of a web row with its citation: the source (found by search) and the words that state it. */
 export interface RowValue {
@@ -189,20 +180,13 @@ export interface RowValue {
 }
 
 export interface Row {
-  key: string; // the dimension value of a web row ("2026-03", "Córdoba"); "r12" for an uploaded row
-  values: Record<string, CellValue>; // web: { value: 2.7 }; user: the columns of the uploaded row
-  source: string; // Source id; "upload" for user data
-  quote: string; // the words of the source that state the value; "" for user data
+  key: string; // the dimension value of the row ("2026-03", "Córdoba")
+  values: Record<string, CellValue>; // { value: 2.7 }
+  source: string; // Source id
+  quote: string; // the words of the source that state the value
   support: ModelId[];
   status: RowStatus;
   alternatives: RowValue[]; // other values with their sources (a dispute, or an unsettled range)
-}
-
-export type ColumnType = "number" | "date" | "text";
-
-export interface Column {
-  name: string;
-  type: ColumnType;
 }
 
 export type ChartLayer = "data" | "transform" | "encoding" | "title" | "caption";
@@ -215,20 +199,18 @@ export const CHART_LAYERS: readonly ChartLayer[] = [
 ];
 
 /**
- * A chart block. Its layers take suggestions and locks separately: `data` (the rows, settled by
- * source), `transform` (Vega-Lite transforms), `encoding` (the mark and the encoding), `title` and
- * `caption` (the short explanation). The data never travels in the encoding: `chartSpec` composes
- * the Vega-Lite spec from the layers and the app's fixed theme.
+ * A chart block, placed among the paragraphs. Its layers take suggestions and locks separately:
+ * `data` (the rows, found on the web and settled by source), `transform` (Vega-Lite transforms),
+ * `encoding` (the mark and the encoding), `title` and `caption` (the short explanation). The data
+ * never travels in the encoding: `chartSpec` composes the Vega-Lite spec from the layers and the
+ * app's fixed theme.
  */
 export interface Chart {
   kind: "chart";
-  id: string; // "c1"
+  id: string; // "c1", "c2", "c3"
   brief: { question: string; measures: string[]; dimensions: string[] };
-  /**
-   * Web data has the fields `key` (the dimension) and `value` (the one measure); user data has the
-   * columns of the upload.
-   */
-  data: { origin: ChartOrigin; columns: Column[]; rows: Row[] };
+  /** The fields of the data are `key` (the dimension) and `value` (the one measure). */
+  data: { rows: Row[] };
   transform: unknown[];
   encoding: Record<string, unknown>;
   mark: string;

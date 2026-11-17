@@ -9,15 +9,9 @@ import { type ChartLocale, DATA_NAME, type Datum } from "./spec.ts";
 
 const TWEEN_MS = 750;
 
-export interface DrawnRow {
-  [field: string]: string | number | null;
-}
-
 export interface Drawing {
   /** Shows a version: its spec (with the named data set) and its rows. */
   update(spec: Record<string, unknown>, rows: readonly Datum[]): Promise<void>;
-  /** The rows the first layer draws, after the calculation (for the table of an upload). */
-  drawn(): DrawnRow[];
   destroy(): void;
 }
 
@@ -64,19 +58,6 @@ function frame(from: readonly Datum[], to: readonly Datum[], p: number): Datum[]
     }
     return out;
   });
-}
-
-/** The name of the data set the first mark draws, in a compiled Vega spec. */
-function firstMarkData(spec: unknown): string | null {
-  const marks = (spec as { marks?: unknown[] } | null)?.marks ?? [];
-  for (const m of marks) {
-    const from = (m as { from?: { data?: unknown; facet?: { data?: unknown } } }).from;
-    if (typeof from?.data === "string") return from.data;
-    if (typeof from?.facet?.data === "string") return from.facet.data;
-    const inner = firstMarkData(m);
-    if (inner) return inner;
-  }
-  return null;
 }
 
 /** The structure of a spec: what must stay the same for the marks to move instead of a new drawing. */
@@ -175,16 +156,6 @@ export async function draw(
       if (mine !== generation || destroyed) return;
       shown = data.map((r) => ({ ...r }));
       await show(shown);
-    },
-    drawn() {
-      if (!result) return [];
-      const name = firstMarkData(result.vgSpec);
-      if (!name) return [];
-      try {
-        return (result.view.data(name) as DrawnRow[]).map((d) => ({ ...d }));
-      } catch {
-        return [];
-      }
     },
     destroy() {
       destroyed = true;

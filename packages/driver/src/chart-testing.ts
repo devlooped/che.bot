@@ -1,9 +1,8 @@
-// Test support for chart runs (phase 4), part of `@chebot/driver/testing`: scripted briefs, merge,
-// spec and rounds, read from the prompts as a model would. Web data: monthly inflation, with a row
-// typed from memory (dropped), a conflict that the sources settle, one that stays a range, a patch
-// that does not render and one of the theme. User data: the briefs agree on a sum by region; the
-// writer's spec carries data (refused); a data patch is refused; one patch of the encoding is
-// accepted.
+// Test support for answers with a chart, part of `@chebot/driver/testing`: scripted drafts that
+// propose a chart, the merge, the grouping, the spec and the rounds, read from the prompts as a model
+// would. The answer is two paragraphs and a chart of monthly inflation, with a row typed from memory
+// (dropped), a conflict that the sources settle, one that stays a range, a patch that does not
+// render and one of the theme.
 import type { ModelId } from "@chebot/protocol";
 import type { FakeOutcome, GenerateRequest } from "@chebot/providers";
 
@@ -61,6 +60,7 @@ const patch = (
   reason: string,
   kind = "misleading",
 ) => ({
+  chart: "c1",
   layer,
   path,
   value,
@@ -71,6 +71,7 @@ const patch = (
 });
 
 const check = (r: string, value: string, verdict: string) => ({
+  chart: "c1",
   row: r,
   value,
   verdict,
@@ -87,6 +88,7 @@ const out = (output: unknown, extra: Partial<Extract<FakeOutcome, { output: unkn
 
 const WEB_ROUND1: Record<ModelId, unknown> = {
   grok: {
+    suggestions: [],
     patches: [
       patch(
         "encoding",
@@ -98,6 +100,7 @@ const WEB_ROUND1: Record<ModelId, unknown> = {
     checks: [check("2026-03", "v2", "fails"), check("2026-05", "v2", "holds")],
   },
   claude: {
+    suggestions: [],
     patches: [
       patch("encoding", "encoding.y.scale.scheme", '"reds"', "El rojo marca la suba."),
       patch(
@@ -111,6 +114,7 @@ const WEB_ROUND1: Record<ModelId, unknown> = {
     checks: [check("2026-03", "v1", "holds"), check("2026-05", "v1", "holds")],
   },
   openai: {
+    suggestions: [],
     patches: [],
     checks: [
       check("2026-03", "v2", "fails"),
@@ -119,6 +123,7 @@ const WEB_ROUND1: Record<ModelId, unknown> = {
     ],
   },
   gemini: {
+    suggestions: [],
     patches: [],
     checks: [
       check("2026-03", "v1", "holds"),
@@ -128,35 +133,64 @@ const WEB_ROUND1: Record<ModelId, unknown> = {
   },
 };
 
-/** The scripted outcome of a call of a web chart run (a FakeScript `respond`). */
+/** The text of every draft: the figures are in the chart. */
+const CLAIMS = [
+  "La inflación mensual se moderó durante 2026.",
+  "Marzo fue el mes de mayor inflación.",
+];
+
+/** The scripted outcome of a call of a run whose answer has a chart (a FakeScript `respond`). */
 export function respondWebChart(req: GenerateRequest<unknown>): FakeOutcome {
   const [kind, n, seat] = req.callKey.split(":") as [string, string, ModelId];
   switch (kind) {
-    case "brief":
+    case "draft":
       return out(
         {
-          question: "¿Cuánto subieron los precios cada mes?",
-          dimension: "Mes",
-          measure: "Inflación mensual (%)",
-          mark: "line",
-          rows: ROWS_WEB[seat],
+          answer: CLAIMS.join("\n\n"),
+          claims: CLAIMS.map((text) => ({ text, confidence: "high", sources: [] })),
+          charts: [
+            {
+              question: "¿Cuánto subieron los precios cada mes?",
+              dimension: "Mes",
+              measure: "Inflación mensual (%)",
+              mark: "line",
+              rows: ROWS_WEB[seat],
+            },
+          ],
         },
         { sources: FOUND_WEB[seat], costUsd: 0.05 },
       );
+    case "merge": {
+      const ids = [...req.prompt.matchAll(/^- (\w+) \[\w+\] (.*)$/gm)].map((m) => ({
+        id: m[1] ?? "",
+        text: m[2] ?? "",
+      }));
+      return out(
+        {
+          paragraphs: CLAIMS.map((text) => ({
+            text,
+            claims: ids.filter((c) => c.text === text).map((c) => c.id),
+          })),
+          conflicts: [],
+        },
+        { costUsd: 0.001 },
+      );
+    }
     case "chart-merge":
       return out(
         {
-          question: "¿Cuánto subieron los precios cada mes de 2026?",
-          dimension: "Mes",
-          measure: "Inflación mensual (%)",
-          drafts: [...req.prompt.matchAll(/^## Draft (\w)$/gm)].map((m) => ({
-            draft: m[1],
-            measure: "same",
-          })),
-          keys: [...req.prompt.matchAll(/^- (\w+): (.*)$/gm)].map((m) => ({
-            row: m[1],
-            key: /enero/i.test(m[2] ?? "") ? "2026-01" : m[2],
-          })),
+          charts: [
+            {
+              question: "¿Cuánto subieron los precios cada mes de 2026?",
+              dimension: "Mes",
+              measure: "Inflación mensual (%)",
+              briefs: [...req.prompt.matchAll(/^## Proposal (\w+)$/gm)].map((m) => m[1]),
+              keys: [...req.prompt.matchAll(/^- ([\w.]+): (.*)$/gm)].map((m) => ({
+                row: m[1],
+                key: /enero/i.test(m[2] ?? "") ? "2026-01" : m[2],
+              })),
+            },
+          ],
         },
         { costUsd: 0.001 },
       );
@@ -177,6 +211,7 @@ export function respondWebChart(req: GenerateRequest<unknown>): FakeOutcome {
         }),
         title: "Inflación mensual de 2026",
         caption: "Según el INDEC.",
+        after: "p1",
       });
     case "round": {
       if (n === "1") return out(WEB_ROUND1[seat]);
@@ -184,82 +219,12 @@ export function respondWebChart(req: GenerateRequest<unknown>): FakeOutcome {
         seat === "grok"
           ? []
           : [{ thread: "t1", choice: seat === "gemini" ? "keep" : "s1", reason: "" }];
-      return out(n === "2" ? { votes, patches: [], checks: [] } : { votes: [], checks: [] });
+      return out(
+        n === "2" ? { votes, suggestions: [], patches: [], checks: [] } : { votes: [], checks: [] },
+      );
     }
     case "moments":
-      return out({ sentences: ["Los cuatro están armando el gráfico."] }, { costUsd: 0.001 });
-    default:
-      return { kind: "error", message: `unscripted ${req.callKey}` };
-  }
-}
-
-export const SALES_CSV = [
-  "region;mes;ventas",
-  "Norte;2026-01;100",
-  "Norte;2026-02;150",
-  "Sur;2026-01;80",
-  'Sur;2026-02;"95,5"',
-  "Oeste;2026-01;40",
-].join("\n");
-
-const SUM_BY_REGION = JSON.stringify([
-  { aggregate: [{ op: "sum", field: "ventas", as: "total" }], groupby: ["region"] },
-]);
-
-/** The scripted outcome of a call of a chart run on SALES_CSV (a FakeScript `respond`). */
-export function respondUserChart(req: GenerateRequest<unknown>): FakeOutcome {
-  const [kind, n, seat] = req.callKey.split(":") as [string, string, ModelId];
-  switch (kind) {
-    case "brief":
-      return out({
-        question: "¿Cuánto vendió cada región?",
-        dimension: "region",
-        measures: ["ventas"],
-        mark: "bar",
-        transform: SUM_BY_REGION,
-      });
-    case "spec":
-      // the writer types the data: refused, the plain chart of code is used
-      return out({
-        spec: JSON.stringify({
-          data: { values: [{ region: "Norte", total: 1000 }] },
-          mark: "bar",
-          encoding: {},
-        }),
-        title: "Ventas por región",
-        caption: "El Norte vende más.",
-      });
-    case "round":
-      if (n === "1") {
-        if (seat === "openai")
-          return out({
-            patches: [
-              patch(
-                "encoding",
-                "encoding.y",
-                '{"field":"total","type":"quantitative","title":"Ventas totales"}',
-                "El eje no dice que es la suma.",
-              ),
-            ],
-            checks: [],
-          });
-        if (seat === "grok")
-          return out({
-            patches: [patch("data", "r1", "1000", "El Norte vendió más.", "wrong")],
-            checks: [],
-          });
-        return out({ patches: [], checks: [] });
-      }
-      return out({
-        votes:
-          seat === "openai"
-            ? []
-            : [{ thread: "t1", choice: seat === "gemini" ? "keep" : "s1", reason: "" }],
-        patches: [],
-        checks: [],
-      });
-    case "moments":
-      return out({ sentences: ["Los cuatro miran tus datos."] });
+      return out({ sentences: ["Los cuatro están armando la respuesta."] }, { costUsd: 0.001 });
     default:
       return { kind: "error", message: `unscripted ${req.callKey}` };
   }

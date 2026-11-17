@@ -10,7 +10,7 @@ import {
   type Thread,
 } from "@chebot/protocol";
 import { t } from "../i18n/index.ts";
-import { chartCounts, chartOpenPoints } from "./chart.ts";
+import { type ChartView, chartCounts, chartIdsOf, chartViewOf, rowsToCheck } from "./chart.ts";
 import { type Discussion, discussionOf } from "./discussion.ts";
 
 export type { Discussion, Position } from "./discussion.ts";
@@ -34,28 +34,35 @@ export function seatChip(view: RunView, model: ModelId): string {
   return last.stage === "round1" ? t.abstainedLater.round1 : t.abstainedLater.votes;
 }
 
-/** Points in discussion: open discussions, or before any, the contested paragraphs. */
+/**
+ * Points in discussion: open discussions and rows of a chart being checked, or before any, the
+ * contested paragraphs and the rows of a chart to check against their sources.
+ */
 export function openPoints(view: RunView): number {
-  const open = Object.values(view.threads).filter((th) => th.state === "open").length;
+  const open =
+    Object.values(view.threads).filter((th) => th.state === "open").length +
+    Object.values(view.disputes).filter((d) => d.state === "open").length;
   if (open > 0) return open;
   const last = view.snapshots.at(-1);
   if (!last) return 0;
-  return Object.values(last.blocks).filter(
+  const contested = Object.values(last.blocks).filter(
     (b) => b.kind === "paragraph" && b.status === "contested",
   ).length;
+  return contested + rowsToCheck(view);
 }
 
 /** The one line under the four seats. `waitingPayment`: the summary says so before the QR event. */
 export function stageLine(view: RunView, waitingPayment = false): string {
   if (view.status === "expired") return t.stage.expired;
   if (view.status === "failed") return t.stage.failed;
-  if (view.chart) return chartStageLine(view);
   if (view.status === "completed") {
     const answer = selectAnswer(view);
     const paragraphs = answer?.paragraphs ?? [];
     const agreed = paragraphs.filter((p) => p.status === "agreed").length;
     const dissent = new Set(answer?.dissent.map((d) => d.thread)).size;
-    return t.stage.done(agreed, paragraphs.length, dissent);
+    const done = t.stage.done(agreed, paragraphs.length, dissent);
+    const charts = t.stage.charts(chartCounts(view));
+    return charts ? `${done} ${charts}` : done;
   }
   if (view.status === "quoted") return waitingPayment ? t.stage.awaiting_payment : t.stage.quoted;
   if (view.status === "awaiting_payment") return t.stage.awaiting_payment;
@@ -73,29 +80,6 @@ export function stageLine(view: RunView, waitingPayment = false): string {
     case "editing":
     case "done":
       return t.stage.editing;
-    default:
-      return t.stage.starting;
-  }
-}
-
-/** The stage line of a chart run, once it started. */
-function chartStageLine(view: RunView): string {
-  const c = t.stage.chart;
-  if (view.status === "completed") {
-    const counts = chartCounts(view);
-    return counts.origin === "user" ? c.doneUser(counts.dissent) : c.done(counts);
-  }
-  switch (view.stage) {
-    case "drafting":
-      return c.drafting[view.chart?.origin ?? "web"];
-    case "merging":
-      return c.merging;
-    case "round1":
-      return c.round1(chartOpenPoints(view));
-    case "round2":
-      return c.round2(chartOpenPoints(view));
-    case "round3":
-      return t.stage.round3(chartOpenPoints(view));
     default:
       return t.stage.starting;
   }
@@ -121,9 +105,17 @@ export interface ParagraphView {
   marked: boolean;
 }
 
+/** A block of the answer, in the order of the document: a paragraph or a chart. */
+export type BlockView =
+  | { kind: "paragraph"; paragraph: ParagraphView }
+  | { kind: "chart"; chart: ChartView };
+
 export interface DocumentView {
   answer: Answer;
   paragraphs: ParagraphView[];
+  charts: ChartView[];
+  blocks: BlockView[];
+  /** The sources the paragraphs cite and the sources of the rows of the charts, by id. */
   sources: Source[];
 }
 
@@ -149,7 +141,12 @@ export function documentOf(view: RunView): DocumentView | null {
     const id = insertedParagraph(view, thread);
     if (id) added.set(id, thread);
   }
-  const sourceNumber = new Map(answer.sources.map((s, i) => [s.id, i + 1]));
+  const last = view.snapshots.find((s) => s.version === answer.version);
+  const charts = chartIdsOf(last).flatMap((id) => chartViewOf(view, id) ?? []);
+  const sources = [...answer.sources, ...charts.flatMap((c) => c.answer.sources)]
+    .filter((s, i, all) => all.findIndex((x) => x.id === s.id) === i)
+    .sort((a, b) => Number(a.id.slice(3)) - Number(b.id.slice(3)));
+  const sourceNumber = new Map(sources.map((s, i) => [s.id, i + 1]));
   const paragraphs = answer.paragraphs.map((p): ParagraphView => {
     const addedBy = added.get(p.id);
     const discussions = threads
@@ -187,7 +184,13 @@ export function documentOf(view: RunView): DocumentView | null {
       marked: p.status !== "agreed" || discussions.length > 0 || addedBy !== undefined,
     };
   });
-  return { answer, paragraphs, sources: answer.sources };
+  const blocks = (last?.order ?? []).flatMap((id): BlockView[] => {
+    const paragraph = paragraphs.find((p) => p.id === id);
+    if (paragraph) return [{ kind: "paragraph", paragraph }];
+    const chart = charts.find((c) => c.id === id);
+    return chart ? [{ kind: "chart", chart }] : [];
+  });
+  return { answer, paragraphs, charts, blocks, sources };
 }
 
 /** The panel of the run ("who sat where"): the four seats and the assistant, as the run resolved them. */
