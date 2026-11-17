@@ -8,30 +8,39 @@ import {
   type FailureReason,
   failRun,
   type LoggedEvent,
+  linkOf,
   nextStep,
   type OutputOf,
   paymentConfirmedEvent,
   paymentRequestedEvent,
   type QuestionClass,
+  quaranSeconds,
   quotedEvent,
   type RunEvent,
   type RunState,
   reduce,
   resolveConfig,
+  runUuid,
+  SLUG_WORDS,
   type Snapshot,
   type Stage,
+  shortOf,
+  slugOf,
+  slugPrompt,
+  slugSchema,
 } from "@chebot/protocol";
+import { ProviderError } from "@chebot/providers";
 import { deps } from "./deps.ts";
 import type { Env } from "./env.ts";
 import { type JobSnapshot, JobsError } from "./jobs.ts";
 import {
   attemptPrefix,
-  type ClassifyCost,
+  type CallCost,
   type RunRecord,
   type RunStatus,
   RunStore,
 } from "./run-store.ts";
-import { indexRun, removeRun, resolveRunModels, setRunStatus } from "./settings.ts";
+import { claimLink, indexRun, removeRun, resolveRunModels, setRunStatus } from "./settings.ts";
 import { type RunSpend, type SpendCall, spendOf, stageOfKey } from "./spend.ts";
 import { spendMeter } from "./spend-meter.ts";
 
@@ -58,6 +67,16 @@ const JOB_MESSAGES = {
   failed: "La corrida falló; se puede volver a correr gratis.",
 } as const;
 
+/** The helper's calls for the link of a run, at most: one per tick until a link is claimed. */
+export const LINK_TRIES = 3;
+/** A call of the helper gives up after this long; the next tick tries again. */
+export const HELPER_TIMEOUT_MS = 30_000;
+/**
+ * The seconds a link tries after the one its question was asked in, when another question of
+ * that second has the same words.
+ */
+export const LINK_SECONDS = 3;
+
 /** The wait before the next try after `retries` failed tries in a row: 2 s doubling, at most 5 min. */
 export const backoffMs = (retries: number) => Math.min(2_000 * 2 ** retries, 300_000);
 
@@ -72,7 +91,7 @@ export interface QuoteInput {
   amount: number;
   currency: string;
   /** What the classification of the question cost, for the spend of the run. */
-  classify?: ClassifyCost | null;
+  classify?: CallCost | null;
 }
 
 export interface PayInput {
@@ -105,6 +124,8 @@ export interface RunSummary {
   failure: FailureReason | null;
   /** How many charts the answer has (0 before they are decided, or when it has none). */
   charts: number;
+  /** The public link (run-link.ts of the protocol), once the helper named the run. */
+  link: string | null;
 }
 
 export type RerunResult =
@@ -146,7 +167,7 @@ function paidByJob(job: JobSnapshot): boolean {
 
 /** The object of a run: one per question, named by the run id. */
 export function runStub(env: Env, id: string) {
-  return env.RUNS.get(env.RUNS.idFromName(id.toLowerCase()));
+  return env.RUNS.get(env.RUNS.idFromName(runUuid(id) ?? id));
 }
 
 /**
@@ -503,12 +524,16 @@ export class RunObject extends DurableObject<Env> {
     if (step.kind === "done") return;
     this.store.append(beginStep(state, step), Date.now(), prefix);
     this.broadcast();
-    const entries = await runCalls(state, step, {
-      provider: deps.provider(this.env),
-      renderer: deps.renderer(this.env),
-      ledger: this.store.ledger(prefix),
-      now: Date.now,
-    });
+    // The helper names the question beside the first steps, so the run does not wait for it.
+    const [entries] = await Promise.all([
+      runCalls(state, step, {
+        provider: deps.provider(this.env),
+        renderer: deps.renderer(this.env),
+        ledger: this.store.ledger(prefix),
+        now: Date.now,
+      }),
+      this.nameRun(run),
+    ]);
     const now = Date.now();
     const reduced = reduce(
       state,
@@ -519,6 +544,80 @@ export class RunObject extends DurableObject<Env> {
     if (!this.commit(run, state, reduced, now)) return;
     if (reduced.state.status === "running") await this.schedule();
     else await this.ended(reduced.state.status);
+  }
+
+  /**
+   * Gives the run its public link, once: the helper sums the question up in at most five words, and the
+   * link of the second it was asked in and those words is claimed in the list of runs, whose index
+   * keeps each link to one run; another question of that second with the same words makes it try
+   * the next seconds (LINK_SECONDS). A call per tick until a link is claimed, at most LINK_TRIES.
+   * The helper's cost goes to the run's spend and the SpendMeter. A run whose models predate the
+   * helper gets no link. Never throws: the run's page works by its UUID without it.
+   */
+  private async nameRun(run: RunRecord): Promise<void> {
+    const model = run.models?.helper;
+    if (run.link !== null || run.linkTries >= LINK_TRIES || !model) return;
+    const tries = run.linkTries + 1;
+    this.store.updateRun({ link_tries: tries });
+    let words: string | null = null;
+    let cost: CallCost;
+    try {
+      const result = await deps.provider(this.env).generate({
+        callKey: `link:${tries}`,
+        model,
+        ...slugPrompt({ question: run.question, words: SLUG_WORDS }),
+        schema: slugSchema,
+        maxOutputTokens: 2_000,
+        signal: AbortSignal.timeout(HELPER_TIMEOUT_MS),
+      });
+      words = slugOf(result.output.words);
+      cost = { model: model.id, costUsd: result.costUsd, ...result.usage };
+    } catch (error) {
+      console.warn(`The helper could not name run ${run.id} (try ${tries}).`, error);
+      const failure = ProviderError.isInstance(error) ? error : null;
+      cost = {
+        model: model.id,
+        costUsd: failure?.costUsd ?? 0,
+        inputTokens: failure?.usage?.inputTokens ?? 0,
+        outputTokens: failure?.usage?.outputTokens ?? 0,
+      };
+    }
+    if (cost.costUsd > 0)
+      await spendMeter(this.env)
+        .settle(`${run.id}:link:${tries}`, cost.costUsd)
+        .catch((error: unknown) => {
+          console.warn(`The cost of the link of run ${run.id} could not be recorded.`, error);
+        });
+    const link = words ? await this.claim(run, words) : null;
+    // The run may have been deleted while the helper answered.
+    const current = this.store.run();
+    if (!current) return;
+    const before = current.helper;
+    this.store.updateRun({
+      link,
+      helper: JSON.stringify({
+        model: model.id,
+        costUsd: (before?.costUsd ?? 0) + cost.costUsd,
+        inputTokens: (before?.inputTokens ?? 0) + cost.inputTokens,
+        outputTokens: (before?.outputTokens ?? 0) + cost.outputTokens,
+      } satisfies CallCost),
+    });
+  }
+
+  /** Claims the first free link of the run's words; null when none is, or D1 fails. */
+  private async claim(run: RunRecord, words: string): Promise<string | null> {
+    const second = quaranSeconds(run.createdAt);
+    try {
+      for (let n = 0; n < LINK_SECONDS; n++) {
+        const short = shortOf(second + n);
+        const link = linkOf(short, words);
+        if (await claimLink(this.env.DB, run.id, short, link)) return link;
+      }
+      console.warn(`Run ${run.id} found every link of its words taken: ${words}`);
+    } catch (error) {
+      console.error(`The link of run ${run.id} could not be claimed.`, error);
+    }
+    return null;
   }
 
   private async fail(run: RunRecord, state: RunState): Promise<void> {
@@ -631,6 +730,7 @@ export class RunObject extends DurableObject<Env> {
     const calls: SpendCall[] = [];
     if (run.classify)
       calls.push({ agent: "classifier", stage: "classify", running: false, ...run.classify });
+    if (run.helper) calls.push({ agent: "helper", stage: "link", running: false, ...run.helper });
     const inFlight = new Map<string, SpendCall>();
     if (run.status === "running" && run.state) {
       const step = nextStep(run.state, Date.now());
@@ -750,6 +850,7 @@ export class RunObject extends DurableObject<Env> {
       failure: run.state?.failure ?? null,
       // a run state from before the charts of an answer has no `charts`
       charts: run.state?.charts ? chartIds(run.state).length : 0,
+      link: run.link,
     };
   }
 

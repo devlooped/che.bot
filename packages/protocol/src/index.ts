@@ -8,6 +8,7 @@ export * from "./moments.ts";
 export * from "./prompts/index.ts";
 export * from "./reducer.ts";
 export * from "./replay.ts";
+export * from "./run-link.ts";
 export * from "./schemas.ts";
 export * from "./seed.ts";
 export * from "./threads.ts";

@@ -101,6 +101,7 @@ describe("quote, pay and paid", () => {
       "draft:0:gemini",
       "draft:0:grok",
       "draft:0:openai",
+      "link:1",
     ]);
     const { results } = await env.DB.prepare("SELECT status FROM runs WHERE id = ?").bind(id).all();
     expect(results).toEqual([{ status: "running" }]);
@@ -173,13 +174,14 @@ describe("the alarm driver", () => {
     const { stub } = await paidRun();
     const before = await inside(stub, (store) => store.run()?.state);
     expect(await runDurableObjectAlarm(stub)).toBe(true);
-    expect(provider.calls).toHaveLength(4);
+    // The four drafts, and the helper's link beside them.
+    expect(provider.calls).toHaveLength(5);
     // The calls of the drafting stage landed, then the commit was lost: the alarm runs again.
     await inside(stub, (store) => {
       store.updateRun({ state: JSON.stringify(before) });
     });
     await runInDurableObject(stub, (instance: RunObject) => instance.alarm());
-    expect(provider.calls).toHaveLength(4);
+    expect(provider.calls).toHaveLength(5);
     expect(await inside(stub, (store) => store.run()?.state?.drafts.length)).toBe(4);
     await runAlarms(stub);
     expect(provider.repeated()).toEqual([]);

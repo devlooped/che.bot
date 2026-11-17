@@ -178,9 +178,9 @@ describe("the guardrails", () => {
   });
 });
 
-/** What a run spent, as its state counts it. */
+/** What a run spent, as its state counts it, and the helper's link beside it. */
 const spentOf = (stub: DurableObjectStub<RunObject>) =>
-  runInDurableObject(
-    stub,
-    (_: RunObject, state) => new RunStore(state.storage.sql).run()?.state?.spentUsd ?? 0,
-  );
+  runInDurableObject(stub, (_: RunObject, state) => {
+    const run = new RunStore(state.storage.sql).run();
+    return (run?.state?.spentUsd ?? 0) + (run?.helper?.costUsd ?? 0);
+  });

@@ -69,6 +69,8 @@ export interface RunSummary {
   mine: boolean;
   /** How many charts the answer has (0 before they are decided, or when it has none). */
   charts: number;
+  /** The public link (runPath), once the helper named the run. */
+  link: string | null;
 }
 
 /** A row of GET /api/me/runs. */
@@ -80,6 +82,8 @@ export interface MyRun {
   class: QuestionClass | null;
   status: RunStatus;
   amount: number | null;
+  /** The public link; null until the helper named the run. */
+  link: string | null;
 }
 
 /** The family and effort of a role (an effort of null: the model's own). */
@@ -201,6 +205,9 @@ export function createApi(base = "") {
         method: "PUT",
         body: JSON.stringify({ prices }),
       }).then((r) => r.prices),
+    /** Public: the UUID and the link of the run of a link, whole or short. */
+    link: (ref: string) =>
+      call<{ id: string; link: string }>(`/api/links/${encodeURIComponent(ref)}`),
     /** Public; `mine` says whether the signed-in user owns it. */
     summary: (runId: string) => call<RunSummary>(`/api/runs/${runId}`),
     /** Admin. */

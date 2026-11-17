@@ -61,6 +61,19 @@ export function editorCheckPrompt(input: {
   };
 }
 
+/** The helper names a question for its link: up to SLUG_WORDS words (see run-link.ts). */
+export function slugPrompt(input: { question: string; words: number }): Prompt {
+  return {
+    system: [
+      `You name a question for the link of its page: at most ${input.words} words that say what the question is about, in the order they read best, in the language of the question.`,
+      "Take the question's own words when they say it best (names, places, figures, key terms), or sum the question up in words of your own when that is clearer or shorter. Fewer words are better when they are enough. Leave out articles, prepositions and question words unless they are needed.",
+      `Return 1 to ${input.words} words, each a single word without spaces or punctuation.`,
+      STRUCTURED_RULE,
+    ].join("\n"),
+    prompt: `Question:\n${input.question}`,
+  };
+}
+
 const LANGUAGE_NAMES: Record<string, string> = {
   "es-AR":
     "Spanish as spoken in Buenos Aires (rioplatense): voseo (vos, tenés, podés), plain everyday words",

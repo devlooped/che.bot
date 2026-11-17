@@ -1,3 +1,4 @@
+import { parseRunRef } from "@chebot/protocol";
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "../auth/context.tsx";
 import { isAdmin } from "../auth/types.ts";
@@ -17,12 +18,60 @@ import { runPath } from "../routes.tsx";
 import { documentOf, flagNotes, stageLine } from "../view/derive.ts";
 import { errorText } from "../view/errors.ts";
 
+/** The runs of the links this page resolved or learned: a link the page shows needs no new read. */
+const known = new Map<string, string>();
+
+function RunNotFound() {
+  return (
+    <main className="page page-narrow">
+      <h1 className="page-title">{t.errors.runNotFound}</h1>
+      <p>
+        <Link to="/">{t.notFound.back}</Link>
+      </p>
+    </main>
+  );
+}
+
 /**
- * The page of a run, by its link: readable by anyone. Its owner pays here, asks again after an
- * expired payment, and reruns a paid question that failed.
+ * The page of a run, by its UUID or its link (run-link.ts of the protocol): readable by anyone. A
+ * link is resolved to the run's UUID first; the short part alone resolves too.
  */
 export function RunPage({ params }: { params: Record<string, string> }) {
-  const runId = (params.id ?? "").toLowerCase();
+  const ref = params.id ?? "";
+  const parsed = parseRunRef(ref);
+  const { api } = useSession();
+  const [found, setFound] = useState<{ ref: string; id: string | null } | null>(null);
+  const cached = known.get(ref);
+  useEffect(() => {
+    if (parsed?.kind !== "link" || cached) return;
+    let live = true;
+    api.link(ref).then(
+      (run) => live && setFound({ ref, id: run.id }),
+      () => live && setFound({ ref, id: null }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, ref, parsed?.kind, cached]);
+
+  if (parsed?.kind === "uuid") return <RunView key={parsed.id} runId={parsed.id} />;
+  if (cached) return <RunView key={cached} runId={cached} />;
+  if (parsed && found?.ref !== ref)
+    return (
+      <main className="page page-narrow">
+        <p className="muted">{t.common.loading}</p>
+      </main>
+    );
+  if (!found?.id) return <RunNotFound />;
+  known.set(ref, found.id);
+  return <RunView key={found.id} runId={found.id} />;
+}
+
+/**
+ * A run, by its UUID: its owner pays here, asks again after an expired payment, and reruns a paid
+ * question that failed.
+ */
+function RunView({ runId }: { runId: string }) {
   const { api, user, local } = useSession();
   const { stream, summary, error, refresh } = useRun(runId);
   const [paying, setPaying] = useState(false);
@@ -37,16 +86,22 @@ export function RunPage({ params }: { params: Record<string, string> }) {
   useEffect(() => {
     if (view.status === "failed" || view.status === "expired") refresh();
   }, [view.status, refresh]);
+  // The helper names a paid question beside its first steps: read the link again at each stage.
+  const linkPending = summary?.link === null && view.status === "running";
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new stage asks for a new read
+  useEffect(() => {
+    if (linkPending) refresh();
+  }, [view.stage, linkPending, refresh]);
+  // The address bar shows the link to share: the run's link once it has one, its UUID before.
+  const link = summary?.id === runId ? summary.link : null;
+  const path = runPath(runId, link);
+  useEffect(() => {
+    if (link) known.set(link, runId);
+    if (summary?.id === runId && window.location.pathname !== path)
+      navigate(`${path}${window.location.search}${window.location.hash}`, { replace: true });
+  }, [summary?.id, runId, link, path]);
 
-  if (error?.kind === "not_found")
-    return (
-      <main className="page page-narrow">
-        <h1 className="page-title">{t.errors.runNotFound}</h1>
-        <p>
-          <Link to="/">{t.notFound.back}</Link>
-        </p>
-      </main>
-    );
+  if (error?.kind === "not_found") return <RunNotFound />;
 
   const question = view.question ?? summary?.question ?? "";
   const started = view.runId !== null;
@@ -103,7 +158,7 @@ export function RunPage({ params }: { params: Record<string, string> }) {
           <p className="muted">{t.common.loading}</p>
         )}
         <div className="run-share">
-          <ShareLink url={new URL(runPath(runId), window.location.origin).href} />
+          <ShareLink url={new URL(path, window.location.origin).href} />
           {view.status === "running" && <p className="fine">{t.run.takesMinutes}</p>}
         </div>
         {(summary?.attempt ?? 1) > 1 && view.status !== "failed" && (

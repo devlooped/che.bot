@@ -110,6 +110,14 @@ The pages: `/` asks, `/r/:id` follows a run and replays how its text and its cha
 the user's questions (copy a link, delete one), and `/admin` sets the model of each role and the two
 prices (admins only; the menu hides it from others).
 
+A run is a UUID inside: its object, its payment job, its row in the list. Once it is paid and
+starts, the helper model (Claude Haiku at medium effort by default) sums the question up in at
+most five words, its own or the question's, and the run gets its public link: the second it was asked, counted from the QuaranTime
+epoch (2020-03-20 00:00 at GMT-03:00) in Base62, then the words, such as
+`/r/EEIHf-cuanto-mide-el-aconcagua-hoy`. A unique index of the list claims the link; in the rare
+case that another question of the same second has the same words, the next second is tried.
+`/r/<uuid>` and the short link alone (`/r/EEIHf`) redirect to the link for good (301).
+
 The end-to-end tests start the local mode themselves. They need Playwright's Chromium
 (`pnpm --filter @chebot/web exec playwright install chromium`) or a browser of the machine:
 `PLAYWRIGHT_CHANNEL=msedge` (or `chrome`). They run at a phone width and a desktop width, and

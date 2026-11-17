@@ -74,7 +74,7 @@ function Row({ run, onDelete }: { run: MyRun; onDelete: (opener: HTMLButtonEleme
   const questionId = `q-${run.id}`;
   return (
     <li className="my-run" data-testid="my-run">
-      <Link to={runPath(run.id)} id={questionId} className="my-run-question">
+      <Link to={runPath(run.id, run.link)} id={questionId} className="my-run-question">
         {run.question}
       </Link>
       <p className="my-run-meta">
@@ -84,7 +84,7 @@ function Row({ run, onDelete }: { run: MyRun; onDelete: (opener: HTMLButtonEleme
       </p>
       <div className="my-run-actions">
         <ShareLink
-          url={new URL(runPath(run.id), window.location.origin).href}
+          url={new URL(runPath(run.id, run.link), window.location.origin).href}
           describedBy={questionId}
         />
         <button

@@ -103,7 +103,9 @@ function Models({ initial }: { initial: AdminModels }) {
           ? t.admin.roleWhat.panel
           : r.role === "utility"
             ? t.admin.roleWhat.utility
-            : t.admin.roleWhat.classifier;
+            : r.role === "helper"
+              ? t.admin.roleWhat.helper
+              : t.admin.roleWhat.classifier;
         const err = fields[r.role];
         return (
           <fieldset key={r.role} className={`role${seat ? ` ink-${seat}` : ""}`} data-testid="role">

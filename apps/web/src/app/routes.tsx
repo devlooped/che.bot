@@ -20,8 +20,8 @@ export const routes: Route[] = [
   { pattern: "/admin", page: AdminPage },
 ];
 
-/** The link of a run: public, readable signed out. */
-export const runPath = (id: string) => `/r/${id}`;
+/** The page of a run: public, readable signed out; by its link once it has one. */
+export { runPath } from "@chebot/protocol";
 
 export interface NavItem {
   to: string;

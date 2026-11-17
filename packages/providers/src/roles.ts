@@ -30,6 +30,13 @@ export const MODEL_ROLES = [
     defaultEffort: null,
   },
   { key: "classifier", kind: "decision", defaultId: "typesafe-ai/jev", defaultEffort: null },
+  // Names a paid question with a few words for its link (run-link.ts of the protocol).
+  {
+    key: "helper",
+    kind: "language",
+    defaultId: "anthropic/claude-haiku-5.5",
+    defaultEffort: "medium",
+  },
 ] as const;
 
 export type ModelRole = (typeof MODEL_ROLES)[number];

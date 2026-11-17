@@ -142,6 +142,9 @@ export const editorCheckSchema = z.object({
   checks: z.array(z.object({ id: z.string(), verdict: z.enum(["same", "changed"]) })),
 });
 
+/** The helper's words for the link of a run (see run-link.ts). */
+export const slugSchema = z.object({ words: z.array(z.string()) });
+
 export const momentsSchema = z.object({
   sentences: z.array(z.string()).describe("At most 3 short sentences."),
 });

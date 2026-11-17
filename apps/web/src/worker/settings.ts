@@ -51,6 +51,8 @@ export interface RunListItem {
   class: QuestionClass | null;
   status: string;
   amount: number | null;
+  /** The public link; null until the helper named the run. */
+  link: string | null;
 }
 
 /** Adds a run to the list once; a second call changes nothing. */
@@ -87,6 +89,59 @@ export async function setRunStatus(db: D1Database, id: string, status: string): 
   await db.prepare("UPDATE runs SET status = ? WHERE id = ?").bind(status, id).run();
 }
 
+/**
+ * Gives the run `id` the public `link`, whose short part is `short`: true, or false when another
+ * run has it (the unique index of migration 0002 decides). Claiming the link a run has is a no-op.
+ */
+export async function claimLink(
+  db: D1Database,
+  id: string,
+  short: string,
+  link: string,
+): Promise<boolean> {
+  try {
+    const result = await db
+      .prepare("UPDATE runs SET link = ?, short = ? WHERE id = ?")
+      .bind(link, short, id)
+      .run();
+    if (!result.meta.changes) throw new Error(`Run ${id} is not in the list of runs.`);
+    return true;
+  } catch (error) {
+    if (/UNIQUE constraint failed/i.test(String(error))) return false;
+    throw error;
+  }
+}
+
+/** The public link of the run `id`; null before it has one. */
+export async function linkOfRun(db: D1Database, id: string): Promise<string | null> {
+  const row = await db
+    .prepare("SELECT link FROM runs WHERE id = ?")
+    .bind(id)
+    .first<{ link: string | null }>();
+  return row?.link ?? null;
+}
+
+/**
+ * The run of a link: by the whole link, else by its short part alone (the first run of that
+ * second). Null when none has it.
+ */
+export async function findLink(
+  db: D1Database,
+  short: string,
+  link: string | null,
+): Promise<{ id: string; link: string } | null> {
+  const row = await db
+    .prepare(
+      `SELECT id, link FROM runs WHERE link = ?
+       UNION ALL
+       SELECT * FROM (SELECT id, link FROM runs WHERE short = ? ORDER BY created_at, id LIMIT 1)
+       LIMIT 1`,
+    )
+    .bind(link, short)
+    .first<{ id: string; link: string }>();
+  return row ?? null;
+}
+
 export async function removeRun(db: D1Database, id: string): Promise<void> {
   await db.prepare("DELETE FROM runs WHERE id = ?").bind(id).run();
 }
@@ -95,7 +150,7 @@ export async function removeRun(db: D1Database, id: string): Promise<void> {
 export async function listRuns(db: D1Database, owner: string): Promise<RunListItem[]> {
   const { results } = await db
     .prepare(
-      `SELECT id, created_at, question, class, status, amount FROM runs
+      `SELECT id, created_at, question, class, status, amount, link FROM runs
        WHERE owner = ? ORDER BY created_at DESC, id`,
     )
     .bind(owner)
@@ -106,6 +161,7 @@ export async function listRuns(db: D1Database, owner: string): Promise<RunListIt
       class: QuestionClass | null;
       status: string;
       amount: number | null;
+      link: string | null;
     }>();
   return results.map((row) => ({
     id: row.id,
@@ -114,6 +170,7 @@ export async function listRuns(db: D1Database, owner: string): Promise<RunListIt
     class: row.class,
     status: row.status,
     amount: row.amount,
+    link: row.link,
   }));
 }
 

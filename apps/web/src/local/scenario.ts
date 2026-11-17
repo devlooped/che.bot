@@ -397,6 +397,11 @@ export function respond(req: GenerateRequest<unknown>): FakeOutcome {
       return out({ checks: [{ id: "p1", verdict: "same" }] });
     case "moments":
       return out({ sentences: phraseMoments(req.prompt) });
+    case "link": {
+      // The longer words of the question, as a helper would choose them.
+      const question = req.prompt.replace(/^Question:\s*/, "").replace(/\[[^\]]*\]/g, "");
+      return out({ words: question.split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 3) });
+    }
   }
   return { kind: "error", message: `The local scenario has no answer for ${req.callKey}.` };
 }

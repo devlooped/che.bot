@@ -168,13 +168,14 @@ describe("the spend of a run", () => {
     });
     expect(inFlight.rows.stage.find((r) => r.label === "draft")).toMatchObject({ running: 1 });
 
-    // The drafts land: four calls of the panel, each with its cost.
+    // The drafts land: four calls of the panel, each with its cost, and the helper's link.
     await runDurableObjectAlarm(stub);
     const drafted = await spendOf(id, admin);
     expect(drafted.running).toBe(0);
     expect(drafted.rows.stage.find((r) => r.label === "draft")).toMatchObject({ calls: 4 });
+    expect(drafted.rows.stage.find((r) => r.label === "link")).toMatchObject({ calls: 1 });
     expect(drafted.rows.agent.map((r) => r.label).sort()).toEqual(
-      ["claude", "classifier", "gemini", "grok", "openai"].sort(),
+      ["claude", "classifier", "gemini", "grok", "helper", "openai"].sort(),
     );
 
     // At the end, the total is what the run spent plus the classification, in every pivot.
@@ -182,7 +183,8 @@ describe("the spend of a run", () => {
     const done = await spendOf(id, admin);
     const ended = (await eventsOf(stub)).find((e) => e.type === "run.completed");
     if (ended?.type !== "run.completed") throw new Error("the run did not complete");
-    expect(done.totalUsd).toBeCloseTo(ended.spentUsd + 0.001, 9);
+    // the classification and the helper's link, US$0.001 each, are beside the run's own spend
+    expect(done.totalUsd).toBeCloseTo(ended.spentUsd + 0.002, 9);
     for (const rows of Object.values(done.rows))
       expect(rows.reduce((sum, r) => sum + r.costUsd, 0)).toBeCloseTo(done.totalUsd, 9);
     expect(done.rows.agent.map((r) => r.label)).toContain("utility");

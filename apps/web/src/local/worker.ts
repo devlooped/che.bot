@@ -80,20 +80,39 @@ const migrations = import.meta.glob<string>("../../migrations/*.sql", {
 
 let schemaReady: Promise<void> | null = null;
 
-/** Applies the D1 migrations to the local database once, when it has none of their tables. */
+/**
+ * Applies the D1 migrations the local database has not had, once per start, and records each in
+ * local_migrations. A database made before that table has the first migration's tables: it counts
+ * as applied.
+ */
 function ensureSchema(db: D1Database): Promise<void> {
   schemaReady ??= (async () => {
-    const found = await db
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'prices'")
-      .first();
-    if (found) return;
-    for (const name of Object.keys(migrations).sort()) {
+    await db.prepare("CREATE TABLE IF NOT EXISTS local_migrations (name TEXT PRIMARY KEY)").run();
+    const { results } = await db
+      .prepare("SELECT name FROM local_migrations")
+      .all<{ name: string }>();
+    const applied = new Set(results.map((row) => row.name));
+    const names = Object.keys(migrations).sort();
+    if (!applied.size && names[0]) {
+      const found = await db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'prices'")
+        .first();
+      if (found) {
+        await db.prepare("INSERT INTO local_migrations (name) VALUES (?)").bind(names[0]).run();
+        applied.add(names[0]);
+      }
+    }
+    for (const name of names) {
+      if (applied.has(name)) continue;
       const statements = (migrations[name] ?? "")
         .replace(/--.*$/gm, "")
         .split(";")
         .map((s) => s.trim())
         .filter(Boolean);
-      await db.batch(statements.map((sql) => db.prepare(sql)));
+      await db.batch([
+        ...statements.map((sql) => db.prepare(sql)),
+        db.prepare("INSERT INTO local_migrations (name) VALUES (?)").bind(name),
+      ]);
     }
   })().catch((error: unknown) => {
     schemaReady = null;

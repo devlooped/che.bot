@@ -44,6 +44,7 @@ describe("the admin API", () => {
       "panel.gemini",
       "utility",
       "classifier",
+      "helper",
     ]);
     expect(body.roles[1]).toEqual({
       role: "panel.claude",

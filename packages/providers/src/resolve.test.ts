@@ -20,6 +20,7 @@ test("without settings every role resolves to its default, with its default effo
     "panel.gemini": { id: "google/gemini-4-argon", effort: "medium" },
     utility: { id: "anthropic/claude-haiku-5.5", effort: null },
     classifier: { id: "typesafe-ai/jev", effort: null },
+    helper: { id: "anthropic/claude-haiku-5.5", effort: "medium" },
   });
 });
 

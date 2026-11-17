@@ -39,7 +39,10 @@ const SCHEMA = [
      deadline_at INTEGER,
      attempt INTEGER NOT NULL DEFAULT 0,
      state TEXT,
-     classify TEXT
+     classify TEXT,
+     link TEXT,
+     helper TEXT,
+     link_tries INTEGER NOT NULL DEFAULT 0
    )`,
   `CREATE TABLE IF NOT EXISTS events (
      seq INTEGER PRIMARY KEY,
@@ -65,8 +68,19 @@ const SCHEMA = [
    )`,
 ];
 
-/** The classification of the question, made before the run: what it cost. */
-export interface ClassifyCost {
+/**
+ * The columns added to the run table after objects were created with it, and how: an object
+ * created before adds them the first time it is read again.
+ */
+const ADDED_COLUMNS: readonly [string, string][] = [
+  ["classify", "TEXT"],
+  ["link", "TEXT"],
+  ["helper", "TEXT"],
+  ["link_tries", "INTEGER NOT NULL DEFAULT 0"],
+];
+
+/** A model call made beside the protocol (the classification, the link): what it cost. */
+export interface CallCost {
   model: string;
   costUsd: number;
   inputTokens: number;
@@ -118,7 +132,13 @@ export interface RunRecord {
   /** The protocol state of the current attempt. */
   state: RunState | null;
   /** What the classification cost; null when it was not recorded. */
-  classify: ClassifyCost | null;
+  classify: CallCost | null;
+  /** The words of the link (run-link.ts), once the helper chose them. */
+  link: string | null;
+  /** What the helper's calls for the link cost, summed; null before the first. */
+  helper: CallCost | null;
+  /** The helper's calls for the link so far. */
+  linkTries: number;
 }
 
 interface RunRow extends Record<string, SqlStorageValue> {
@@ -146,8 +166,10 @@ interface RunRow extends Record<string, SqlStorageValue> {
   deadline_at: number | null;
   attempt: number;
   state: string | null;
-  /** Absent (undefined) in the rows of objects created before the spend was shown. */
   classify: string | null;
+  link: string | null;
+  helper: string | null;
+  link_tries: number;
 }
 
 /** The columns of the run row that `updateRun` may set. */
@@ -168,14 +190,29 @@ export class RunStore {
 
   constructor(private readonly sql: SqlStorage) {}
 
-  /** Whether the tables exist; reading never creates them, so an unknown run stores nothing. */
+  /**
+   * Whether the tables exist; reading never creates them, so an unknown run stores nothing. The
+   * run table of an object created before ADDED_COLUMNS gets them here.
+   */
   exists(): boolean {
     if (this.created) return true;
     this.created =
       this.sql
         .exec("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'run'")
         .toArray().length > 0;
+    if (this.created) this.addColumns();
     return this.created;
+  }
+
+  private addColumns(): void {
+    const have = new Set(
+      this.sql
+        .exec<{ name: string }>("SELECT name FROM pragma_table_info('run')")
+        .toArray()
+        .map((row) => row.name),
+    );
+    for (const [name, type] of ADDED_COLUMNS)
+      if (!have.has(name)) this.sql.exec(`ALTER TABLE run ADD COLUMN ${name} ${type}`);
   }
 
   create(): void {
@@ -217,7 +254,10 @@ export class RunStore {
       deadlineAt: row.deadline_at,
       attempt: row.attempt,
       state: row.state ? (JSON.parse(row.state) as RunState) : null,
-      classify: row.classify ? (JSON.parse(row.classify) as ClassifyCost) : null,
+      classify: row.classify ? (JSON.parse(row.classify) as CallCost) : null,
+      link: row.link,
+      helper: row.helper ? (JSON.parse(row.helper) as CallCost) : null,
+      linkTries: row.link_tries,
     };
   }
 
@@ -230,7 +270,7 @@ export class RunStore {
     amount: number;
     currency: string;
     createdAt: number;
-    classify?: ClassifyCost | null;
+    classify?: CallCost | null;
   }): void {
     this.sql.exec(
       `INSERT INTO run (id, owner, question, class, probability, amount, currency, status, created_at, classify)

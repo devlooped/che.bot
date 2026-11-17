@@ -314,8 +314,10 @@ export const esAR = {
       usd: "Dólares",
     },
     classifier: "Clasificador",
+    helper: "Ayudante",
     stages: {
       classify: "Clasificación",
+      link: "Enlace",
       draft: "Respuestas",
       merge: "Unión de las respuestas",
       "chart-merge": "Unión de los gráficos",
@@ -326,7 +328,7 @@ export const esAR = {
       edit: "Redacción final",
       "edit-check": "Control de la redacción",
     } as Record<string, string>,
-    note: "Lo que Vercel AI Gateway informó por cada llamada, en dólares, sumando todos los intentos y la clasificación de la pregunta. Una llamada en curso suma cuando termina.",
+    note: "Lo que Vercel AI Gateway informó por cada llamada, en dólares, sumando todos los intentos, la clasificación de la pregunta y la elección de su enlace. Una llamada en curso suma cuando termina.",
   },
 
   flags: {
@@ -681,11 +683,13 @@ export const esAR = {
       "panel.gemini": "Gemini",
       utility: "Asistente",
       classifier: "Clasificador",
+      helper: "Ayudante",
     } as Record<string, string>,
     roleWhat: {
       panel: "Escribe una de las cuatro respuestas, propone cambios y vota.",
       utility: "Junta las respuestas, busca propuestas repetidas y escribe los resúmenes.",
       classifier: "Decide si una pregunta es simple o compleja, y con eso el precio.",
+      helper: "Resume la pregunta en hasta cinco palabras para su enlace, una vez pagada.",
     },
     family: "Modelo",
     effort: "Esfuerzo",

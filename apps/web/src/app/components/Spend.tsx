@@ -17,6 +17,7 @@ function labelOf(pivot: SpendPivot, label: string): string {
   if (isModel(label)) return t.models[label];
   if (label === "utility") return t.panel.utility;
   if (label === "classifier") return t.spend.classifier;
+  if (label === "helper") return t.spend.helper;
   return label;
 }
 

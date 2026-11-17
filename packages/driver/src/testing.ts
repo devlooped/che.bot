@@ -194,6 +194,9 @@ export function respond(req: GenerateRequest<unknown>): FakeOutcome {
       });
     case "moments":
       return out({ sentences: ["Los cuatro están trabajando."] });
+    // The helper's words for the link of a run (the RunObject of apps/web).
+    case "link":
+      return out({ words: ["Capital", "de", "Australia", "población", "Canberra"] });
     default:
       return { kind: "error", message: `unscripted ${req.callKey}` };
   }

@@ -1,4 +1,4 @@
-import { resolveConfig } from "@chebot/protocol";
+import { linkOf, parseRunRef, resolveConfig } from "@chebot/protocol";
 import { readModels, updateModels, updatePrices } from "./admin.ts";
 import { handleAuth } from "./auth0.ts";
 import { deps } from "./deps.ts";
@@ -7,11 +7,15 @@ import { type Identity, isAdmin, mayAsk, type User } from "./identity.ts";
 import { questionOf, quoteQuestion } from "./quote.ts";
 import { runStub } from "./run-object.ts";
 import { fromThisOrigin } from "./session.ts";
-import { listRuns, readPrices } from "./settings.ts";
+import { findLink, linkOfRun, listRuns, readPrices } from "./settings.ts";
 import { spendMeter } from "./spend-meter.ts";
 
-// The HTTP API, and the sign-in routes of auth0.ts under /auth/. Who may call each route:
+// The HTTP API, the sign-in routes of auth0.ts under /auth/, and the pages of runs under /r/. Who
+// may call each route:
 //
+//   GET    /r/:ref                    anyone: the page of a run (the app); a UUID or a short link
+//                                    redirects for good to the run's link once it has one
+//   GET    /api/links/:ref            anyone: the UUID and the link of a run, by its link
 //   GET    /api/me                    anyone: the signed-in user, or null
 //   POST   /api/runs                  signed in, Admin or Contrib role until launch: the quote
 //   POST   /api/runs/:id/pay          the owner (an admin owner runs free, with no job)
@@ -44,6 +48,54 @@ const RUN_PATH = new RegExp(
   `^/api/runs/(${UUID})(/events|/ws|/pay|/rerun|/spend|/snapshots/(\\d+)|/charts/(c\\d+)/(\\d+)\\.svg)?$`,
   "i",
 );
+
+/** The last segment of the path of a run's page. */
+const RUN_PAGE = /^\/r\/([^/]+)\/?$/;
+const LINK_PATH = /^\/api\/links\/([^/]+)$/;
+
+/**
+ * The run that a link names (run-link.ts of the protocol), by the whole link, else by its short
+ * part: its UUID and its link. Null for anything else.
+ */
+async function resolveLink(env: Env, ref: string): Promise<{ id: string; link: string } | null> {
+  const parsed = parseRunRef(ref);
+  if (parsed?.kind !== "link") return null;
+  return findLink(env.DB, parsed.short, parsed.words ? linkOf(parsed.short, parsed.words) : null);
+}
+
+/**
+ * GET /r/:ref: the app's page. A run named by its UUID or by a link that is not its own (the short
+ * part alone, or other words) redirects for good to its link; any other path is the app, which
+ * says when there is no such run. A failure of D1 serves the app, which resolves the run itself.
+ */
+async function runPage(request: Request, env: Env, ref: string): Promise<Response> {
+  let to: string | null = null;
+  try {
+    const parsed = parseRunRef(ref);
+    if (parsed?.kind === "uuid") to = await linkOfRun(env.DB, parsed.id);
+    else if (parsed?.kind === "link") {
+      const found = await resolveLink(env, ref);
+      if (found && found.link !== ref) to = found.link;
+    }
+  } catch (e) {
+    console.error("The link of a run page could not be read.", e);
+  }
+  if (!to) return env.ASSETS.fetch(request);
+  const url = new URL(request.url);
+  return new Response(null, {
+    status: 301,
+    headers: { location: `/r/${to}${url.search}` },
+  });
+}
+
+/** A path segment decoded, or "" when it is not valid percent-encoding. */
+function segment(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return "";
+  }
+}
 
 /** The largest JSON body read, in bytes: a question is at most 2,000 characters. */
 const MAX_BODY_BYTES = 32_768;
@@ -132,6 +184,9 @@ async function payHook(request: Request, env: Env): Promise<Response> {
 export async function handle(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   if (url.pathname.startsWith("/auth/")) return handleAuth(request, env);
+  const page = RUN_PAGE.exec(url.pathname);
+  if (page?.[1] && (request.method === "GET" || request.method === "HEAD"))
+    return runPage(request, env, segment(page[1]));
   if (!url.pathname.startsWith("/api/")) return error(404, "Not found.");
   const method = request.method;
 
@@ -155,6 +210,13 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       admin: isAdmin(identity),
       mayAsk: mayAsk(identity, env),
     });
+  }
+
+  const linked = LINK_PATH.exec(url.pathname);
+  if (linked?.[1]) {
+    if (method !== "GET") return error(405, "Method not allowed.");
+    const found = await resolveLink(env, segment(linked[1]));
+    return found ? json(200, found) : error(404, "No such run.");
   }
 
   if (url.pathname === "/api/runs") {

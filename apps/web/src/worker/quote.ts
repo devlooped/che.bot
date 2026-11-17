@@ -3,7 +3,7 @@ import { ProviderError } from "@chebot/providers";
 import { deps } from "./deps.ts";
 import type { Env } from "./env.ts";
 import { runStub } from "./run-object.ts";
-import type { ClassifyCost } from "./run-store.ts";
+import type { CallCost } from "./run-store.ts";
 import { priceOf, resolveRunModels } from "./settings.ts";
 
 // The quote of POST /api/runs: the decision model classes the question simple or complex, and
@@ -39,7 +39,7 @@ export function questionOf(body: unknown): { question: string } | { error: strin
 export async function classifyQuestion(
   env: Env,
   question: string,
-): Promise<{ class: QuestionClass; probability: number | null; cost: ClassifyCost }> {
+): Promise<{ class: QuestionClass; probability: number | null; cost: CallCost }> {
   const model = (await resolveRunModels(env)).classifier;
   if (!model) throw new Error("The settings have no classifier.");
   try {

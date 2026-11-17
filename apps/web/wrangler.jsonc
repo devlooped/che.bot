@@ -6,11 +6,13 @@
   "compatibility_date": "2026-11-01",
   "observability": { "enabled": true },
   // The built single-page app. With the Cloudflare Vite plugin the directory is the client build
-  // (the plugin writes it into the deploy config); /api/* and the sign-in routes /auth/* always
-  // reach the Worker, and any other path that is not a file gets index.html.
+  // (the plugin writes it into the deploy config); /api/*, the sign-in routes /auth/* and the pages
+  // of runs /r/* (which may redirect to a run's link) always reach the Worker, and any other path
+  // that is not a file gets index.html.
   "assets": {
+    "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/auth/*"]
+    "run_worker_first": ["/api/*", "/auth/*", "/r/*"]
   },
   "durable_objects": {
     "bindings": [

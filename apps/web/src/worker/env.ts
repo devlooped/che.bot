@@ -6,6 +6,8 @@ export interface Env {
   RUNS: DurableObjectNamespace<RunObject>;
   SPEND: DurableObjectNamespace<SpendMeter>;
   DB: D1Database;
+  /** The built single-page app: the pages of runs under /r/ that do not redirect. */
+  ASSETS: Fetcher;
   /** The brake on POST /api/runs, per user (approximate, per Cloudflare location). */
   ASK_LIMITER: RateLimit;
   /** The budget of one question in USD; empty means the protocol's default. */

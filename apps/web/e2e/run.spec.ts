@@ -82,10 +82,22 @@ test("a reload while waiting for payment shows the same QR", async ({ page }) =>
   await expect(page.getByText(t.payment.waiting)).toBeVisible();
 });
 
-test("a shared link opens signed out", async ({ page, request }) => {
+test("a shared link opens signed out; the UUID and the short link lead to the run's link", async ({
+  page,
+  request,
+}) => {
   const runId = await finishedRun(request);
   await page.goto(`/r/${runId}`);
   await expect(page.getByRole("heading", { name: SCENARIO_QUESTION })).toBeVisible();
+  // The run's link: the second it was asked in Base62, then up to five words for the question.
+  const linked = /\/r\/([0-9A-Za-z]{5})(-[a-z0-9]+){1,5}$/;
+  await expect(page).toHaveURL(linked);
+  const link = new URL(page.url()).pathname;
+  const short = link.slice(3, 8);
+  await page.goto(`/r/${short}`);
+  await expect(page).toHaveURL(new RegExp(`${link}$`));
+  await page.goto(`/r/${short}-otras-palabras`);
+  await expect(page).toHaveURL(new RegExp(`${link}$`));
   await expect(page.getByTestId("stage-line")).toHaveText(DONE);
   await expect(page.getByTestId("paragraph").first()).toBeVisible();
   await expect(page.getByRole("button", { name: t.nav.signIn })).toBeVisible();
