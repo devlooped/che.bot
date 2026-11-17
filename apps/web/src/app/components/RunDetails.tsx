@@ -1,7 +1,7 @@
 import type { RunView, Source } from "@chebot/protocol";
 import { t } from "../i18n/index.ts";
 import { seatsOf } from "../view/derive.ts";
-import { ModelMark } from "./ModelMark.tsx";
+import { ModelMark, ModelName, WithMarks } from "./ModelMark.tsx";
 
 /** The sources the answer cites, numbered as the paragraphs cite them, with who found each. */
 export function Sources({ sources }: { sources: readonly Source[] }) {
@@ -20,9 +20,13 @@ export function Sources({ sources }: { sources: readonly Source[] }) {
                 {s.title || s.url}
               </a>
               {s.quote && <q className="source-quote">{s.quote}</q>}
-              <span className={`source-by ink-${s.foundBy}`}>
-                <ModelMark model={s.foundBy} size={9} />
-                {t.sources.foundBy(t.models[s.foundBy])}
+              <span className="source-by">
+                <span className="sr-only">{t.sources.foundBy}</span>
+                {[s.foundBy, ...(s.alsoFoundBy ?? [])].map((m) => (
+                  <span key={m} className={`ink-${m}`}>
+                    <ModelName model={m} />
+                  </span>
+                ))}
               </span>
             </li>
           ))}
@@ -50,7 +54,6 @@ export function Panel({ view }: { view: RunView }) {
             </dt>
             <dd>
               <span className="model-id">{s.id}</span>
-              {s.effort && <span className="fine">{t.panel.effort(s.effort)}</span>}
               {s.seat === "utility" && <span className="fine">{t.panel.utilityRole}</span>}
             </dd>
           </div>
@@ -70,7 +73,9 @@ export function Notes({ notes }: { notes: readonly string[] }) {
       </h3>
       <ul>
         {notes.map((n) => (
-          <li key={n}>{n}</li>
+          <li key={n}>
+            <WithMarks text={n} />
+          </li>
         ))}
       </ul>
     </section>

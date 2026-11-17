@@ -12,7 +12,7 @@ import {
 } from "../view/chart.ts";
 import { ChartCanvas } from "./ChartCanvas.tsx";
 import { LayerSheet } from "./Discussion.tsx";
-import { ModelMark, Tally, Votes } from "./ModelMark.tsx";
+import { ModelMark, Tally, Votes, WithMarks } from "./ModelMark.tsx";
 import { Notes } from "./RunDetails.tsx";
 
 function SourceLink({ source }: { source: Source }) {
@@ -57,7 +57,8 @@ function RowNote({ row }: { row: RowView }) {
   return (
     <div className="row-note" id={`nota-${row.note}`} data-testid="row-note" data-kind={row.kind}>
       <p className="row-note-head">
-        <strong>{t.chart.note(row.note)}.</strong> {row.noteText}
+        <strong>{t.chart.note(row.note)}.</strong>{" "}
+        {row.noteText && <WithMarks text={row.noteText} />}
       </p>
       {row.settledBy && (
         <p className="row-note-settled">
@@ -199,11 +200,10 @@ function Layers({ chart }: { chart: ChartView }) {
             return (
               <aside key={d.suggestion} className={`dissent ink-${d.author}`} data-testid="dissent">
                 <p className="dissent-title">
-                  <ModelMark model={d.author} size={10} />
                   {t.dissent.title}: {t.chart.layers.names[d.layer]}
                 </p>
                 <p>
-                  {t.dissent.note(t.models[d.author], d.action)}
+                  <WithMarks text={t.dissent.note(t.models[d.author], d.action)} />
                   {d.proposed && <q className="dissent-text">{d.proposed}</q>}
                 </p>
                 <p className="dissent-reason">{d.reason}</p>

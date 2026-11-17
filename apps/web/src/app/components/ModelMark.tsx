@@ -1,5 +1,5 @@
 import { MODELS_BY_NAME, type ModelId } from "@chebot/protocol";
-import { useState } from "react";
+import { useId, useSyncExternalStore } from "react";
 import { t } from "../i18n/index.ts";
 
 // Each model has a color and a shape, used together everywhere (the shape keeps them apart without
@@ -37,6 +37,34 @@ export function ModelMark({
   );
 }
 
+/** A model's name in a sentence, after its mark: "■ Grok". */
+export function ModelName({ model }: { model: ModelId }) {
+  return (
+    <span className="model-name">
+      <ModelMark model={model} />
+      {t.models[model]}
+    </span>
+  );
+}
+
+const byName = new Map(Object.entries(t.models).map(([m, name]) => [name, m as ModelId]));
+const names = new RegExp(`\\b(${[...byName.keys()].join("|")})\\b`);
+
+/**
+ * A sentence of the interface with each model's name after its mark. Only for the interface's own
+ * texts: a model's words (an answer, a reason, a quote) stay as they were written.
+ */
+export function WithMarks({ text }: { text: string }) {
+  // split with a capturing group: the names are at the odd places
+  const parts = text.split(names);
+  if (parts.length === 1) return text;
+  return parts.map((part, i) => {
+    const model = i % 2 === 1 ? byName.get(part) : undefined;
+    // biome-ignore lint/suspicious/noArrayIndexKey: the parts of a text are in their order
+    return model ? <ModelName key={i} model={model} /> : part;
+  });
+}
+
 /** The marks of who holds a paragraph, in the margin; the badge beside them says how many of four. */
 export function Support({ support }: { support: readonly ModelId[] }) {
   return (
@@ -48,20 +76,45 @@ export function Support({ support }: { support: readonly ModelId[] }) {
   );
 }
 
+// The one mark of the page that shows its name: the last one hovered, focused or tapped, so that a
+// new one hides the label of the one before.
+let shown: string | null = null;
+const listeners = new Set<() => void>();
+function show(id: string | null) {
+  shown = id;
+  for (const l of listeners) l();
+}
+function subscribe(l: () => void) {
+  listeners.add(l);
+  return () => listeners.delete(l);
+}
+
 /**
  * A mark in a line of text, as large as an emoji: hovering, focusing or tapping it shows the name
  * of its model, so the shapes read on a phone too.
  */
 export function NamedMark({ model }: { model: ModelId }) {
-  const [open, setOpen] = useState(false);
+  const id = useId();
+  const open = useSyncExternalStore(
+    subscribe,
+    () => shown === id,
+    () => false,
+  );
+  const hide = () => {
+    if (shown === id) show(null);
+  };
   return (
     <button
       type="button"
       className={`named-mark${open ? " named-mark-open" : ""}`}
       aria-label={t.models[model]}
       data-name={t.models[model]}
-      onClick={() => setOpen((o) => !o)}
-      onBlur={() => setOpen(false)}
+      // A touch also enters and leaves: only a mouse shows the name by hovering.
+      onPointerEnter={(e) => e.pointerType === "mouse" && show(id)}
+      onPointerLeave={(e) => e.pointerType === "mouse" && hide()}
+      onFocus={() => show(id)}
+      onClick={() => show(id)}
+      onBlur={hide}
     >
       <ModelMark model={model} />
     </button>

@@ -126,7 +126,8 @@ export function RunPage({ params }: { params: Record<string, string> }) {
               {connection === "reconnecting" ? t.connection.reconnecting : t.connection.polling}
             </p>
           )}
-          {started && <Moments view={view} />}
+          {/* While the run goes, what happens shows beside it; once done, it moves into the main column. */}
+          {started && !final && <Moments view={view} />}
         </div>
 
         <div className="run-main">
@@ -170,6 +171,7 @@ export function RunPage({ params }: { params: Record<string, string> }) {
                 animate={live}
                 notes={flagNotes(view, doc.answer)}
               />
+              {final && <Moments view={view} />}
               <History view={view} />
               <Sources sources={doc.sources} />
             </>
@@ -177,6 +179,7 @@ export function RunPage({ params }: { params: Record<string, string> }) {
           {chart && (
             <>
               <ChartDocument chart={chart} final={final} notes={flagNotes(view, chart.answer)} />
+              {final && <Moments view={view} />}
               <History view={view} />
               {chart.origin === "web" && <Sources sources={chart.answer.sources} />}
             </>

@@ -1,21 +1,22 @@
 import type { ChartBrief, ChartRender, Dispute, DroppedPatch } from "./chart-run.ts";
 import type { Dataset } from "./csv.ts";
 import type { EventOf, RunEvent } from "./events.ts";
-import type {
-  Abstention,
-  ChartOrigin,
-  Claim,
-  Draft,
-  Flags,
-  Mode,
-  ModelId,
-  ModelSnapshot,
-  Snapshot,
-  Source,
-  Stage,
-  Suggestion,
-  Thread,
-  Vote,
+import {
+  type Abstention,
+  type ChartOrigin,
+  type Claim,
+  type Draft,
+  type Flags,
+  foundAgain,
+  type Mode,
+  type ModelId,
+  type ModelSnapshot,
+  type Snapshot,
+  type Source,
+  type Stage,
+  type Suggestion,
+  type Thread,
+  type Vote,
 } from "./model.ts";
 import { clone } from "./util.ts";
 
@@ -192,6 +193,7 @@ function applyEvent(view: RunView, e: RunEvent) {
       view.drafts.push({ model: e.model, answer: e.answer, claims: e.claims.map((c) => c.id) });
       for (const c of e.claims) view.claims[c.id] = c;
       view.sources.push(...e.sources);
+      for (const id of e.alsoFound ?? []) foundAgain(view.sources, id, e.model);
       break;
     case "document.seeded":
       view.snapshots = [e.snapshot];
@@ -287,6 +289,7 @@ function applyEvent(view: RunView, e: RunEvent) {
     case "brief.completed":
       view.briefs.push(clone(e.brief));
       view.sources.push(...e.sources);
+      for (const id of e.alsoFound ?? []) foundAgain(view.sources, id, e.model);
       break;
     case "chart.written":
       view.written = {

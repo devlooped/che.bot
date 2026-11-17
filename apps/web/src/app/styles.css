@@ -128,6 +128,17 @@ a {
   stroke-width: 1px;
 }
 
+/* A model's name in a sentence, after its mark: the two never break apart. */
+.model-name {
+  white-space: nowrap;
+}
+
+.model-name .model-mark {
+  width: 0.8em;
+  height: 0.8em;
+  margin-right: 0.2em;
+}
+
 /* A mark in a line of text: as large as an emoji, with its model's name on hover, focus or tap. */
 .tally {
   display: inline-flex;
@@ -187,8 +198,6 @@ a {
   transition: opacity 0.12s;
 }
 
-.named-mark:hover::after,
-.named-mark:focus-visible::after,
 .named-mark-open::after {
   opacity: 1;
 }
@@ -1556,8 +1565,9 @@ a.button {
 
 .source-by {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.2rem 0.75rem;
   font-size: 0.8rem;
 }
 

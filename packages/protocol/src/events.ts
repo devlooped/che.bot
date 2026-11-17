@@ -58,7 +58,16 @@ export type RunEvent = { key: string; batch: number } & (
       stage: RunStage;
       reason: AbstainReason | null;
     }
-  | { type: "draft.completed"; model: ModelId; answer: string; claims: Claim[]; sources: Source[] }
+  | {
+      type: "draft.completed";
+      model: ModelId;
+      answer: string;
+      claims: Claim[];
+      /** The sources this model found first. */
+      sources: Source[];
+      /** The ids of earlier sources this model found too (absent when none). */
+      alsoFound?: string[];
+    }
   | {
       type: "document.seeded";
       snapshot: Snapshot;
@@ -98,7 +107,15 @@ export type RunEvent = { key: string; batch: number } & (
       threads: string[];
     }
   // chart runs
-  | { type: "brief.completed"; model: ModelId; brief: ChartBrief; sources: Source[] }
+  | {
+      type: "brief.completed";
+      model: ModelId;
+      brief: ChartBrief;
+      /** The sources this model found first. */
+      sources: Source[];
+      /** The ids of earlier sources this model found too (absent when none). */
+      alsoFound?: string[];
+    }
   | {
       type: "chart.written";
       block: string;

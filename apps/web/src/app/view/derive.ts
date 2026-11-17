@@ -191,14 +191,12 @@ export function documentOf(view: RunView): DocumentView | null {
 }
 
 /** The panel of the run ("who sat where"): the four seats and the assistant, as the run resolved them. */
-export function seatsOf(
-  view: RunView,
-): { seat: ModelId | "utility"; id: string; effort: string | null }[] {
+export function seatsOf(view: RunView): { seat: ModelId | "utility"; id: string }[] {
   if (!view.models) return [];
-  const out: { seat: ModelId | "utility"; id: string; effort: string | null }[] = [];
+  const out: { seat: ModelId | "utility"; id: string }[] = [];
   for (const seat of [...MODELS_BY_NAME, "utility" as const]) {
     const model = view.models[seat === "utility" ? "utility" : `panel.${seat}`];
-    if (model) out.push({ seat, id: model.id, effort: model.effort });
+    if (model) out.push({ seat, id: model.id });
   }
   return out;
 }

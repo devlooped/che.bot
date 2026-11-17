@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { t } from "../i18n/index.ts";
 import type { DocumentView, ParagraphView } from "../view/derive.ts";
 import { DiscussionSheet } from "./Discussion.tsx";
-import { ModelMark, Support, Votes } from "./ModelMark.tsx";
+import { Support, Votes, WithMarks } from "./ModelMark.tsx";
 import { Notes } from "./RunDetails.tsx";
 
 /** How long a new text stays highlighted (the CSS animation of .para-new is shorter). */
@@ -17,12 +17,9 @@ function Dissent({ paragraph }: { paragraph: ParagraphView }) {
         const silent = MODELS.filter((m) => !d.holders.includes(m) && !d.keep.includes(m));
         return (
           <aside key={d.suggestion} className={`dissent ink-${d.author}`} data-testid="dissent">
-            <p className="dissent-title">
-              <ModelMark model={d.author} size={10} />
-              {t.dissent.title}
-            </p>
+            <p className="dissent-title">{t.dissent.title}</p>
             <p>
-              {t.dissent.note(t.models[d.author], t.dissent.actions[d.op])}
+              <WithMarks text={t.dissent.note(t.models[d.author], t.dissent.actions[d.op])} />
               {d.op !== "delete" && d.text && <q className="dissent-text">{d.text}</q>}
             </p>
             <p className="dissent-reason">{d.reason}</p>

@@ -21,6 +21,7 @@ import {
   type Chart,
   type ChartLayer,
   type ChartOrigin,
+  foundAgain,
   MODELS,
   type ModelId,
   type Row,
@@ -284,6 +285,7 @@ export function reduceBriefs(
     if (!out) continue;
     const lbl = label(run.id, model);
     const added: Source[] = [];
+    const again: string[] = [];
     let brief: ChartBrief;
     if (chart.origin === "web") {
       const o = out.output as OutputOf<"brief_web">;
@@ -292,7 +294,11 @@ export function reduceBriefs(
         const key = normalizeUrl(f.url.trim());
         if (!key) continue;
         found.set(key, f.quote);
-        if (urls.has(key)) continue;
+        const known = urls.get(key);
+        if (known) {
+          if (foundAgain(run.sources, known, model)) again.push(known);
+          continue;
+        }
         const source: Source = {
           id: `src${++run.counters.source}`,
           url: f.url.trim(),
@@ -391,6 +397,7 @@ export function reduceBriefs(
       model,
       brief: clone(brief),
       sources: added,
+      ...(again.length > 0 && { alsoFound: again }),
     });
   }
   if (chart.briefs.length === 0) return false;

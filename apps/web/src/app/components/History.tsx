@@ -4,7 +4,7 @@ import { t } from "../i18n/index.ts";
 import { type ChartChange, chartHistoryOf, chartViewOf } from "../view/chart.ts";
 import { type HistoryParagraph, historyOf } from "../view/history.ts";
 import { ChartCanvas } from "./ChartCanvas.tsx";
-import { ModelMark } from "./ModelMark.tsx";
+import { ModelMark, WithMarks } from "./ModelMark.tsx";
 
 function Paragraph({ p }: { p: HistoryParagraph }) {
   const ink = p.by ? ` ink-${p.by}` : "";
@@ -115,7 +115,9 @@ function Steps({
               <p className="history-label" data-testid="history-label">
                 {step.label} <span className="fine">{position}</span>
               </p>
-              <p className="history-what">{step.what}</p>
+              <p className="history-what">
+                <WithMarks text={step.what} />
+              </p>
             </div>
             {children(at)}
           </>
@@ -126,15 +128,23 @@ function Steps({
 }
 
 function Change({ change }: { change: ChartChange }) {
-  if (change.kind === "row") return <li className="hist-change">{change.text}</li>;
+  if (change.kind === "row")
+    return (
+      <li className="hist-change">
+        <WithMarks text={change.text} />
+      </li>
+    );
   const ink = change.by ? ` ink-${change.by}` : "";
   return (
     <li className={`hist-change hist-changed${ink}`}>
       <span className="hist-change-what">
-        {change.by && <ModelMark model={change.by} size={10} />}
-        {change.by
-          ? t.chart.history.layerBy(change.name, t.models[change.by])
-          : t.chart.history.layer(change.name)}
+        <WithMarks
+          text={
+            change.by
+              ? t.chart.history.layerBy(change.name, t.models[change.by])
+              : t.chart.history.layer(change.name)
+          }
+        />
       </span>{" "}
       <span className="hist-text">
         <del>

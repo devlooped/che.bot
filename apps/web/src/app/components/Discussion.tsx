@@ -3,7 +3,7 @@ import { type ReactNode, useEffect, useRef } from "react";
 import { t } from "../i18n/index.ts";
 import { type LayerView, patchText } from "../view/chart.ts";
 import type { Discussion, ParagraphView, Position } from "../view/derive.ts";
-import { ModelMark, Tally } from "./ModelMark.tsx";
+import { ModelMark, Tally, WithMarks } from "./ModelMark.tsx";
 
 function positionText(position: Position, alternatives: Suggestion[]): string {
   if (position.choice === null) return t.discussion.noVote;
@@ -28,13 +28,16 @@ function Proposal({ s, added }: { s: Suggestion; added: boolean }) {
   return (
     <div className={`proposal ink-${s.author}`}>
       <p className="proposal-head">
-        <ModelMark model={s.author} size={11} />
-        {added
-          ? t.discussion.addedBy(t.models[s.author])
-          : t.discussion.proposal(
-              t.models[s.author],
-              patch ? patch.action : t.discussion.actions[s.op],
-            )}
+        <WithMarks
+          text={
+            added
+              ? t.discussion.addedBy(t.models[s.author])
+              : t.discussion.proposal(
+                  t.models[s.author],
+                  patch ? patch.action : t.discussion.actions[s.op],
+                )
+          }
+        />
       </p>
       {text && <blockquote className="proposal-text">{text}</blockquote>}
       <p className="proposal-why">
@@ -42,7 +45,9 @@ function Proposal({ s, added }: { s: Suggestion; added: boolean }) {
       </p>
       {s.coAuthors.length > 0 && (
         <p className="fine">
-          {t.discussion.alsoProposed(t.modelNames(s.coAuthors), s.coAuthors.length)}
+          <WithMarks
+            text={t.discussion.alsoProposed(t.modelNames(s.coAuthors), s.coAuthors.length)}
+          />
         </p>
       )}
     </div>
@@ -63,7 +68,9 @@ function DiscussionBlock({ discussion, added }: { discussion: Discussion; added:
               <ModelMark model={p.model} size={11} />
               {t.models[p.model]}
             </span>
-            <span className="position-what">{positionText(p, discussion.alternatives)}</span>
+            <span className="position-what">
+              <WithMarks text={positionText(p, discussion.alternatives)} />
+            </span>
             {p.changedBecause && (
               <span className="position-changed">
                 <strong>{t.discussion.changed}:</strong> <q>{p.changedBecause}</q>

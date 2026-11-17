@@ -36,6 +36,7 @@ import {
   type Claim,
   type Draft,
   type Flags,
+  foundAgain,
   isPanel,
   MODELS,
   type Mode,
@@ -985,12 +986,17 @@ function reduceDrafts(run: RunState, outputs: Map<string, Output>, events: RunEv
     const draft = out.output as OutputOf<"draft">;
     const found = new Set<string>();
     const added: Source[] = [];
+    const again: string[] = [];
     for (const f of out.sources) {
       const url = f.url.trim();
       const key = normalizeUrl(url);
       if (!key) continue;
       found.add(key);
-      if (urls.has(key)) continue;
+      const known = urls.get(key);
+      if (known) {
+        if (foundAgain(run.sources, known, model)) again.push(known);
+        continue;
+      }
       const source: Source = {
         id: `src${++run.counters.source}`,
         url,
@@ -1034,6 +1040,7 @@ function reduceDrafts(run: RunState, outputs: Map<string, Output>, events: RunEv
       answer: draft.answer.trim(),
       claims,
       sources: added,
+      ...(again.length > 0 && { alsoFound: again }),
     });
   }
   if (run.drafts.length === 0) return fail(run, "no_drafts", events);

@@ -344,7 +344,7 @@ export const esAR = {
 
   sources: {
     title: "Fuentes",
-    foundBy: (who: string) => `La encontró ${who}`,
+    foundBy: "La encontró:",
     none: "Ningún párrafo cita fuentes.",
   },
 
@@ -352,7 +352,6 @@ export const esAR = {
     title: "El panel",
     utility: "Asistente",
     utilityRole: "Juntó las respuestas y escribió los resúmenes.",
-    effort: (effort: string) => `esfuerzo ${effortName(effort)}`,
   },
 
   spend: {
@@ -839,12 +838,6 @@ const dateFormat = new Intl.DateTimeFormat("es-AR", {
 /** "16 de noviembre de 2026, 14:30" (as Intl words it for es-AR). */
 function formatDate(iso: string | number): string {
   return dateFormat.format(new Date(iso));
-}
-
-function effortName(effort: string): string {
-  return (
-    ({ low: "bajo", medium: "medio", high: "alto" } as Record<string, string>)[effort] ?? effort
-  );
 }
 
 export type Messages = typeof esAR;

@@ -124,7 +124,22 @@ export interface Source {
   url: string;
   title: string;
   quote: string;
+  /** The model whose search found it first. */
   foundBy: ModelId;
+  /** The other models whose search found it too (absent on runs before it was kept). */
+  alsoFoundBy?: ModelId[];
+}
+
+/**
+ * Records in `sources` that `model` found the source `id` too, with a new object (an emitted event
+ * may hold the old one). False when the model had already found it.
+ */
+export function foundAgain(sources: Source[], id: string, model: ModelId): boolean {
+  const i = sources.findIndex((s) => s.id === id);
+  const s = sources[i];
+  if (!s || s.foundBy === model || s.alsoFoundBy?.includes(model)) return false;
+  sources[i] = { ...s, alsoFoundBy: [...(s.alsoFoundBy ?? []), model] };
+  return true;
 }
 
 export type AbstainReason = "timeout" | "invalid" | "refusal" | "error";

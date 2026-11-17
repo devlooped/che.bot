@@ -2,10 +2,12 @@ import type { RunView } from "@chebot/protocol";
 import { useState } from "react";
 import { t } from "../i18n/index.ts";
 import { momentsByBatch } from "../view/derive.ts";
+import { WithMarks } from "./ModelMark.tsx";
 
 /**
  * The moments feed: the plain one-liners of the run, a group per stage, oldest first. On a phone
- * only the latest group shows until the reader asks for the rest.
+ * only the latest group shows until the reader asks for the rest. While the run goes it sits beside
+ * the answer; once done it is a section of the main column, titled as one.
  */
 export function Moments({ view }: { view: RunView }) {
   const [all, setAll] = useState(false);
@@ -16,7 +18,7 @@ export function Moments({ view }: { view: RunView }) {
   if (groups.length === 0 && view.status === "failed") return null;
   return (
     <section className="moments" aria-labelledby="moments-title">
-      <h2 id="moments-title" className="side-title">
+      <h2 id="moments-title" className={done ? "section-title" : "side-title"}>
         {done ? t.moments.titleDone : t.moments.title}
       </h2>
       {groups.length === 0 ? (
@@ -31,7 +33,7 @@ export function Moments({ view }: { view: RunView }) {
               <ul>
                 {g.texts.map((text) => (
                   <li key={text} className="moment">
-                    {text}
+                    <WithMarks text={text} />
                   </li>
                 ))}
               </ul>

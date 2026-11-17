@@ -69,6 +69,15 @@ describe("a scripted thorough run", () => {
       ["src1", "https://example.org/canberra", "grok"],
       ["src2", "https://example.org/abs", "gemini"],
     ]);
+    // ChatGPT's search found Grok's page too: one source, with both finders, in the state and the view
+    expect(state.sources.map((s) => s.alsoFoundBy)).toEqual([["openai"], undefined]);
+    expect(eventsOf(log, "draft.completed").find((e) => e.model === "openai")?.alsoFound).toEqual([
+      "src1",
+    ]);
+    expect(replay(log).sources).toEqual(state.sources);
+    // the event that brought the source keeps it as it was then
+    const first = eventsOf(log, "draft.completed").find((e) => e.model === "grok");
+    expect(first?.sources[0]?.alsoFoundBy).toBeUndefined();
     const grok = state.drafts.find((d) => d.model === "grok")?.claims ?? [];
     expect(grok.map((id) => state.claims[id]?.sources)).toEqual([["src1"], []]);
     expect(state.suggestions.s6?.sources).toEqual(["src1"]);
