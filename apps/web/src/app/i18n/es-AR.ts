@@ -37,21 +37,25 @@ export const esAR = {
   appName: "che.bot",
   money,
   list,
+  date: formatDate,
   models: MODEL_NAMES,
   modelNames: names,
 
   nav: {
-    home: "Ir al inicio",
+    home: "che.bot, ir al inicio",
     ask: "Preguntar",
     signIn: "Entrar",
     signOut: "Salir",
     signedInAs: (name: string) => `Entraste como ${name}`,
     menu: "Navegación",
+    myRuns: "Mis preguntas",
+    admin: "Administración",
   },
 
   common: {
     loading: "Cargando…",
     close: "Cerrar",
+    cancel: "Cancelar",
     retry: "Probar de nuevo",
     copyLink: "Copiar el link",
     linkCopied: "Link copiado",
@@ -66,6 +70,9 @@ export const esAR = {
     empty: "Escribí una pregunta.",
     dailyLimit: "Hoy ya se llegó al límite de preguntas del día. Probá de nuevo mañana.",
     notYours: "Esta pregunta es de otra cuenta.",
+    notAdmin: "Esta página es solo para quienes administran che.bot.",
+    cannotRerun: "Esta pregunta ya no se puede volver a intentar.",
+    invalid: "No se guardó: revisá los valores marcados.",
     network: "No pudimos conectarnos. Revisá tu conexión y probá de nuevo.",
     generic: "Algo salió mal. Probá de nuevo en un rato.",
     runNotFound: "No encontramos esta pregunta. Puede que la hayan borrado.",
@@ -120,6 +127,9 @@ export const esAR = {
     expiresNote: "El QR vence a los 15 minutos.",
     waitingOther: "Esta pregunta está esperando el pago.",
     expired: "El pago no llegó a tiempo y esta pregunta quedó sin responder.",
+    askAgain: "Preguntar de nuevo",
+    askingAgain: "Calculando el precio…",
+    askAgainNote: "Vas a ver el precio otra vez antes de pagar.",
     confirmed: "Pago recibido.",
   },
 
@@ -128,6 +138,12 @@ export const esAR = {
     thinking: "pensando",
     done: "listo",
     abstained: "no contestó",
+  },
+
+  /** The chip of a model that answered the drafts but not a later step. */
+  abstainedLater: {
+    round1: "no llegó a proponer",
+    votes: "no llegó a votar",
   },
 
   seats: {
@@ -252,13 +268,163 @@ export const esAR = {
   },
 
   flags: {
-    fewDrafts: "Llegaron menos de tres respuestas, así que no hubo discusión ni votos.",
-    budgetReached: "Se terminó el presupuesto de la pregunta y se cerró con lo que había.",
-    deadlineReached: "Se acabó el tiempo previsto y se cerró con lo que había.",
+    title: "Para tener en cuenta",
+    fewDrafts: (n: number) =>
+      `Llegaron solo ${n} ${plural(n, "respuesta", "respuestas")} de cuatro, así que no hubo discusión ni votos: el texto junta lo que dijeron, sin que los demás lo revisaran.`,
+    /** What a cut left out: the discussion of the text, or only the last part. */
+    budgetReached: {
+      discussion:
+        "Se terminó el presupuesto de la pregunta antes de que los cuatro discutieran el texto: lo marcado al margen quedó sin votar.",
+      final:
+        "Se terminó el presupuesto de la pregunta antes del último repaso: la respuesta es la que quedó después de los votos.",
+    },
+    deadlineReached: {
+      discussion:
+        "Se acabó el tiempo previsto antes de que los cuatro discutieran el texto: lo marcado al margen quedó sin votar.",
+      final:
+        "Se acabó el tiempo previsto antes del último repaso: la respuesta es la que quedó después de los votos.",
+    },
     quorumLost: "En una vuelta contestaron menos de tres, así que se cortó la discusión ahí.",
     mergeFallback:
       "Algunas partes se acomodaron sin el asistente; el contenido es el de los cuatro.",
-    abstained: (who: string) => `${who} no contestó en alguna vuelta; siguieron los demás.`,
+    abstained: {
+      drafting: (who: string, n: number) =>
+        `${who} no ${plural(n, "contestó", "contestaron")}, así que la respuesta se armó con los demás.`,
+      round1: (who: string, n: number) =>
+        `${who} no ${plural(n, "llegó", "llegaron")} a proponer cambios a tiempo; siguieron los demás.`,
+      votes: (who: string, n: number) =>
+        `${who} no ${plural(n, "llegó", "llegaron")} a votar en una vuelta; decidieron los demás.`,
+    },
+  },
+
+  failure: {
+    title: "No se pudo armar la respuesta",
+    reasons: {
+      no_drafts: "Ninguno de los cuatro llegó a contestar.",
+      error: "Hubo una falla de nuestro lado mientras los cuatro trabajaban.",
+      budget: "Se terminó el presupuesto antes de que alguno contestara.",
+      deadline: "Se acabó el tiempo antes de que alguno contestara.",
+    },
+    rerunOffer:
+      "Como ya pagaste, podés volver a intentarlo sin cargo: los cuatro empiezan de nuevo con la misma pregunta.",
+    rerun: "Volver a intentar sin cargo",
+    rerunning: "Empezando de nuevo…",
+    noRerunLeft: "Ya se volvió a intentar una vez sin cargo y tampoco salió.",
+    askAgain: "Podés hacer la pregunta de nuevo.",
+    reader: "Quien hizo la pregunta puede volver a intentarlo.",
+    secondAttempt: "Segundo intento, sin cargo.",
+  },
+
+  history: {
+    title: "Cómo cambió el texto",
+    show: "Ver cómo cambió el texto",
+    hide: "Ocultar cómo cambió el texto",
+    lede: "Mové la barra para ver el texto en cada momento. Lo que entró en ese paso está subrayado y lo que salió, tachado.",
+    slider: "Momento del texto",
+    position: (i: number, n: number) => `Paso ${i} de ${n}`,
+    previous: "Anterior",
+    next: "Siguiente",
+    steps: {
+      merge: "Primera versión",
+      round: (round: number | null) =>
+        round === 2
+          ? "Después de la primera ronda de votos"
+          : round === 3
+            ? "Después de la última ronda de votos"
+            : "Con los cambios aceptados al final",
+      edit: "Redacción final",
+    },
+    what: {
+      merge: (n: number) =>
+        n === 4
+          ? "Las respuestas de los cuatro, juntas en un solo texto."
+          : `Las respuestas de los ${n} que contestaron, juntas en un solo texto.`,
+      round: (who: string, n: number) =>
+        n === 1
+          ? `Entró el cambio que propuso ${who}.`
+          : `Entraron los cambios que propusieron ${who}.`,
+      edit: "Un último repaso de la redacción, sin cambiar lo que dice.",
+    },
+    added: "agregado:",
+    removed: "sacado:",
+    newParagraph: "Párrafo nuevo",
+    removedParagraph: "Párrafo que salió",
+  },
+
+  myRuns: {
+    title: "Mis preguntas",
+    lede: "Las preguntas que hiciste, de la más nueva a la más vieja. Cualquiera que tenga el link de una respuesta la puede leer.",
+    empty: "Todavía no hiciste ninguna pregunta.",
+    askFirst: "Hacer una pregunta",
+    signIn: "Entrá para ver tus preguntas.",
+    status: {
+      quoted: "Sin pagar",
+      awaiting_payment: "Esperando el pago",
+      running: "Respondiendo",
+      completed: "Respondida",
+      failed: "No se pudo responder",
+      expired: "El pago venció",
+    },
+    asked: (date: string) => `Preguntada el ${date}`,
+    price: (price: string) => `Precio: ${price}`,
+    remove: "Borrar",
+    confirmTitle: "¿Borrar esta pregunta?",
+    confirmBody:
+      "La respuesta y su link van a dejar de funcionar: nadie la va a poder abrir, tampoco vos. No se puede deshacer.",
+    confirm: "Sí, borrar",
+    removing: "Borrando…",
+    removed: "Borraste la pregunta.",
+  },
+
+  admin: {
+    title: "Administración",
+    lede: "Los modelos y los precios valen para las preguntas nuevas: las que ya empezaron siguen con lo que tenían.",
+    signIn: "Entrá con una cuenta de administración.",
+    modelsTitle: "Modelos",
+    roles: {
+      "panel.grok": "Grok",
+      "panel.claude": "Claude",
+      "panel.openai": "ChatGPT",
+      "panel.gemini": "Gemini",
+      utility: "Asistente",
+      classifier: "Clasificador",
+    } as Record<string, string>,
+    roleWhat: {
+      panel: "Escribe una de las cuatro respuestas, propone cambios y vota.",
+      utility: "Junta las respuestas, busca propuestas repetidas y escribe los resúmenes.",
+      classifier: "Decide si una pregunta es simple o compleja, y con eso el precio.",
+    },
+    family: "Modelo",
+    effort: "Esfuerzo",
+    byDefault: (what: string) => `Por defecto: ${what}`,
+    noEffort: "Sin indicar",
+    efforts: {
+      minimal: "mínimo",
+      low: "bajo",
+      medium: "medio",
+      high: "alto",
+      xhigh: "máximo",
+    } as Record<string, string>,
+    today: (id: string) => `Hoy usa ${id}.`,
+    usesDefault: "Usa el valor por defecto.",
+    backToDefault: "Volver al valor por defecto",
+    saveModels: "Guardar los modelos",
+    savedModels: "Modelos guardados.",
+    pricesTitle: "Precios",
+    priceLabel: { simple: "Pregunta simple, en pesos", complex: "Pregunta compleja, en pesos" },
+    savePrices: "Guardar los precios",
+    savedPrices: "Precios guardados.",
+    saving: "Guardando…",
+    noChanges: "No hay cambios para guardar.",
+    fieldErrors: {
+      unknown: "Esto no existe.",
+      family: "Ese modelo ya no está disponible: elegí otro.",
+      effort: "Ese esfuerzo no está disponible para este modelo.",
+      noEffort: "Este modelo no lleva esfuerzo.",
+      amount: "El precio tiene que ser un número mayor que cero.",
+      amountMax: "El precio es demasiado alto: revisá que no sobre un cero.",
+      other: "Este valor no es válido.",
+    },
   },
 
   run: {
@@ -281,8 +447,23 @@ export const esAR = {
       outsider: "Juan, sin acceso todavía",
     },
     pay: "Simular el pago",
+    expire: "Simular que venció el QR",
   },
 };
+
+const dateFormat = new Intl.DateTimeFormat("es-AR", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/** "16 de noviembre de 2026, 14:30" (as Intl words it for es-AR). */
+function formatDate(iso: string | number): string {
+  return dateFormat.format(new Date(iso));
+}
 
 function effortName(effort: string): string {
   return (

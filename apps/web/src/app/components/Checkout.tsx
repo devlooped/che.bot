@@ -12,6 +12,9 @@ export function Checkout({
   error,
   onPay,
   onSimulatePayment,
+  onSimulateExpiry,
+  askingAgain,
+  onAskAgain,
 }: {
   view: RunView;
   summary: RunSummary;
@@ -20,6 +23,9 @@ export function Checkout({
   error: string | null;
   onPay: () => void;
   onSimulatePayment?: (() => void) | undefined;
+  onSimulateExpiry?: (() => void) | undefined;
+  askingAgain: boolean;
+  onAskAgain: () => void;
 }) {
   const quote = view.quote ?? {
     class: summary.class,
@@ -30,7 +36,35 @@ export function Checkout({
   const awaiting = summary.status === "awaiting_payment" || view.status === "awaiting_payment";
 
   if (view.status === "expired" || summary.status === "expired")
-    return <p className="notice">{t.payment.expired}</p>;
+    return (
+      <section
+        className="checkout checkout-expired"
+        aria-labelledby="expired-title"
+        data-testid="expired"
+      >
+        <h2 id="expired-title" className="checkout-class">
+          {t.payment.expired}
+        </h2>
+        {summary.mine && (
+          <>
+            <p className="muted">{t.payment.askAgainNote}</p>
+            {error && (
+              <p className="error" role="alert">
+                {error}
+              </p>
+            )}
+            <button
+              type="button"
+              className="button button-primary"
+              disabled={askingAgain}
+              onClick={onAskAgain}
+            >
+              {askingAgain ? t.payment.askingAgain : t.payment.askAgain}
+            </button>
+          </>
+        )}
+      </section>
+    );
   if (view.paid) return <p className="notice notice-ok">{t.payment.confirmed}</p>;
   if (!summary.mine)
     return <p className="notice">{awaiting ? t.payment.waitingOther : t.quote.notPaidYet}</p>;
@@ -80,9 +114,16 @@ export function Checkout({
       <p className="muted">{t.payment.afterPay}</p>
       <p className="fine">{t.payment.expiresNote}</p>
       {onSimulatePayment && view.payment && (
-        <button type="button" className="button button-quiet" onClick={onSimulatePayment}>
-          {t.local.pay}
-        </button>
+        <div className="local-actions">
+          <button type="button" className="button button-quiet" onClick={onSimulatePayment}>
+            {t.local.pay}
+          </button>
+          {onSimulateExpiry && (
+            <button type="button" className="button button-text" onClick={onSimulateExpiry}>
+              {t.local.expire}
+            </button>
+          )}
+        </div>
       )}
     </section>
   );

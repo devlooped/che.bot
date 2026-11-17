@@ -22,6 +22,8 @@ export interface Auth {
   }>;
   /** The local mode: plays the user paying the QR of a run. */
   simulatePayment?(runId: string): Promise<void>;
+  /** The local mode: plays the 15 minutes of the QR passing without a payment. */
+  simulateExpiry?(runId: string): Promise<void>;
 }
 
 /** The roles of a token's claims, as the Worker reads them (src/worker/auth0.ts). */

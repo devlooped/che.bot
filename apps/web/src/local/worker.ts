@@ -4,19 +4,40 @@
 // Auth0 are fakes. The production entry (src/worker/index.ts, wrangler.jsonc) never imports this
 // folder, so no variable of a deployed Worker can switch it on; scripts/check-build.mjs checks the
 // production build for LOCAL_MODE_MARKER.
-import { CATALOG } from "@chebot/driver/testing";
 import { FakeProvider } from "@chebot/providers";
 import { handle } from "../worker/api.ts";
 import { overrideDeps } from "../worker/deps.ts";
 import type { Env } from "../worker/env.ts";
+import { PAYMENT_WINDOW_MS, RunObject as ProductionRunObject } from "../worker/run-object.ts";
+import { LOCAL_CATALOG } from "./catalog.ts";
 import { LOCAL_RUN_CONFIG } from "./config.ts";
 import { localIdentity } from "./identity.ts";
 import { localJobs } from "./jobs.ts";
 import { LOCAL_MODE_MARKER } from "./marker.ts";
 import { scenario } from "./scenario.ts";
 
-export { RunObject } from "../worker/run-object.ts";
 export { SpendMeter } from "../worker/spend-meter.ts";
+
+/**
+ * The run object of the production Worker, with one addition of the local mode: `expireNow` plays
+ * the 15 minutes of the payment window passing (POST /api/local/expire/:id). It moves the start of
+ * the window back and wakes the alarm; the production code then expires the run and cancels its
+ * job, as it would after a real wait.
+ */
+export class RunObject extends ProductionRunObject {
+  async expireNow(): Promise<boolean> {
+    const rows = this.ctx.storage.sql
+      .exec<{ status: string }>("SELECT status FROM run LIMIT 1")
+      .toArray();
+    if (rows[0]?.status !== "awaiting_payment") return false;
+    this.ctx.storage.sql.exec(
+      "UPDATE run SET pay_requested_at = ?",
+      Date.now() - PAYMENT_WINDOW_MS - 1,
+    );
+    await this.ctx.storage.setAlarm(Date.now());
+    return true;
+  }
+}
 
 /** A question up to this long counts as simple (5,000 ARS), a longer one as complex. */
 const SIMPLE_UP_TO_CHARS = 80;
@@ -25,7 +46,7 @@ const SIMPLE_UP_TO_CHARS = 80;
 // dev server sees the fakes too (the Worker and its objects share this isolate in local dev).
 overrideDeps({
   provider: () => new FakeProvider(scenario()),
-  catalog: async () => CATALOG,
+  catalog: async () => LOCAL_CATALOG,
   classifier: () => ({
     async classify(req) {
       const simple = req.question.length <= SIMPLE_UP_TO_CHARS;
@@ -76,6 +97,7 @@ function ensureSchema(db: D1Database): Promise<void> {
 }
 
 const PAY_PATH = /^\/api\/local\/pay\/([0-9a-f-]{36})$/i;
+const EXPIRE_PATH = /^\/api\/local\/expire\/([0-9a-f-]{36})$/i;
 
 export default {
   async fetch(request, env) {
@@ -86,6 +108,15 @@ export default {
     const pay = PAY_PATH.exec(url.pathname);
     if (pay?.[1] && request.method === "POST")
       return localJobs(env).pay(pay[1].toLowerCase(), (hook) => handle(hook, env));
+    // Plays the payment window of a run passing: the run expires and its QR is cancelled.
+    const expire = EXPIRE_PATH.exec(url.pathname);
+    if (expire?.[1] && request.method === "POST") {
+      const id = expire[1].toLowerCase();
+      const stub = env.RUNS.get(env.RUNS.idFromName(id)) as unknown as DurableObjectStub<RunObject>;
+      return (await stub.expireNow())
+        ? new Response(null, { status: 202 })
+        : new Response("Not waiting for payment.", { status: 409 });
+    }
     return handle(request, env);
   },
 } satisfies ExportedHandler<Env>;

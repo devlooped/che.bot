@@ -90,5 +90,8 @@ export function createLocalAuth(): Auth {
     simulatePayment: async (runId) => {
       await fetch(`/api/local/pay/${runId}`, { method: "POST" });
     },
+    simulateExpiry: async (runId) => {
+      await fetch(`/api/local/expire/${runId}`, { method: "POST" });
+    },
   };
 }

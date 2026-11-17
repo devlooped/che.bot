@@ -469,14 +469,14 @@ Verified when:
 - [x] 29. Build the ambient layer: four avatars, status chips, the stage line.
 - [x] 30. Build the moments feed.
 - [x] 31. Build the document view: margin marks, the "3 de 4" badge, the thread popover with reasons and votes, dissent notes, sources, and the models of the run.
-- [ ] 32. Build the history slider over the stored snapshots.
-- [ ] 33. Build "Mis preguntas": the list of the user's runs, the share link, and delete with confirmation.
-- [ ] 34. Build the admin page for the model of each role and the two prices.
-- [ ] 35. Finish the states around the happy path: abstained model, failed run with its free rerun, expired payment, budget reached, reload in the middle of a run, small screens, keyboard and screen reader use.
+- [x] 32. Build the history slider over the stored snapshots.
+- [x] 33. Build "Mis preguntas": the list of the user's runs, the share link, and delete with confirmation.
+- [x] 34. Build the admin page for the model of each role and the two prices.
+- [x] 35. Finish the states around the happy path: abstained model, failed run with its free rerun, expired payment, budget reached, reload in the middle of a run, small screens, keyboard and screen reader use.
 
 Verified when:
 
-- [ ] Playwright tests against `wrangler dev` with fake providers and a fake jobs service show: sign in, ask, see the price, pay, and reach a finished answer; a click on a margin mark opens its thread; the slider shows an earlier version; a reload while waiting for payment shows the same QR; a shared link opens signed out.
+- [x] Playwright tests against `wrangler dev` with fake providers and a fake jobs service show: sign in, ask, see the price, pay, and reach a finished answer; a click on a margin mark opens its thread; the slider shows an earlier version; a reload while waiting for payment shows the same QR; a shared link opens signed out.
 - [ ] Every visible text comes from the `es-AR` messages file, and a native reader finds no neutral or peninsular Spanish in it.
 - [ ] One paid question on the preview deployment against the live models reads well to the user: no raw transcript, no technical term, the disagreement is clear.
 

@@ -180,6 +180,20 @@ describe("a scripted thorough run", () => {
     expect(selectAnswer(view)).toEqual(selectAnswer(state));
   });
 
+  test("replay says why each version of the document exists, for the history of the text", () => {
+    const view = replay(log);
+    expect(view.versions.map((v) => v.version)).toEqual(state.snapshots.map((s) => s.version));
+    expect(view.versions[0]).toEqual({ version: 1, cause: "merge", threads: [], round: null });
+    const created = log.filter((e) => e.type === "snapshot.created");
+    expect(view.versions.slice(1).map((v) => [v.cause, v.threads])).toEqual(
+      created.map((e) => [e.cause, e.threads]),
+    );
+    for (const v of view.versions.filter((v) => v.cause === "round")) {
+      const rounds = view.votes.filter((vote) => v.threads.includes(vote.thread));
+      expect(v.round).toBe(Math.max(...rounds.map((vote) => vote.round)));
+    }
+  });
+
   test("replay is idempotent on the log order: seq decides", () => {
     expect(replay([...log].reverse()).snapshots).toEqual(state.snapshots);
   });

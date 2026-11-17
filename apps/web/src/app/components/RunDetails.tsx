@@ -60,14 +60,19 @@ export function Panel({ view }: { view: RunView }) {
   );
 }
 
-/** The notes about how the run went. */
+/** The notes about how the run went, before the text: what a reader should know first. */
 export function Notes({ notes }: { notes: readonly string[] }) {
   if (notes.length === 0) return null;
   return (
-    <ul className="run-notes">
-      {notes.map((n) => (
-        <li key={n}>{n}</li>
-      ))}
-    </ul>
+    <section className="run-notes" aria-labelledby="notes-title" data-testid="notes">
+      <h3 id="notes-title" className="run-notes-title">
+        {t.flags.title}
+      </h3>
+      <ul>
+        {notes.map((n) => (
+          <li key={n}>{n}</li>
+        ))}
+      </ul>
+    </section>
   );
 }

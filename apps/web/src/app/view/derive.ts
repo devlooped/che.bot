@@ -21,6 +21,16 @@ export function seatStatus(view: RunView, model: ModelId): SeatStatus {
   return view.modelStatus[model] ?? "waiting";
 }
 
+/** The chip of a seat: its status, and for a model that missed a step after its draft, which. */
+export function seatChip(view: RunView, model: ModelId): string {
+  const status = seatStatus(view, model);
+  if (status !== "abstained") return t.status[status];
+  const last = view.abstentions.findLast((a) => a.seat === model);
+  if (!last || last.stage === "drafting" || !view.drafts.some((d) => d.model === model))
+    return t.status.abstained;
+  return last.stage === "round1" ? t.abstainedLater.round1 : t.abstainedLater.votes;
+}
+
 /** Points in discussion: open discussions, or before any, the contested paragraphs. */
 export function openPoints(view: RunView): number {
   const open = Object.values(view.threads).filter((th) => th.state === "open").length;
@@ -207,17 +217,41 @@ export function seatsOf(
   return out;
 }
 
-/** The notes about how the run went, in plain words. */
-export function flagNotes(answer: Answer): string[] {
+/** Where a model was left out, in the words of the notes. */
+type MissedStep = keyof typeof t.flags.abstained;
+
+function missedStep(stage: string): MissedStep {
+  if (stage === "drafting") return "drafting";
+  return stage === "round1" ? "round1" : "votes";
+}
+
+/**
+ * The notes about how the run went, in plain words: fewer answers than four, a budget or time
+ * limit and what it left out (the discussion, or only the last pass), the models that missed a
+ * step.
+ */
+export function flagNotes(view: RunView, answer: Answer): string[] {
   const notes: string[] = [];
   const f = answer.flags;
-  if (f.fewDrafts) notes.push(t.flags.fewDrafts);
-  if (f.budgetReached) notes.push(t.flags.budgetReached);
-  if (f.deadlineReached) notes.push(t.flags.deadlineReached);
+  // Without a discussion there is no proposal and no version after the merge.
+  const left =
+    Object.keys(view.threads).length === 0 && view.snapshots.length <= 1 ? "discussion" : "final";
+  if (f.fewDrafts) notes.push(t.flags.fewDrafts(view.drafts.length));
+  if (f.budgetReached) notes.push(t.flags.budgetReached[left]);
+  if (f.deadlineReached) notes.push(t.flags.deadlineReached[left]);
   if (f.quorumLost) notes.push(t.flags.quorumLost);
   if (f.mergeFallback) notes.push(t.flags.mergeFallback);
-  const out = [...new Set(answer.abstained.map((a) => a.model))];
-  if (out.length > 0) notes.push(t.flags.abstained(t.modelNames(out)));
+  const missed = new Map<MissedStep, Set<ModelId>>();
+  for (const a of answer.abstained) {
+    const step = missedStep(a.stage);
+    // Fewer answers already says who did not write a draft.
+    if (step === "drafting" && f.fewDrafts) continue;
+    missed.set(step, (missed.get(step) ?? new Set()).add(a.model));
+  }
+  for (const step of ["drafting", "round1", "votes"] as const) {
+    const who = MODELS.filter((m) => missed.get(step)?.has(m));
+    if (who.length > 0) notes.push(t.flags.abstained[step](t.modelNames(who), who.length));
+  }
   return notes;
 }
 

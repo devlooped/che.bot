@@ -17,6 +17,13 @@ const publicApi = createApi(async () => null);
 
 const initial: StreamState = { view: emptyView(), seq: 0, connection: "connecting", fresh: [] };
 
+/** A reader who asked for reduced motion gets each batch at once, not played event by event. */
+function prefersReducedMotion(): boolean {
+  return typeof window.matchMedia === "function"
+    ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    : false;
+}
+
 /** The live view of a run: its summary, and its event stream through RunStream. */
 export function useRun(runId: string): RunState {
   const { api, ready, user } = useSession();
@@ -61,6 +68,7 @@ export function useRun(runId: string): RunState {
         },
       },
       onChange: setStream,
+      ...(prefersReducedMotion() ? { gapMs: 0, batchCapMs: 0 } : {}),
     });
     s.start().catch((e: unknown) => {
       setError(e instanceof ApiError ? e : new ApiError("network", 0, String(e)));

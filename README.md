@@ -68,13 +68,29 @@ Spanish whatever the question (four drafts, agreed, majority and contested parag
 suggestions and votes, a change of position, an accepted change and one without agreement, a model
 that does not answer, the editor), a classifier (up to 80 characters is simple), a jobs service
 whose QR appears at once (`POST /api/local/pay/:id`, or the "Simular el pago" button, plays the
-payment and calls the hook), and a sign-in that picks a test user (beta, admin, or no access). The
-production entry never imports `src/local`, and `pnpm build` fails if anything of it is in the
-output (`scripts/check-build.mjs`).
+payment and calls the hook), a Gateway catalog with a few more families for the admin page, and a
+sign-in that picks a test user (beta, admin, or no access). The production entry never imports
+`src/local`, and `pnpm build` fails if anything of it is in the output (`scripts/check-build.mjs`).
+
+The states around the happy path are played the same way, to see and test them:
+
+| To see                                   | Do                                                                                                                      |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| A run that fails, and its free rerun     | Ask with `[falla]` in the question and pay: no model answers the drafts the first time, so the rerun plays the full run |
+| Fewer than three answers                 | Ask with `[pocas]`: Grok and Gemini do not answer the drafts                                                            |
+| The budget reached before the discussion | Ask with `[presupuesto]`: the drafts spend nearly all of it                                                             |
+| An expired payment                       | "Simular que venció el QR" under the QR (`POST /api/local/expire/:id`)                                                  |
+| A model that does not answer             | Every run: Gemini misses the last round of votes                                                                        |
+
+The pages: `/` asks, `/r/:id` follows a run and replays how its text formed, `/mis-preguntas` lists
+the user's questions (copy a link, delete one), and `/admin` sets the model of each role and the two
+prices (admins only; the menu hides it from others).
 
 The end-to-end tests start the local mode themselves. They need Playwright's Chromium
 (`pnpm --filter @chebot/web exec playwright install chromium`) or a browser of the machine:
-`PLAYWRIGHT_CHANNEL=msedge` (or `chrome`).
+`PLAYWRIGHT_CHANNEL=msedge` (or `chrome`). They run at a phone width and a desktop width, and
+`e2e/a11y.spec.ts` checks the main pages and states with axe (WCAG 2.1 A and AA, and its best
+practices).
 
 The browser app signs in with the Auth0 SPA SDK, configured by public build variables:
 `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID` and `VITE_AUTH0_AUDIENCE` (see `apps/web/.env.example`).

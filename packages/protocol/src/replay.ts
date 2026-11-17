@@ -35,6 +35,8 @@ export interface RunView {
   sources: Source[];
   conflicts: { first: string; second: string }[];
   snapshots: Snapshot[];
+  /** Why each document version exists, in the order of `snapshots` (the history of the text). */
+  versions: VersionCause[];
   suggestions: Record<string, Suggestion>;
   threads: Record<string, Thread>;
   positions: Record<string, Partial<Record<ModelId, string>>>;
@@ -46,6 +48,18 @@ export interface RunView {
   abstentions: Abstention[];
   spentUsd: number | null;
   lastBatch: number;
+}
+
+/**
+ * How a version of the document came to be: the merge of the drafts, the changes accepted after a
+ * round of votes (`threads`, and `round`, the last round whose votes those threads had), or the
+ * editor's pass.
+ */
+export interface VersionCause {
+  version: number;
+  cause: "merge" | "round" | "edit";
+  threads: string[];
+  round: number | null;
 }
 
 export function emptyView(): RunView {
@@ -64,6 +78,7 @@ export function emptyView(): RunView {
     sources: [],
     conflicts: [],
     snapshots: [],
+    versions: [],
     suggestions: {},
     threads: {},
     positions: {},
@@ -162,6 +177,7 @@ function applyEvent(view: RunView, e: RunEvent) {
       break;
     case "document.seeded":
       view.snapshots = [e.snapshot];
+      view.versions = [{ version: e.snapshot.version, cause: "merge", threads: [], round: null }];
       view.conflicts = e.conflicts;
       view.flags = { ...e.flags };
       break;
@@ -227,9 +243,17 @@ function applyEvent(view: RunView, e: RunEvent) {
       t.tally = e.tally;
       break;
     }
-    case "snapshot.created":
+    case "snapshot.created": {
       view.snapshots.push(e.snapshot);
+      const rounds = view.votes.filter((v) => e.threads.includes(v.thread)).map((v) => v.round);
+      view.versions.push({
+        version: e.snapshot.version,
+        cause: e.cause,
+        threads: [...e.threads],
+        round: rounds.length > 0 ? Math.max(...rounds) : null,
+      });
       break;
+    }
     case "moment":
       view.moments.push({ batch: e.batch, text: e.text, origin: e.origin });
       break;

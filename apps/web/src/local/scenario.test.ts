@@ -3,7 +3,7 @@ import { replay, selectAnswer } from "@chebot/protocol";
 import { FakeProvider } from "@chebot/providers";
 import { describe, expect, it } from "vitest";
 import { LOCAL_RUN_CONFIG } from "./config.ts";
-import { SCENARIO_QUESTION, scenario } from "./scenario.ts";
+import { MARKERS, SCENARIO_QUESTION, scenario } from "./scenario.ts";
 
 const SNAPSHOT_MODELS = {
   "panel.grok": { id: "spacexai/grok-4.7", effort: "low" },
@@ -48,5 +48,47 @@ describe("the scripted run of the local mode", () => {
     expect(types).toContain("suggestion.opened");
     const answer = selectAnswer(view);
     expect(answer?.dissent.map((d) => d.author)).toEqual(["grok"]);
+  }, 60_000);
+});
+
+describe.concurrent("the markers of the local scenario", () => {
+  const play = async (question: string) => {
+    const run = startRun(
+      {
+        id: crypto.randomUUID(),
+        question,
+        mode: "thorough",
+        models: SNAPSHOT_MODELS,
+        config: LOCAL_RUN_CONFIG,
+      },
+      Date.now(),
+    );
+    const provider = new FakeProvider(scenario());
+    return replay((await drive(run, { provider })).log);
+  };
+
+  it("fail: the first run of a question fails, the next one completes", async () => {
+    const question = `${MARKERS.fail} ${SCENARIO_QUESTION} ${crypto.randomUUID()}`;
+    const first = await play(question);
+    expect(first.status).toBe("failed");
+    expect(first.abstentions.map((a) => a.stage)).toEqual(Array(4).fill("drafting"));
+    expect((await play(question)).status).toBe("completed");
+  }, 60_000);
+
+  it("fewDrafts: two answers, no discussion", async () => {
+    const view = await play(`${MARKERS.fewDrafts} ${SCENARIO_QUESTION}`);
+    expect(view.status).toBe("completed");
+    expect(view.flags.fewDrafts).toBe(true);
+    expect(view.drafts.map((d) => d.model)).toEqual(["claude", "openai"]);
+    expect(Object.keys(view.threads)).toEqual([]);
+    expect(selectAnswer(view)?.paragraphs.length).toBeGreaterThan(0);
+  }, 60_000);
+
+  it("budget: the budget ends before the rounds and the merged answer stays", async () => {
+    const view = await play(`${MARKERS.budget} ${SCENARIO_QUESTION}`);
+    expect(view.status).toBe("completed");
+    expect(view.flags.budgetReached).toBe(true);
+    expect(Object.keys(view.threads)).toEqual([]);
+    expect(view.versions.map((v) => v.cause)).toEqual(["merge"]);
   }, 60_000);
 });

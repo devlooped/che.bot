@@ -1,13 +1,12 @@
 import type { ComponentType } from "react";
-import type { AuthUser } from "./auth/types.ts";
+import { type AuthUser, isAdmin } from "./auth/types.ts";
 import { t } from "./i18n/index.ts";
+import { AdminPage } from "./pages/AdminPage.tsx";
 import { AskPage } from "./pages/AskPage.tsx";
+import { MyRunsPage } from "./pages/MyRunsPage.tsx";
 import { RunPage } from "./pages/RunPage.tsx";
 
-// The pages of the app, by path. Steps 32 to 35 add theirs here and in `navItems`:
-//   "/mis-preguntas"  the user's questions (step 33), signed in
-//   "/admin"          the models and the prices (step 34), shown to admins (isAdmin)
-// The history slider (step 32) lives on the run page.
+// The pages of the app, by path. The history slider of the text lives on the run page.
 
 export interface Route {
   pattern: string;
@@ -17,6 +16,8 @@ export interface Route {
 export const routes: Route[] = [
   { pattern: "/", page: AskPage },
   { pattern: "/r/:id", page: RunPage },
+  { pattern: "/mis-preguntas", page: MyRunsPage },
+  { pattern: "/admin", page: AdminPage },
 ];
 
 /** The link of a run: public, readable signed out. */
@@ -29,4 +30,9 @@ export interface NavItem {
   show?: (user: AuthUser | null) => boolean;
 }
 
-export const navItems: NavItem[] = [{ to: "/", label: t.nav.ask }];
+export const navItems: NavItem[] = [
+  { to: "/", label: t.nav.ask },
+  { to: "/mis-preguntas", label: t.nav.myRuns, show: (user) => user !== null },
+  // Hidden from others; the page refuses them too, and the API answers them 403.
+  { to: "/admin", label: t.nav.admin, show: isAdmin },
+];

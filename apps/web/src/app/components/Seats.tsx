@@ -1,6 +1,6 @@
 import { MODELS, type RunView } from "@chebot/protocol";
 import { t } from "../i18n/index.ts";
-import { seatStatus } from "../view/derive.ts";
+import { seatChip, seatStatus } from "../view/derive.ts";
 import { ModelMark } from "./ModelMark.tsx";
 
 /** The ambient layer: the four seats with a status each, and the stage line. */
@@ -22,7 +22,7 @@ export function Seats({ view, line }: { view: RunView; line: string }) {
               </span>
               <span className="seat-text">
                 <span className="seat-name">{t.models[model]}</span>
-                <span className="seat-chip">{t.status[status]}</span>
+                <span className="seat-chip">{seatChip(view, model)}</span>
               </span>
             </li>
           );

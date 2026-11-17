@@ -4,8 +4,26 @@
 // contested paragraphs, suggestions in two rounds, two alternatives in one discussion, votes with
 // a changed position, an accepted change and one left without agreement, a model that does not
 // answer in the last round, the editor's pass, and moments phrased by the utility model.
+//
+// A marker in the question plays the states around that run (see MARKERS).
 import type { ModelId } from "@chebot/protocol";
 import type { FakeOutcome, FakeScript, FoundSource, GenerateRequest } from "@chebot/providers";
+
+/**
+ * Markers that, written anywhere in a question, change how the scripted run goes:
+ * - `fail`: no model answers the drafts, so the run fails; the first time only, per question and
+ *   per model, so that the free rerun of a paid run plays the full run.
+ * - `fewDrafts`: Grok and Gemini do not answer the drafts: two answers, no discussion.
+ * - `budget`: the drafts cost so much that the budget ends before the rounds.
+ */
+export const MARKERS = {
+  fail: "[falla]",
+  fewDrafts: "[pocas]",
+  budget: "[presupuesto]",
+} as const;
+
+/** The models whose first draft already failed, per question (the `fail` marker): this isolate. */
+const failedOnce = new Set<string>();
 
 /** The question the scripted run answers best (the e2e tests ask it). */
 export const SCENARIO_QUESTION =
@@ -315,24 +333,38 @@ export function respond(req: GenerateRequest<unknown>): FakeOutcome {
       ...(extra.sources ? { sources: extra.sources } : {}),
     }) satisfies FakeOutcome;
 
+  const marked = (marker: string) => req.prompt.includes(marker);
+
   switch (kind) {
     case "draft": {
       if (!seat) break;
+      const failKey = `${seat}:${req.prompt}`;
+      if (marked(MARKERS.fail) && !failedOnce.has(failKey)) {
+        failedOnce.add(failKey);
+        return { kind: "error", message: "The local scenario fails this draft.", delayMs };
+      }
+      if (marked(MARKERS.fewDrafts) && (seat === "grok" || seat === "gemini"))
+        return { kind: "error", message: "The local scenario drops this draft.", delayMs };
       return out(
         {
           answer: ANSWERS[seat],
           claims: CLAIMS[seat].map((c) => ({ ...c, confidence: "high" })),
         },
-        { sources: FOUND[seat], costUsd: 0.05 },
+        // With the budget marker, four drafts leave less than the worst case of a round.
+        { sources: FOUND[seat], costUsd: marked(MARKERS.budget) ? 0.7 : 0.05 },
       );
     }
     case "merge": {
+      // Only the claims of the drafts that arrived are in the prompt; a paragraph keeps those.
       const ids = claimIdsByText(req.prompt);
-      const idOf = ([model, i]: [ModelId, number]) => ids.get(CLAIMS[model][i]?.text ?? "") ?? "";
-      return out({
-        paragraphs: MERGE.map((p) => ({ text: p.text, claims: p.claims.map(idOf) })),
-        conflicts: [],
+      const paragraphs = MERGE.flatMap((p) => {
+        const claims = p.claims.flatMap(([model, i]) => {
+          const id = ids.get(CLAIMS[model][i]?.text ?? "");
+          return id ? [id] : [];
+        });
+        return claims.length > 0 ? [{ text: p.text, claims }] : [];
       });
+      return out({ paragraphs, conflicts: [] });
     }
     case "round":
       if (!seat) break;

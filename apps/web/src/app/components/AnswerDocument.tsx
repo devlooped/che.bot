@@ -4,6 +4,7 @@ import { t } from "../i18n/index.ts";
 import type { DocumentView, ParagraphView } from "../view/derive.ts";
 import { DiscussionSheet } from "./Discussion.tsx";
 import { ModelMark, Support } from "./ModelMark.tsx";
+import { Notes } from "./RunDetails.tsx";
 
 /** How long a new text stays highlighted (the CSS animation of .para-new is shorter). */
 const HIGHLIGHT_MS = 1_500;
@@ -45,12 +46,17 @@ export function AnswerDocument({
   doc,
   final,
   animate,
+  notes,
 }: {
   doc: DocumentView;
   final: boolean;
   animate: boolean;
+  /** What the reader should know about how the run went (flagNotes). */
+  notes: readonly string[];
 }) {
   const [open, setOpen] = useState<string | null>(null);
+  // The margin marks, by paragraph: the one that opened the discussion gets the focus back.
+  const marks = useRef(new Map<string, HTMLButtonElement>());
   // When each text was first shown: a paragraph whose text appears while the run is live gets a
   // short highlight, so the reader sees what just changed. The first render highlights nothing.
   const shown = useRef<Map<string, number> | null>(null);
@@ -75,6 +81,7 @@ export function AnswerDocument({
         {t.answer.title}
       </h2>
       {!final && <p className="muted">{t.answer.draftNote}</p>}
+      <Notes notes={notes} />
       <p className="legend">{t.answer.legend}</p>
       <div className="doc">
         {doc.paragraphs.map((p) => (
@@ -97,6 +104,10 @@ export function AnswerDocument({
                     t.answer.statusName[p.status],
                   )}
                   data-testid="mark"
+                  ref={(el) => {
+                    if (el) marks.current.set(p.id, el);
+                    else marks.current.delete(p.id);
+                  }}
                   onClick={() => setOpen(p.id)}
                 >
                   <Support support={p.support} />
@@ -126,7 +137,10 @@ export function AnswerDocument({
         <DiscussionSheet
           key={opened.id}
           paragraph={opened}
-          onClose={() => setOpen((current) => (current === opened.id ? null : current))}
+          onClose={() => {
+            setOpen((current) => (current === opened.id ? null : current));
+            marks.current.get(opened.id)?.focus();
+          }}
         />
       )}
     </section>

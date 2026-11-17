@@ -12,6 +12,8 @@ export function Moments({ view }: { view: RunView }) {
   const groups = momentsByBatch(view);
   const done = view.status === "completed";
   const older = groups.slice(0, -1).reduce((n, g) => n + g.texts.length, 0);
+  // A run that failed before anything happened has nothing to tell here: the failure says it.
+  if (groups.length === 0 && view.status === "failed") return null;
   return (
     <section className="moments" aria-labelledby="moments-title">
       <h2 id="moments-title" className="side-title">

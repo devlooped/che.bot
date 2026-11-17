@@ -1,10 +1,14 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import { esAR as t } from "../src/app/i18n/es-AR.ts";
 import { LOCAL_MODE_MARKER } from "../src/local/marker.ts";
-import { SCENARIO_QUESTION } from "../src/local/scenario.ts";
+import { MARKERS, SCENARIO_QUESTION } from "../src/local/scenario.ts";
 import { localToken } from "../src/local/token.ts";
 
-export { SCENARIO_QUESTION, t };
+export { MARKERS, SCENARIO_QUESTION, t };
+
+/** The scripted question, made unique (a run of the local mode keys some fakes by the question). */
+export const uniqueQuestion = (marker = "") =>
+  `${marker ? `${marker} ` : ""}${SCENARIO_QUESTION} (${crypto.randomUUID().slice(0, 8)})`;
 
 export interface TestUser {
   id: string;
@@ -41,11 +45,14 @@ export async function ask(page: Page, question = SCENARIO_QUESTION): Promise<str
 }
 
 /** An admin run through the API, to its end: no payment. */
-export async function finishedRun(request: APIRequestContext): Promise<string> {
+export async function finishedRun(
+  request: APIRequestContext,
+  question = SCENARIO_QUESTION,
+): Promise<string> {
   const admin = newUser(["admin"]);
   const quote = await request.post("/api/runs", {
     headers: authHeader(admin),
-    data: { question: SCENARIO_QUESTION },
+    data: { question },
   });
   const { runId } = (await quote.json()) as { runId: string };
   await request.post(`/api/runs/${runId}/pay`, { headers: authHeader(admin) });

@@ -11,6 +11,12 @@ export function errorText(error: unknown): string {
       return t.errors.noAccess;
     case "not_yours":
       return t.errors.notYours;
+    case "not_admin":
+      return t.errors.notAdmin;
+    case "cannot_rerun":
+      return t.errors.cannotRerun;
+    case "invalid":
+      return t.errors.invalid;
     case "too_many":
       return t.errors.tooMany;
     case "too_long":
@@ -26,4 +32,19 @@ export function errorText(error: unknown): string {
     default:
       return t.errors.generic;
   }
+}
+
+/**
+ * The refusal of one field of the admin API (worded in English for the logs, see
+ * src/worker/admin.ts), in plain words.
+ */
+export function fieldErrorText(message: string): string {
+  const e = t.admin.fieldErrors;
+  if (/^Unknown (role|class)/i.test(message)) return e.unknown;
+  if (/takes no effort/i.test(message)) return e.noEffort;
+  if (/effort/i.test(message)) return e.effort;
+  if (/family|catalog|Gateway id/i.test(message)) return e.family;
+  if (/at most/i.test(message)) return e.amountMax;
+  if (/amount|positive/i.test(message)) return e.amount;
+  return e.other;
 }

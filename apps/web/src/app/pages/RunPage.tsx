@@ -1,44 +1,40 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "../auth/context.tsx";
 import { isAdmin } from "../auth/types.ts";
 import { AnswerDocument } from "../components/AnswerDocument.tsx";
 import { Checkout } from "../components/Checkout.tsx";
+import { CopyLink } from "../components/CopyLink.tsx";
+import { Failure } from "../components/Failure.tsx";
+import { History } from "../components/History.tsx";
 import { Moments } from "../components/Moments.tsx";
-import { Notes, Panel, Sources } from "../components/RunDetails.tsx";
+import { Panel, Sources } from "../components/RunDetails.tsx";
 import { Seats } from "../components/Seats.tsx";
 import { useRun } from "../events/useRun.ts";
 import { t } from "../i18n/index.ts";
-import { Link } from "../router/index.tsx";
+import { Link, navigate } from "../router/index.tsx";
+import { runPath } from "../routes.tsx";
 import { documentOf, flagNotes, stageLine } from "../view/derive.ts";
 import { errorText } from "../view/errors.ts";
 
-function ShareLink() {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      className="button button-quiet share"
-      onClick={() => {
-        navigator.clipboard
-          ?.writeText(window.location.href)
-          .then(() => setCopied(true))
-          .catch(() => {});
-      }}
-    >
-      {copied ? t.common.linkCopied : t.common.copyLink}
-    </button>
-  );
-}
-
-/** The page of a run, by its link: readable by anyone; its owner pays here. */
+/**
+ * The page of a run, by its link: readable by anyone. Its owner pays here, asks again after an
+ * expired payment, and reruns a paid question that failed.
+ */
 export function RunPage({ params }: { params: Record<string, string> }) {
   const runId = (params.id ?? "").toLowerCase();
   const { api, user, auth } = useSession();
   const { stream, summary, error, refresh } = useRun(runId);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  /** Asking again or rerunning: the button waits for the API. */
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const { view, connection } = stream;
   const doc = useMemo(() => documentOf(view), [view]);
+  // The summary says why a run failed and whether it may run again: read it again when it ends.
+  useEffect(() => {
+    if (view.status === "failed" || view.status === "expired") refresh();
+  }, [view.status, refresh]);
 
   if (error?.kind === "not_found")
     return (
@@ -69,6 +65,33 @@ export function RunPage({ params }: { params: Record<string, string> }) {
     }
   }
 
+  /** The same question as a new one: a new quote, on its own page. */
+  async function askAgain() {
+    setBusy(true);
+    setActionError(null);
+    try {
+      const quote = await api.ask(question);
+      navigate(runPath(quote.runId));
+    } catch (err) {
+      setActionError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function rerun() {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await api.rerun(runId);
+      refresh();
+    } catch (err) {
+      setActionError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <main className="page run" data-status={view.status}>
       <header className="run-head">
@@ -78,13 +101,16 @@ export function RunPage({ params }: { params: Record<string, string> }) {
           <p className="muted">{t.common.loading}</p>
         )}
         <div className="run-share">
-          <ShareLink />
+          <CopyLink url={new URL(runPath(runId), window.location.origin).href} />
           <p className="fine">{t.run.shareNote}</p>
         </div>
+        {(summary?.attempt ?? 1) > 1 && view.status !== "failed" && (
+          <p className="fine">{t.failure.secondAttempt}</p>
+        )}
       </header>
 
       <div className="run-grid">
-        <aside className="run-side">
+        <div className="run-side">
           <Seats view={view} line={line} />
           {(connection === "reconnecting" || connection === "polling") && !final && (
             <p className="connection" role="status">
@@ -92,7 +118,7 @@ export function RunPage({ params }: { params: Record<string, string> }) {
             </p>
           )}
           {started && <Moments view={view} />}
-        </aside>
+        </div>
 
         <div className="run-main">
           {error && (
@@ -106,11 +132,26 @@ export function RunPage({ params }: { params: Record<string, string> }) {
               summary={summary}
               admin={isAdmin(user)}
               paying={paying}
-              error={payError}
+              error={payError ?? actionError}
               onPay={pay}
               onSimulatePayment={
                 auth?.simulatePayment ? () => auth.simulatePayment?.(runId) : undefined
               }
+              onSimulateExpiry={
+                auth?.simulateExpiry ? () => auth.simulateExpiry?.(runId) : undefined
+              }
+              askingAgain={busy}
+              onAskAgain={askAgain}
+            />
+          )}
+          {view.status === "failed" && (
+            <Failure
+              view={view}
+              summary={summary}
+              busy={busy}
+              error={actionError}
+              onRerun={rerun}
+              onAskAgain={askAgain}
             />
           )}
           {started && !doc && view.status !== "failed" && (
@@ -118,8 +159,13 @@ export function RunPage({ params }: { params: Record<string, string> }) {
           )}
           {doc && (
             <>
-              <AnswerDocument doc={doc} final={final} animate={live} />
-              <Notes notes={flagNotes(doc.answer)} />
+              <AnswerDocument
+                doc={doc}
+                final={final}
+                animate={live}
+                notes={flagNotes(view, doc.answer)}
+              />
+              <History view={view} />
               <Sources sources={doc.sources} />
             </>
           )}
