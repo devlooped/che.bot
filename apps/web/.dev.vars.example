@@ -1,7 +1,12 @@
 # Copy to .dev.vars for `vite dev` (never commit .dev.vars). In production these are secrets:
 # `wrangler secret put <NAME>`.
 AI_GATEWAY_API_KEY=
+# The CheBot jobs service and its token (the payment by QR).
 JOBS_URL=https://jobs.chebot.si
 JOBS_TOKEN=
+# The Auth0 tenant (tenant.us.auth0.com) and the identifier of the API the SPA requests tokens for.
 AUTH0_DOMAIN=
 AUTH0_AUDIENCE=
+# Variables of wrangler.jsonc that may be overridden locally:
+# DAILY_CAP_USD=25
+# LAUNCHED=false

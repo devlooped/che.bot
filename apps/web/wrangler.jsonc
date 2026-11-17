@@ -27,9 +27,20 @@
       "migrations_dir": "migrations"
     }
   ],
+  // The brake on POST /api/runs: questions per user and minute, counted per Cloudflare location
+  // and approximate (the daily cap bounds the spend). namespace_id is any integer unique in the
+  // account.
+  "ratelimits": [
+    { "name": "ASK_LIMITER", "namespace_id": "4201", "simple": { "limit": 5, "period": 60 } }
+  ],
   "vars": {
     // The budget of one question in USD; empty means the protocol's default (RunConfig.budgetUsd).
-    "RUN_BUDGET_USD": ""
+    "RUN_BUDGET_USD": "",
+    // The global spend cap of a day (UTC) in USD. A new question is refused when the worst case
+    // of a run (its budget) does not fit; a paid run is never refused.
+    "DAILY_CAP_USD": "25",
+    // "true" at launch: any signed-in user may ask. Until then, only the admin and beta roles.
+    "LAUNCHED": "false"
   },
   "secrets": {
     "required": ["AI_GATEWAY_API_KEY", "JOBS_URL", "JOBS_TOKEN", "AUTH0_DOMAIN", "AUTH0_AUDIENCE"]

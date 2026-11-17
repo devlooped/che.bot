@@ -26,6 +26,13 @@ const SCHEMA = [
      pay_requested_at INTEGER,
      paid_at INTEGER,
      hook_token TEXT,
+     hook_url TEXT,
+     free INTEGER NOT NULL DEFAULT 0,
+     job_enqueued_at INTEGER,
+     job_closed TEXT,
+     retries INTEGER NOT NULL DEFAULT 0,
+     reserved_attempt INTEGER NOT NULL DEFAULT 0,
+     settled_attempt INTEGER NOT NULL DEFAULT 0,
      models TEXT,
      budget_usd REAL,
      deadline_at INTEGER,
@@ -77,7 +84,21 @@ export interface RunRecord {
   createdAt: number;
   payRequestedAt: number | null;
   paidAt: number | null;
+  /** The secret the jobs service sends to the payment hook of this run. */
   hookToken: string | null;
+  /** Where the jobs service calls when the payment is processed. */
+  hookUrl: string | null;
+  /** An admin run: no payment job. */
+  free: boolean;
+  /** When the payment job was enqueued. */
+  jobEnqueuedAt: number | null;
+  /** How the payment job ended: cancelled (expired), done or failed (the run's outcome). */
+  jobClosed: "cancelled" | "done" | "failed" | null;
+  /** Failed calls to the outside (jobs service, settings, meter) in a row, for the backoff. */
+  retries: number;
+  /** The last attempt whose worst case is reserved in the SpendMeter, and the last settled. */
+  reservedAttempt: number;
+  settledAttempt: number;
   /** The model snapshot, resolved once when the run is paid. */
   models: ModelSnapshot | null;
   budgetUsd: number | null;
@@ -101,6 +122,13 @@ interface RunRow extends Record<string, SqlStorageValue> {
   pay_requested_at: number | null;
   paid_at: number | null;
   hook_token: string | null;
+  hook_url: string | null;
+  free: number;
+  job_enqueued_at: number | null;
+  job_closed: string | null;
+  retries: number;
+  reserved_attempt: number;
+  settled_attempt: number;
   models: string | null;
   budget_usd: number | null;
   deadline_at: number | null;
@@ -161,6 +189,13 @@ export class RunStore {
       payRequestedAt: row.pay_requested_at,
       paidAt: row.paid_at,
       hookToken: row.hook_token,
+      hookUrl: row.hook_url,
+      free: row.free === 1,
+      jobEnqueuedAt: row.job_enqueued_at,
+      jobClosed: row.job_closed as RunRecord["jobClosed"],
+      retries: row.retries,
+      reservedAttempt: row.reserved_attempt,
+      settledAttempt: row.settled_attempt,
       models: row.models ? (JSON.parse(row.models) as ModelSnapshot) : null,
       budgetUsd: row.budget_usd,
       deadlineAt: row.deadline_at,
@@ -245,6 +280,11 @@ export class RunStore {
       )
       .toArray()
       .map((row) => ({ ...(JSON.parse(row.data) as RunEvent), seq: row.seq, at: row.at }));
+  }
+
+  /** Whether the log holds the event of `key`. */
+  hasEvent(key: string): boolean {
+    return this.sql.exec("SELECT 1 FROM events WHERE key = ?", key).toArray().length > 0;
   }
 
   lastSeq(): number {

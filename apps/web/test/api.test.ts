@@ -139,9 +139,10 @@ describe("the event stream", () => {
     fakes();
     const { id, stub } = await paidRun();
     const first = await connect(id, 0);
-    await vi.waitFor(() => expect(first.received).toHaveLength(3));
+    await vi.waitFor(() => expect(first.received).toHaveLength(4));
     expect(first.received.map((e) => e.type)).toEqual([
       "run.quoted",
+      "payment.requested",
       "payment.confirmed",
       "run.started",
     ]);

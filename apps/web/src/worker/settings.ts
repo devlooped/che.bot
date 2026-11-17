@@ -116,3 +116,47 @@ export async function listRuns(db: D1Database, owner: string): Promise<RunListIt
     amount: row.amount,
   }));
 }
+
+/** A change of a role: its family and effort, or null to go back to the default. */
+export interface ModelSettingChange {
+  role: string;
+  setting: { family: string; effort: string | null } | null;
+}
+
+/** Writes the changes of the admin page together; runs already started keep their snapshot. */
+export async function writeModelSettings(
+  db: D1Database,
+  changes: readonly ModelSettingChange[],
+  by: string,
+): Promise<void> {
+  if (!changes.length) return;
+  const now = new Date().toISOString();
+  await db.batch(
+    changes.map((change) =>
+      change.setting === null
+        ? db.prepare("DELETE FROM model_settings WHERE role = ?").bind(change.role)
+        : db
+            .prepare(
+              `INSERT INTO model_settings (role, model_id, effort, updated_at, updated_by)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT (role) DO UPDATE SET model_id = excluded.model_id,
+                 effort = excluded.effort, updated_at = excluded.updated_at,
+                 updated_by = excluded.updated_by`,
+            )
+            .bind(change.role, change.setting.family, change.setting.effort, now, by),
+    ),
+  );
+}
+
+/** Sets the amounts of some classes; the next quote reads them. */
+export async function writePrices(
+  db: D1Database,
+  amounts: readonly { class: QuestionClass; amount: number }[],
+): Promise<void> {
+  if (!amounts.length) return;
+  await db.batch(
+    amounts.map((price) =>
+      db.prepare("UPDATE prices SET amount = ? WHERE class = ?").bind(price.amount, price.class),
+    ),
+  );
+}

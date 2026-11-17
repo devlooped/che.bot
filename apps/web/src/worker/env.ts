@@ -6,8 +6,14 @@ export interface Env {
   RUNS: DurableObjectNamespace<RunObject>;
   SPEND: DurableObjectNamespace<SpendMeter>;
   DB: D1Database;
+  /** The brake on POST /api/runs, per user (approximate, per Cloudflare location). */
+  ASK_LIMITER: RateLimit;
   /** The budget of one question in USD; empty means the protocol's default. */
   RUN_BUDGET_USD: string;
+  /** The global spend cap of a day (UTC) in USD, over every run. */
+  DAILY_CAP_USD: string;
+  /** "true" opens asking to every signed-in user; until then it needs the admin or beta role. */
+  LAUNCHED: string;
   // Secrets
   AI_GATEWAY_API_KEY: string;
   JOBS_URL: string;

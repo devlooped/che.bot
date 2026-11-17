@@ -17,7 +17,7 @@ The full plan: [.alta/plans/2026-11-16-consensus-answers.md](.alta/plans/2026-11
 - `packages/protocol`: types, schemas, reducer, prompts. No I/O.
 - `packages/providers`: model providers, roles, families, catalog.
 - `apps/cli`: headless runner and evaluation (Node).
-- `apps/web`: Worker, Durable Object and React app (later).
+- `apps/web`: the Worker (API, `RunObject` per question, `SpendMeter`), D1 migrations, and the React app (phase 3).
 - `eval/`: the question set (`questions.jsonl`) and the evaluation reports (`results/`).
 
 ## Usage
@@ -51,3 +51,36 @@ The evaluation writes `report.md` and `report.json`, and, once complete, `gradin
 20 blind answer pairs and `grades.txt` for your choices, in `eval/results/<date>/` (or `--out`).
 The sheet only grows: its pairs and your grades never change, and a kind of pair added to the
 evaluation later is appended after them.
+
+## The web app (`apps/web`)
+
+```sh
+pnpm --filter @chebot/web test    # in the Workers runtime: fake models, jobs service and Auth0 keys
+pnpm --filter @chebot/web dev     # needs apps/web/.dev.vars (see .dev.vars.example)
+```
+
+| Route                                                                | Who may call it                                                    |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `POST /api/runs {question}` → `201 {runId, class, amount, currency}` | signed in; the `admin` or `beta` role until `LAUNCHED` is `"true"` |
+| `POST /api/runs/:id/pay` → `202`                                     | the owner; an `admin` owner runs free, with no payment job         |
+| `POST /api/runs/:id/rerun` → `202`                                   | the owner, once, after a paid run failed                           |
+| `DELETE /api/runs/:id`                                               | the owner or an admin                                              |
+| `GET /api/runs/:id`, `/events?after=`, `/ws?after=`, `/snapshots/:v` | anyone with the link                                               |
+| `GET /api/me/runs`                                                   | signed in                                                          |
+| `GET`, `PUT /api/admin/models`, `/api/admin/prices`                  | `admin`                                                            |
+| `POST /api/pay/hook`                                                 | the jobs service, with the run's own token as Bearer               |
+
+Sign-in is an Auth0 access token (`Authorization: Bearer`), verified with the tenant's JWKS
+(RS256, issuer `https://AUTH0_DOMAIN/`, audience `AUTH0_AUDIENCE`); the roles are read from any
+claim named `roles`, or ending in `/roles` (such as `https://che.bot/roles`).
+
+Configuration of a deployment:
+
+- Secrets: `AI_GATEWAY_API_KEY`, `JOBS_URL`, `JOBS_TOKEN`, `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`.
+- Variables (`wrangler.jsonc`): `DAILY_CAP_USD` (the spend of a UTC day over every run),
+  `LAUNCHED`, `RUN_BUDGET_USD` (empty: the protocol's default).
+- Bindings: the D1 database `chebot-web` (its id in `wrangler.jsonc`, migrations with
+  `wrangler d1 migrations apply chebot-web --remote`), the `RunObject` and `SpendMeter` classes, and
+  the `ASK_LIMITER` rate limit (5 questions per user and minute).
+- The payment hook is the origin of the `pay` request plus `/api/pay/hook`: the hostname the user
+  reached, which must be https for the jobs service.

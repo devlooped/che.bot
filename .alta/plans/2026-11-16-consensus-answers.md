@@ -443,22 +443,22 @@ Starts only after step 15 says go.
 
 - [x] 16. Scaffold `apps/web`: Worker, `wrangler.jsonc` with the `RunObject` and `SpendMeter` SQLite classes and the D1 database, the Cloudflare Vite plugin, and the secrets `AI_GATEWAY_API_KEY`, `JOBS_URL`, `JOBS_TOKEN`, `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`.
 - [x] 17. Write the D1 migrations (`model_settings`, `prices`, `runs`) and the settings access: read the settings and the catalog, resolve the snapshot.
-- [ ] 18. Write the Auth0 check in the Worker: verify the access token against the tenant's keys, read the roles claim, and guard each route as listed in the API.
+- [x] 18. Write the Auth0 check in the Worker: verify the access token against the tenant's keys, read the roles claim, and guard each route as listed in the API.
 - [x] 19. Write `RunObject` storage: the four tables, `quote()`, `pay()` and `paid()` that are each safe to call twice, and the idempotent event append.
-- [ ] 20. Write the quote: classify with the decision model, read the price of the class, store both with the run, answer the `POST`.
-- [ ] 21. Write the payment: enqueue the job with the automation hook and a per-run token, wait for the QR on alarm ticks, emit `payment.requested`, handle `POST /api/pay/hook`, expire and cancel an unpaid job after 15 minutes, and mark the job `done` or `failed` at the end of the run. Admin runs skip the job.
+- [x] 20. Write the quote: classify with the decision model, read the price of the class, store both with the run, answer the `POST`.
+- [x] 21. Write the payment: enqueue the job with the automation hook and a per-run token, wait for the QR on alarm ticks, emit `payment.requested`, handle `POST /api/pay/hook`, expire and cancel an unpaid job after 15 minutes, and mark the job `done` or `failed` at the end of the run. Admin runs skip the job.
 - [x] 22. Write the alarm driver with the call ledger: one stage per tick, results stored as each call lands, the retry and abstain rules, `run.failed` after repeated handler errors, and the free rerun of a paid run that failed.
 - [x] 23. Write the read API and the WebSocket endpoint with the Hibernation API, with replay from a sequence number; write `GET /api/me/runs` and `DELETE /api/runs/:id`.
-- [ ] 24. Write the guardrails: `SpendMeter` (one object, a daily cap in USD, reserve at start and settle at the end, runs refused when the cap is reached), the rate limiting binding on `POST /api/runs`, a length limit on the question, and the `admin` or `beta` role required to ask until launch.
-- [ ] 25. Write the admin API for model settings and prices, with the family names offered from the catalog.
+- [x] 24. Write the guardrails: `SpendMeter` (one object, a daily cap in USD, reserve at start and settle at the end, runs refused when the cap is reached), the rate limiting binding on `POST /api/runs`, a length limit on the question, and the `admin` or `beta` role required to ask until launch.
+- [x] 25. Write the admin API for model settings and prices, with the family names offered from the catalog.
 - [ ] 26. Deploy to a preview hostname and run one paid question end to end with a small real amount.
 
 Verified when:
 
-- [ ] Tests in the Workers runtime (`@cloudflare/vitest-pool-workers`, fake providers, a fake jobs service) show: no panel call is made before `paid()`; a second alarm for the same stage repeats no finished call; a restart in the middle of a round loses no finished call; a repeated hook or a second `pay` enqueues nothing.
-- [ ] A client that disconnects and reconnects with `after=<seq>` receives every event once, in order, including the QR.
-- [ ] A model that times out produces `model.status: abstained` and the run completes with three models; an exhausted budget sends the run to the editor pass; an unpaid run expires and its job is cancelled.
-- [ ] A request without a valid token cannot ask, pay or delete; a run is readable by its link without signing in; a deleted run answers 404.
+- [x] Tests in the Workers runtime (`@cloudflare/vitest-pool-workers`, fake providers, a fake jobs service) show: no panel call is made before `paid()`; a second alarm for the same stage repeats no finished call; a restart in the middle of a round loses no finished call; a repeated hook or a second `pay` enqueues nothing.
+- [x] A client that disconnects and reconnects with `after=<seq>` receives every event once, in order, including the QR.
+- [x] A model that times out produces `model.status: abstained` and the run completes with three models; an exhausted budget sends the run to the editor pass; an unpaid run expires and its job is cancelled.
+- [x] A request without a valid token cannot ask, pay or delete; a run is readable by its link without signing in; a deleted run answers 404.
 - [x] A change of `model_settings` during a run does not change the models of that run.
 - [ ] A paid run on the preview deployment against the live models completes with the browser tab closed, and its job ends as `done`.
 
@@ -518,6 +518,9 @@ Verified when:
 - **Workers runtime (step 16).** AI SDK 7 and the Gateway adapter run unchanged in the Workers runtime, without `nodejs_compat`. The assets keys are `not_found_handling: "single-page-application"` and `run_worker_first: ["/api/*"]`; the Vite plugin adds the directory. The tests use `@cloudflare/vitest-plugin`, the current name of the Workers test pool for vitest 5.
 - **Failed runs (step 22).** A run fails after 3 handler errors on one stage. A paid run that failed gets one free rerun, through `POST /api/runs/:id/rerun`, which the API list did not have; its event and call keys carry the attempt. How many free reruns a user gets is the user's to confirm.
 - **Tables (step 19).** The `run` row also keeps the probability, the status, the timestamps, the attempt and the protocol state; `calls` keeps the whole ledger entry in one column.
+- **Sign-in (step 18).** The Worker verifies an Auth0 access token (RS256, issuer, audience) and reads the roles from any roles claim, as the existing app does. It compares the roles `admin` and `beta`; the tenant of the existing app has `Admin` and `Contrib` and no `beta`, so the roles must be created or the names changed. A request with an invalid token answers 401 on every route, the public ones included.
+- **Payment (step 21).** The hook URL is the origin of the `pay` request, so a deployment needs no setting for it. A payment is recorded before anything that can fail; a run that cannot start yet starts on a later alarm. A job that was paid but whose hook was lost starts the run at the end of the 15 minutes. An admin run has no job and no payment, and so no free rerun.
+- **Guardrails (step 24).** The daily cap (`DAILY_CAP_USD`, default 25) is checked when asking and again at `pay`, never after a QR was shown, so a user who paid always runs; the day is the UTC day. The rate limit is 5 questions per minute per user, the question at most 2,000 characters, and `LAUNCHED` opens asking to every signed-in user.
 - **Line endings.** A `.gitattributes` keeps LF in every checkout, because Biome rejects the CRLF files that `core.autocrlf` produces on Windows.
 
 ## Results of the evaluation (step 15, run on 2026-11-16)
@@ -631,7 +634,7 @@ These are the user's to decide. None blocks phases 0 and 1.
 
 > **Open:** What does a user get when a paid run fails? The plan gives a free rerun of the same question; a refund through Mercado Pago would need a call the jobs service does not have. Needed before launch.
 
-> **Open:** Which Auth0 tenant and roles? The plan assumes the tenant of the existing app with a new application and API, and its `admin` and `beta` roles. Needed before step 18.
+> **Open:** Which Auth0 tenant and roles? The plan assumes the tenant of the existing app with a new application and API, and its `admin` and `beta` roles. That tenant has the roles `Admin` and `Contrib` and no `beta`: either the lowercase roles are created there, or the Worker compares the existing names. Needed before step 26.
 
 > **Open:** Is a credit balance wanted soon? The plan charges per question by QR and leaves a prepaid balance out; it would add a ledger per user and a top-up flow.
 

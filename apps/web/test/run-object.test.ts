@@ -5,11 +5,10 @@ import { CATALOG, catalogEntry, script } from "@chebot/driver/testing";
 import { type LoggedEvent, nextStep, quotedEvent, replay, selectAnswer } from "@chebot/protocol";
 import { FakeProvider, resolveModels } from "@chebot/providers";
 import { describe, expect, test } from "vitest";
-import { runStub } from "../src/worker/api.ts";
 import { overrideDeps } from "../src/worker/deps.ts";
-import type { RunObject } from "../src/worker/run-object.ts";
+import { type RunObject, runStub } from "../src/worker/run-object.ts";
 import { RunStore } from "../src/worker/run-store.ts";
-import { eventsOf, fakes, paidRun, QUESTION, quoted, runAlarms } from "./helpers.ts";
+import { eventsOf, fakes, HOOK_URL, paidRun, QUESTION, quoted, runAlarms } from "./helpers.ts";
 
 type Stub = DurableObjectStub<RunObject>;
 
@@ -65,17 +64,26 @@ describe("quote, pay and paid", () => {
       .all();
     expect(listed.results).toEqual([{ owner: "owner-qpp", status: "quoted" }]);
 
-    await stub.pay();
+    await stub.pay({ hookUrl: HOOK_URL, free: false });
     const paying = await inside(stub, (store) => store.run());
-    expect((await stub.pay())?.status).toBe("awaiting_payment");
+    expect(await stub.pay({ hookUrl: HOOK_URL, free: false })).toMatchObject({
+      ok: true,
+      summary: { status: "awaiting_payment" },
+    });
     expect(await inside(stub, (store) => store.run())).toEqual(paying);
-    expect(await runDurableObjectAlarm(stub)).toBe(false);
+    // The alarm enqueues the job and shows its QR; no model is called.
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
     expect(provider.calls).toEqual([]);
 
     const started = await stub.paid();
     expect(started?.status).toBe("running");
     const log = await eventsOf(stub);
-    expect(log.map((e) => e.type)).toEqual(["run.quoted", "payment.confirmed", "run.started"]);
+    expect(log.map((e) => e.type)).toEqual([
+      "run.quoted",
+      "payment.requested",
+      "payment.confirmed",
+      "run.started",
+    ]);
     expect(await stub.paid()).toEqual(started);
     expect(await eventsOf(stub)).toEqual(log);
     expect(provider.calls).toEqual([]);

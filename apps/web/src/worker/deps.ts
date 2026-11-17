@@ -8,33 +8,19 @@ import {
   gatewayCatalog,
   type ModelProvider,
 } from "@chebot/providers";
+import type { JWTVerifyGetKey } from "jose";
+import { auth0Identity, auth0Jwks } from "./auth0.ts";
 import type { Env } from "./env.ts";
-import { type IdentityResolver, noSignIn } from "./identity.ts";
+import type { IdentityResolver } from "./identity.ts";
+import { createJobsClient, type JobsClient } from "./jobs.ts";
 
-// What the runtime takes from the outside world, in one place: the Worker and the RunObject read
-// these, and tests replace them with `overrideDeps` (the tests run in the same isolate as the
+// What the runtime takes from the outside world, in one place: the Worker and the Durable Objects
+// read these, and tests replace them with `overrideDeps` (the tests run in the same isolate as the
 // Worker and its Durable Objects).
 
-/** Classifies a question with the decision model of the run snapshot (step 20). */
+/** Classifies a question with the decision model of the classifier role (step 20). */
 export interface Classifier {
   classify(req: ClassifyRequest): Promise<Classification>;
-}
-
-/** The payment job of a run in the CheBot jobs service (step 21). The job id is the run id. */
-export interface JobsClient {
-  /** POST /jobs/:id with the amount in ARS and the automation hook that calls back the app. */
-  enqueue(job: {
-    id: string;
-    amount: number;
-    currency: string;
-    hook: { url: string; token: string };
-  }): Promise<void>;
-  /** GET /jobs/:id: the status, and the Mercado Pago QR once the job is pending. */
-  get(id: string): Promise<{ status: string; qr: string | null }>;
-  /** DELETE /jobs/:id: cancels a job that was not paid. */
-  cancel(id: string): Promise<void>;
-  /** PATCH /jobs/:id: ends the job with the outcome of the run. */
-  finish(id: string, status: "done" | "failed", message: string): Promise<void>;
 }
 
 export interface Deps {
@@ -43,13 +29,18 @@ export interface Deps {
   /** The Gateway catalog; cached per isolate. */
   catalog(env: Env): Promise<CatalogModel[]>;
   classifier(env: Env): Classifier;
+  /** The payment jobs (jobs.ts). */
   jobs(env: Env): JobsClient;
-  /** Who calls: see identity.ts. */
+  /** The public keys that sign the access tokens: the tenant's JWKS, cached per isolate. */
+  jwks(env: Env): JWTVerifyGetKey;
+  /** Who calls: the Auth0 check of auth0.ts. */
   identify: IdentityResolver;
   /** The run configuration: the protocol's defaults, with the budget of RUN_BUDGET_USD. */
   runConfig(env: Env): ConfigOverrides;
   /** The wait between two alarm ticks of a run; 0 in production. */
   tickDelayMs: number;
+  /** The name of the one SpendMeter of the app; each test gets its own. */
+  spendMeterName: string;
 }
 
 /** The budget of RUN_BUDGET_USD, when it is set. */
@@ -66,12 +57,12 @@ const defaults: Deps = {
   provider: (env) => createGatewayProvider({ apiKey: env.AI_GATEWAY_API_KEY }),
   catalog: () => gatewayCatalog(),
   classifier: (env) => ({ classify: (req) => classify(req, { apiKey: env.AI_GATEWAY_API_KEY }) }),
-  jobs: () => {
-    throw new Error("The jobs service client is written in step 21.");
-  },
-  identify: noSignIn,
+  jobs: (env) => createJobsClient({ url: env.JOBS_URL, token: env.JOBS_TOKEN }),
+  jwks: (env) => auth0Jwks(env),
+  identify: (request, env) => auth0Identity(request, env, deps.jwks(env)),
   runConfig: budgetOverride,
   tickDelayMs: 0,
+  spendMeterName: "global",
 };
 
 export const deps: Deps = { ...defaults };
