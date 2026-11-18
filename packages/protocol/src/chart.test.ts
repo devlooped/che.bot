@@ -55,11 +55,28 @@ describe("numbers of the web", () => {
     expect(readModelNumber("n/d")).toBeNull();
   });
 
-  test("the same value: equal, or equal at the coarser precision when both have decimals", () => {
+  test("the same value: equal, or one is the other rounded", () => {
     expect(sameValue(2.4, 2.4)).toBe(true);
     expect(sameValue(2.7, 2.72)).toBe(true);
-    expect(sameValue(3, 3.4)).toBe(false);
+    expect(sameValue(2.7, 2.76)).toBe(false);
+    expect(sameValue(77.543, 77.395)).toBe(false);
     expect(sameValue(3121707, 3120612)).toBe(false);
+    expect(sameValue(6792, 6793)).toBe(false);
+  });
+
+  test("an integer is the same as the value that rounds to it when they differ by less than 5%", () => {
+    expect(sameValue(6961, 6960.8)).toBe(true);
+    expect(sameValue(76, 76.023)).toBe(true);
+    expect(sameValue(73.982, 74)).toBe(true);
+    expect(sameValue(-76, -76.023)).toBe(true);
+    expect(sameValue(77, 77.4)).toBe(true);
+    expect(sameValue(7, 6.9)).toBe(true);
+    expect(sameValue(3, 3.1)).toBe(true);
+    expect(sameValue(2.9, 3)).toBe(true);
+    expect(sameValue(3, 3.4)).toBe(false);
+    expect(sameValue(3, 3.2)).toBe(false);
+    expect(sameValue(76, 76.6)).toBe(false);
+    expect(sameValue(0, 0.004)).toBe(false);
   });
 
   test("a quote states a value in the ways pages write numbers", () => {
@@ -68,6 +85,8 @@ describe("numbers of the web", () => {
     expect(quoteStates(3121707, "unos 3,1 millones de personas")).toBe(true);
     expect(quoteStates(3121707, "unos 2,9 millones de personas")).toBe(false);
     expect(quoteStates(2.7, "subió 3,7% en abril")).toBe(false);
+    expect(quoteStates(6960.8, "1. Aconcagua (6.961 m.s.n.m., América del Sur)")).toBe(true);
+    expect(quoteStates(3, "subió 3,4% en abril")).toBe(false);
   });
 });
 

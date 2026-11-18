@@ -458,17 +458,24 @@ function decimals(n: number): number {
   return s.includes(".") ? (s.split(".")[1]?.length ?? 0) : 0;
 }
 
+/** The most an integer may differ from the value it is the rounding of, as a share of the integer. */
+const INTEGER_ROUNDING = 0.05;
+
 /**
- * Two values are the same when they are equal, or when both have decimals and they are equal at
- * the coarser precision of the two (2.7 and 2.72). An integer is never the same as a rounded one
- * (3 and 3.4, 3,100,000 and 3,121,707 are different values: the sources settle them).
+ * Two values are the same when they are equal, or when one is the other rounded: they are equal at
+ * the coarser precision of the two (2.7 and 2.72). An integer does not say whether it is rounded,
+ * so it is the same as a value with decimals only when that value rounds to it and differs from it
+ * by less than 5% of it (6,961 and 6,960.8 are the same, and so are 7 and 6.9; 3 and 3.4 are not).
+ * Two integers are the same only when they are equal (3,100,000 and 3,121,707 are different
+ * values: the sources settle them).
  */
 export function sameValue(a: number, b: number): boolean {
   if (a === b) return true;
   const d = Math.min(decimals(a), decimals(b));
-  if (d === 0) return false;
   const f = 10 ** d;
-  return Math.round(a * f) === Math.round(b * f);
+  if (Math.round(a * f) !== Math.round(b * f)) return false;
+  // without decimals, both round to the integer of the two
+  return d > 0 || Math.abs(a - b) < INTEGER_ROUNDING * Math.abs(Math.round(a));
 }
 
 const MULTIPLIERS: [RegExp, number][] = [

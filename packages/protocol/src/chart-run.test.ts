@@ -153,7 +153,7 @@ describe("a scripted run whose answer has two charts among its paragraphs", () =
       status: "disputed",
       values: { value: 3.1 },
       support: ["grok", "openai"],
-      alternatives: [{ values: { value: 3 }, support: ["claude"] }],
+      alternatives: [{ values: { value: 3.4 }, support: ["claude"] }],
     });
     expect(row("2026-04")).toMatchObject({ status: "single", support: ["gemini"] });
     expect(chartOf(state.snapshots[0] as never, "c2").data.rows.map((r) => r.status)).toEqual([
@@ -308,7 +308,7 @@ describe("a scripted run whose answer has two charts among its paragraphs", () =
       winner: "v1",
       values: [
         { id: "v1", value: 3.1, holds: 2, checkers: 2 },
-        { id: "v2", value: 3, holds: 0, checkers: 3 },
+        { id: "v2", value: 3.4, holds: 0, checkers: 3 },
       ],
     });
     expect(answer?.render).toMatchObject({ block: "c1", version: 4, call: "render:v3" });

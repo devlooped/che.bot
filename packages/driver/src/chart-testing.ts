@@ -16,7 +16,7 @@ const FOUND_WEB: Record<ModelId, { url: string; title: string; quote: string }[]
   ],
   claude: [
     found("https://indec.gob.ar/ipc-enero", "INDEC enero", "La inflación de enero fue de 2,2%"),
-    found("https://diario.example/marzo", "Diario", "en marzo el IPC subió 3%"),
+    found("https://diario.example/marzo", "Diario", "en marzo el IPC subió 3,4%"),
     found("https://otra.example/mayo", "Otra", "mayo: 3,7%"),
   ],
   openai: [
@@ -41,7 +41,7 @@ const ROWS_WEB: Record<ModelId, ReturnType<typeof row>[]> = {
   ],
   claude: [
     row("2026-01", "2.2", "https://indec.gob.ar/ipc-enero", "enero fue de 2,2%"),
-    row("2026-03", "3.0", "https://diario.example/marzo", "subió 3%"),
+    row("2026-03", "3.4", "https://diario.example/marzo", "subió 3,4%"),
     row("2026-05", "3.7", "https://otra.example/mayo", "mayo: 3,7%"),
     // typed from memory: the search of this call did not return the URL
     row("2026-06", "4.0", "https://typed.example/junio", "junio 4%"),

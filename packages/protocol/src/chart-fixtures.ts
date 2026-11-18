@@ -20,7 +20,7 @@ export const FOUND: Record<ModelId, ReturnType<typeof src>[]> = {
   claude: [
     src("https://indec.gob.ar/ipc-enero", "INDEC enero", "La inflación de enero fue de 2,2%"),
     src("https://indec.gob.ar/ipc-febrero", "INDEC febrero", "En febrero el IPC subió 2,4%"),
-    src("https://diario.example/marzo", "Diario", "en marzo el IPC subió 3%"),
+    src("https://diario.example/marzo", "Diario", "en marzo el IPC subió 3,4%"),
     src("https://otra.example/mayo", "Otra", "mayo: 3,7%"),
     src("https://indec.gob.ar/eph", "INDEC EPH", "desocupación: 7,1% y 6,9%"),
   ],
@@ -54,7 +54,7 @@ export const BRIEF_ROWS: Record<ModelId, ReturnType<typeof row>[]> = {
   claude: [
     row("2026-01", "2.2", "https://indec.gob.ar/ipc-enero", "enero fue de 2,2%"),
     row("2026-02", "2.4", "https://indec.gob.ar/ipc-febrero", "subió 2,4%"),
-    row("2026-03", "3.0", "https://diario.example/marzo", "en marzo el IPC subió 3%"),
+    row("2026-03", "3.4", "https://diario.example/marzo", "en marzo el IPC subió 3,4%"),
     row("2026-05", "3.7", "https://otra.example/mayo", "mayo: 3,7%"),
     // typed from memory: its search did not return this URL
     row("2026-06", "4.0", "https://typed.example/junio", "junio 4%"),
