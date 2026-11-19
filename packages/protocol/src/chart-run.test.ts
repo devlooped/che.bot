@@ -11,7 +11,7 @@ import {
   WEB_QUESTION,
   webChart,
 } from "./chart-fixtures.ts";
-import { holdsUp } from "./chart-run.ts";
+import { groupSame, holdsUp } from "./chart-run.ts";
 import { DEFAULT_CONFIG } from "./config.ts";
 import { drive, eventsOf, ok, type Responder } from "./fixtures.ts";
 import type { Chart, ModelId } from "./model.ts";
@@ -365,6 +365,39 @@ describe("a scripted run whose answer has two charts among its paragraphs", () =
       }),
       { numRuns: 25 },
     );
+  });
+});
+
+describe("the values of a row are grouped the same way whatever the order of the models", () => {
+  const groups = (values: number[], seeds?: number[]) =>
+    groupSame(values, (v) => v, seeds).map((g) => g.items);
+
+  test("a coarse value joins the closest of the finer values it is the same as", () => {
+    // Brasil in a run: 76.0 (data of 2024) is support for 76.023 and 76.02, not for 75.848 (2023)
+    expect(groups([76.023, 75.848, 76, 76.02])).toEqual([[76.023, 76, 76.02], [75.848]]);
+    expect(groups([75.848, 76, 76.02])).toEqual([[75.848], [76, 76.02]]);
+    expect(groups([76, 76.02, 75.848])).toEqual([[76, 76.02], [75.848]]);
+  });
+
+  test("the groups do not depend on the order of the values", () => {
+    const values = [76.023, 75.848, 76, 76.02, 77.46, 77.54, 2.7, 2.72, 3, 3.4];
+    const sets = (vs: number[]) =>
+      groups(vs)
+        .map((g) => [...g].sort((a, b) => a - b).join(","))
+        .sort();
+    fc.assert(
+      fc.property(fc.integer(), (seed) => {
+        expect(sets(seededShuffle(values, String(seed)))).toEqual(sets(values));
+      }),
+      { numRuns: 50 },
+    );
+  });
+
+  test("a value as close to two groups joins the first; seeds keep their place and never merge", () => {
+    expect(groups([77.46, 77.5, 77.54])).toEqual([[77.46, 77.5], [77.54]]);
+    expect(groups([77.54, 77.5, 77.46])).toEqual([[77.54, 77.5], [77.46]]);
+    expect(groups([75.848, 76], [76.02])).toEqual([[76], [75.848]]);
+    expect(groups([], [3.1, 3.4])).toEqual([[], []]);
   });
 });
 

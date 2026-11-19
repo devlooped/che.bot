@@ -1,6 +1,7 @@
 import {
   chartSpec,
   checkPatch,
+  decimals,
   defaultLayers,
   layersFromSpec,
   type PatchDropReason,
@@ -563,13 +564,46 @@ function baseChart(run: RunState, id: string, g: Group, events: RunEvent[]): Cha
   return base;
 }
 
-function buildRow(label: string, entries: readonly { model: ModelId; row: BriefRow }[]): Row {
-  const clusters: { value: number; entries: { model: ModelId; row: BriefRow }[] }[] = [];
-  for (const e of [...entries].sort((a, b) => byModelOrder(a.model, b.model))) {
-    const c = clusters.find((x) => sameValue(x.value, e.row.value));
-    if (c) c.entries.push(e);
-    else clusters.push({ value: e.row.value, entries: [e] });
+/**
+ * Groups the items whose values are the same (`sameValue`). "The same by rounding" is not
+ * transitive (76 is the same as 75.848 and as 76.02, which differ), so the finer values are placed
+ * first, each a group of its own unless it is the same as one already placed, and a value joins
+ * the group whose value is closest among those it is the same as: the groups do not depend on the
+ * order of the items, but for a value as close to two groups. That order still gives the order of
+ * the items in a group and of the new groups (by their first item), after the `seeds`: groups of
+ * values already kept, which items may join but never merge.
+ */
+export function groupSame<T>(
+  items: readonly T[],
+  numberOf: (item: T) => number,
+  seeds: readonly number[] = [],
+): { value: number; items: T[] }[] {
+  const groups: { value: number; at: number[] }[] = seeds.map((value) => ({ value, at: [] }));
+  const finerFirst = items
+    .map((_, i) => i)
+    .sort((a, b) => decimals(numberOf(items[b] as T)) - decimals(numberOf(items[a] as T)) || a - b);
+  for (const i of finerFirst) {
+    const v = numberOf(items[i] as T);
+    let best: (typeof groups)[number] | undefined;
+    for (const g of groups)
+      if (sameValue(g.value, v) && (!best || Math.abs(g.value - v) < Math.abs(best.value - v)))
+        best = g;
+    if (best) best.at.push(i);
+    else groups.push({ value: v, at: [i] });
   }
+  for (const g of groups) g.at.sort((a, b) => a - b);
+  const fresh = groups.slice(seeds.length).sort((a, b) => (a.at[0] ?? 0) - (b.at[0] ?? 0));
+  return [...groups.slice(0, seeds.length), ...fresh].map((g) => ({
+    value: g.value,
+    items: g.at.map((i) => items[i] as T),
+  }));
+}
+
+function buildRow(label: string, entries: readonly { model: ModelId; row: BriefRow }[]): Row {
+  const clusters = groupSame(
+    [...entries].sort((a, b) => byModelOrder(a.model, b.model)),
+    (e) => e.row.value,
+  ).map((g) => ({ entries: g.items }));
   clusters.sort((a, b) => b.entries.length - a.entries.length);
   const toValue = (c: (typeof clusters)[number]) => {
     const first =
@@ -1155,23 +1189,30 @@ export function placeDataPatches(
     const values: Row[] = existing
       ? [base, ...base.alternatives.map((a) => ({ ...base, ...a, alternatives: [] }))]
       : [];
-    for (const d of [...list].sort((a, b) => byModelOrder(a.model, b.model))) {
-      const same = values.find(
-        (v) => typeof v.values.value === "number" && sameValue(v.values.value, d.value),
-      );
+    const groups = groupSame(
+      [...list].sort((a, b) => byModelOrder(a.model, b.model)),
+      (d) => d.value,
+      values.map((v) => (typeof v.values.value === "number" ? v.values.value : Number.NaN)),
+    );
+    groups.forEach((g, i) => {
+      const same = values[i];
       if (same) {
-        if (!same.support.includes(d.model)) same.support.push(d.model);
-        continue;
+        for (const d of g.items) if (!same.support.includes(d.model)) same.support.push(d.model);
+        return;
       }
+      const d = g.items[0] as DataCandidate;
       values.push({
         ...base,
         values: { value: d.value },
         source: d.source,
         quote: d.quote,
-        support: [d.model],
+        support: uniqueSorted(
+          g.items.map((x) => x.model),
+          byModelOrder,
+        ),
         alternatives: [],
       });
-    }
+    });
     const [main, ...rest] = values;
     if (!main) continue;
     const dispute = openDispute(
