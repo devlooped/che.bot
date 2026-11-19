@@ -452,7 +452,8 @@ export function readModelNumber(text: string): number | null {
   return parseNumber(t);
 }
 
-function decimals(n: number): number {
+/** How many decimals a number is written with. */
+export function decimals(n: number): number {
   const s = String(n);
   if (s.includes("e")) return 0;
   return s.includes(".") ? (s.split(".")[1]?.length ?? 0) : 0;
