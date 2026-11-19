@@ -87,6 +87,12 @@ describe("numbers of the web", () => {
     expect(quoteStates(2.7, "subió 3,7% en abril")).toBe(false);
     expect(quoteStates(6960.8, "1. Aconcagua (6.961 m.s.n.m., América del Sur)")).toBe(true);
     expect(quoteStates(3, "subió 3,4% en abril")).toBe(false);
+    expect(quoteStates(1600000, "Canada 4,820 5,600 1,600,000")).toBe(true);
+    expect(quoteStates(8615770, "Brasil 8.615.770 217.637 25,3 76,0")).toBe(true);
+    expect(quoteStates(217637, "Brasil 8.615.770 217.637 25,3 76,0")).toBe(true);
+    expect(quoteStates(25.3, "Brasil 8.615.770 217.637 25,3 76,0")).toBe(true);
+    expect(quoteStates(406750, "Paraguay 406.750 6.947 17,1 74,0")).toBe(true);
+    expect(quoteStates(1234567, "hay 1 234 567 casos")).toBe(true);
   });
 });
 
