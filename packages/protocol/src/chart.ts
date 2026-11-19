@@ -487,9 +487,12 @@ const MULTIPLIERS: [RegExp, number][] = [
 /** Every number a text states, with both readings of an ambiguous separator and its multiplier. */
 export function numbersIn(text: string): number[] {
   const out: number[] = [];
-  const re = /[-−]?\d[\d.,   ]*\d|\d/g;
+  // A space joins two groups of digits only as a thousands separator ("1 234 567", "1 234,5"):
+  // what follows is exactly three digits that do not start another dotted group ("4,820 5,600" and
+  // "8.615.770 217.637" are separate cells).
+  const re = /[-−]?\d{1,3}(?:[   ]\d{3}(?!\d)(?![.,]\d{3}))+(?:[.,]\d+)?|[-−]?\d[\d.,]*\d|\d/g;
   for (const m of text.matchAll(re)) {
-    const raw = m[0].replace(/[   ]+$/, "");
+    const raw = m[0];
     const after = text.slice((m.index ?? 0) + m[0].length).trimStart();
     const mult = MULTIPLIERS.find(([r]) => r.test(after))?.[1] ?? 1;
     const readings = new Set<number>();
