@@ -5,7 +5,6 @@ import type { DocumentView, ParagraphView } from "../view/derive.ts";
 import { ChartBlock } from "./ChartDocument.tsx";
 import { DiscussionSheet } from "./Discussion.tsx";
 import { Support, Votes, WithMarks } from "./ModelMark.tsx";
-import { Notes } from "./RunDetails.tsx";
 
 /** How long a new text stays highlighted (the CSS animation of .para-new is shorter). */
 const HIGHLIGHT_MS = 1_500;
@@ -40,19 +39,17 @@ function Dissent({ paragraph }: { paragraph: ParagraphView }) {
 
 /**
  * The answer: its paragraphs, with the margin marks of what was not unanimous or was discussed, and
- * the charts the models drew, each in its place among them.
+ * the charts the models drew, each in its place among them. The help of the page (RunActions)
+ * says what the marks are.
  */
 export function AnswerDocument({
   doc,
   final,
   animate,
-  notes,
 }: {
   doc: DocumentView;
   final: boolean;
   animate: boolean;
-  /** What the reader should know about how the run went (flagNotes). */
-  notes: readonly string[];
 }) {
   const [open, setOpen] = useState<string | null>(null);
   // The margin marks, by paragraph: the one that opened the discussion gets the focus back.
@@ -77,12 +74,11 @@ export function AnswerDocument({
   const opened = doc.paragraphs.find((p) => p.id === open) ?? null;
   return (
     <section className="answer" aria-labelledby="answer-title">
-      <h2 id="answer-title" className="section-title">
+      {/* The answer needs no visible title under its question; screen readers keep the heading. */}
+      <h2 id="answer-title" className="sr-only">
         {t.answer.title}
       </h2>
       {!final && <p className="muted">{t.answer.draftNote}</p>}
-      <Notes notes={notes} />
-      <p className="legend">{t.answer.legend}</p>
       <div className="doc">
         {doc.blocks.map((block) => {
           if (block.kind === "chart")
@@ -115,7 +111,6 @@ export function AnswerDocument({
                     onClick={() => setOpen(p.id)}
                   >
                     <Support support={p.support} />
-                    <span className="badge">{t.answer.badge(p.tally.for, p.tally.of)}</span>
                   </button>
                 )}
               </div>

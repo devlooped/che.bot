@@ -7,9 +7,9 @@ import { Checkout } from "../components/Checkout.tsx";
 import { Failure } from "../components/Failure.tsx";
 import { History } from "../components/History.tsx";
 import { Moments } from "../components/Moments.tsx";
+import { RunActions } from "../components/RunActions.tsx";
 import { Panel, Sources } from "../components/RunDetails.tsx";
-import { Seats } from "../components/Seats.tsx";
-import { ShareLink } from "../components/ShareLink.tsx";
+import { Seats, useSettled } from "../components/Seats.tsx";
 import { Spend } from "../components/Spend.tsx";
 import { useRun } from "../events/useRun.ts";
 import { t } from "../i18n/index.ts";
@@ -25,6 +25,19 @@ function RunNotFound() {
   return (
     <main className="page page-narrow">
       <h1 className="page-title">{t.errors.runNotFound}</h1>
+      <p>
+        <Link to="/">{t.notFound.back}</Link>
+      </p>
+    </main>
+  );
+}
+
+/** A run its owner deleted, to anyone else. */
+function RunDeleted() {
+  return (
+    <main className="page page-narrow" data-testid="run-gone">
+      <h1 className="page-title">{t.run.deletedTitle}</h1>
+      <p>{t.run.deletedBody}</p>
       <p>
         <Link to="/">{t.notFound.back}</Link>
       </p>
@@ -80,6 +93,8 @@ function RunView({ runId }: { runId: string }) {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const { view, connection } = stream;
+  // Done, the seats step back under the bar of the question, and the page is one centered column.
+  const settled = useSettled(view);
   // The text of the answer, with its charts in their places among the paragraphs.
   const doc = useMemo(() => documentOf(view), [view]);
   // The summary says why a run failed and whether it may run again: read it again when it ends.
@@ -100,8 +115,16 @@ function RunView({ runId }: { runId: string }) {
     if (summary?.id === runId && window.location.pathname !== path)
       navigate(`${path}${window.location.search}${window.location.hash}`, { replace: true });
   }, [summary?.id, runId, link, path]);
+  // A deleted run that was asked again leads to the new one.
+  const replacedBy = error?.kind === "deleted" ? error.replacedBy : null;
+  useEffect(() => {
+    if (replacedBy) navigate(runPath(replacedBy), { replace: true });
+  }, [replacedBy]);
+  // The notes of what went wrong open "Cómo se armó la respuesta".
+  const notes = useMemo(() => (doc ? flagNotes(view, doc.answer) : []), [view, doc]);
 
   if (error?.kind === "not_found") return <RunNotFound />;
+  if (error?.kind === "deleted") return replacedBy ? null : <RunDeleted />;
 
   const question = view.question ?? summary?.question ?? "";
   const started = view.runId !== null;
@@ -150,7 +173,7 @@ function RunView({ runId }: { runId: string }) {
   }
 
   return (
-    <main className="page run" data-status={view.status}>
+    <main className={settled ? "page run run-settled" : "page run"} data-status={view.status}>
       <header className="run-head">
         {question ? (
           <h1 className="question">{question}</h1>
@@ -158,25 +181,37 @@ function RunView({ runId }: { runId: string }) {
           <p className="muted">{t.common.loading}</p>
         )}
         <div className="run-share">
-          <ShareLink url={new URL(path, window.location.origin).href} />
+          <RunActions
+            runId={runId}
+            question={question}
+            url={new URL(path, window.location.origin).href}
+            mine={summary?.mine ?? false}
+            deleted={summary?.deleted ?? false}
+            answered={view.status === "completed" || view.status === "failed"}
+            free={isAdmin(user)}
+            onChange={refresh}
+          />
           {view.status === "running" && <p className="fine">{t.run.takesMinutes}</p>}
         </div>
         {(summary?.attempt ?? 1) > 1 && view.status !== "failed" && (
           <p className="fine">{t.failure.secondAttempt}</p>
         )}
+        {settled && <Seats view={view} line={line} compact />}
       </header>
 
       <div className="run-grid">
-        <div className="run-side">
-          <Seats view={view} line={line} />
-          {(connection === "reconnecting" || connection === "polling") && !final && (
-            <p className="connection" role="status">
-              {connection === "reconnecting" ? t.connection.reconnecting : t.connection.polling}
-            </p>
-          )}
-          {/* While the run goes, what happens shows beside it; once done, it moves into the main column. */}
-          {started && !final && <Moments view={view} />}
-        </div>
+        {!settled && (
+          <div className="run-side">
+            <Seats view={view} line={line} compact={false} />
+            {(connection === "reconnecting" || connection === "polling") && !final && (
+              <p className="connection" role="status">
+                {connection === "reconnecting" ? t.connection.reconnecting : t.connection.polling}
+              </p>
+            )}
+            {/* While the run goes, what happens shows beside it; once done, it moves into the main column. */}
+            {started && !final && <Moments view={view} notes={notes} />}
+          </div>
+        )}
 
         <div className="run-main">
           {error && (
@@ -211,20 +246,14 @@ function RunView({ runId }: { runId: string }) {
           {started && !doc && view.status !== "failed" && (
             <p className="doc-empty">{t.answer.noDocument}</p>
           )}
-          {doc && (
-            <AnswerDocument
-              doc={doc}
-              final={final}
-              animate={live}
-              notes={flagNotes(view, doc.answer)}
-            />
-          )}
+          {doc && <AnswerDocument doc={doc} final={final} animate={live} />}
           {doc && <Sources sources={doc.sources} />}
-          {started && <Panel view={view} />}
           {/* How the answer came to be, closed: for the reader who wants it, after what they need. */}
-          {final && doc && <Moments view={view} />}
+          {final && doc && <Moments view={view} notes={notes} />}
           {doc && <History view={view} />}
           {started && isAdmin(user) && <Spend runId={runId} running={view.status === "running"} />}
+          {/* Who sat where: the last thing on the page. */}
+          {started && <Panel view={view} />}
         </div>
       </div>
     </main>

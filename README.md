@@ -107,8 +107,14 @@ The states around the happy path are played the same way, to see and test them:
 
 The pages: `/` asks, `/r/:id` follows a run and replays how its text and its charts formed,
 `/mis-preguntas` lists
-the user's questions (copy a link, delete one), and `/admin` sets the model of each role and the two
-prices (admins only; the menu hides it from others).
+the user's questions (copy a link, delete one, restore a deleted one), and `/admin` sets the model
+of each role and the two prices (admins only; the menu of the account hides it from others).
+
+On the page of a run, its owner asks the question again or deletes it. Asking again is a new run of
+the same text, quoted and paid as any other, with the models of today; once it starts, the old run
+is deleted and its link leads to the new one. A deleted run stays (`deleted_at` in the list, see
+`migrations/0003_run_deleted.sql`): its owner still reads it and may restore it, and anyone else
+is told that its author deleted it (410).
 
 A run is a UUID inside: its object, its payment job, its row in the list. Once it is paid and
 starts, the helper model (Claude Haiku at medium effort by default) sums the question up in at
@@ -136,11 +142,12 @@ hook back on the origin of the page, which it cannot reach on localhost).
 | -------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | `GET /auth/login?returnTo=/path`, `/auth/callback`, `/auth/logout`   | anyone: the sign-in, see below                                        |
 | `GET /api/me` → `{id, name, admin, mayAsk}` or `null`                | anyone: the signed-in user                                            |
-| `POST /api/runs {question}` → `201 {runId, class, amount, currency}` | signed in; the `Admin` or `Contrib` role until `LAUNCHED` is `"true"` |
+| `POST /api/runs {question, replaces?}` → `201 {runId, class, amount, currency}` | signed in; the `Admin` or `Contrib` role until `LAUNCHED` is `"true"`; `replaces`, a run of theirs |
 | `POST /api/runs/:id/pay` → `202`                                     | the owner; an `Admin` owner runs free, with no payment job            |
 | `POST /api/runs/:id/rerun` → `202`                                   | the owner, once, after a paid run failed                              |
-| `DELETE /api/runs/:id`                                               | the owner or an admin                                                 |
-| `GET /api/runs/:id`, `/events?after=`, `/ws?after=`, `/snapshots/:v` | anyone with the link (`mine` in the summary: the caller owns it)      |
+| `DELETE /api/runs/:id`                                               | the owner, who may restore it; an admin, for good                     |
+| `POST /api/runs/:id/restore` → `204`                                 | the owner, after deleting it                                          |
+| `GET /api/runs/:id`, `/events?after=`, `/ws?after=`, `/snapshots/:v` | anyone with the link (`mine` in the summary: the caller owns it); a deleted run, its owner only (`410` for anyone else) |
 | `GET /api/runs/:id/charts/:chart/:v.svg`                             | anyone with the link: the render of a chart (`c1`) at version `v`     |
 | `GET /api/me/runs`                                                   | signed in                                                             |
 | `GET`, `PUT /api/admin/models`, `/api/admin/prices`                  | `Admin`                                                               |

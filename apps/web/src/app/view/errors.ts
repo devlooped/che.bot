@@ -27,6 +27,8 @@ export function errorText(error: unknown): string {
       return t.errors.dailyLimit;
     case "not_found":
       return t.errors.runNotFound;
+    case "deleted":
+      return t.errors.runDeleted;
     case "network":
       return t.errors.network;
     default:

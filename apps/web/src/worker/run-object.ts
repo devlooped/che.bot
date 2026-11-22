@@ -40,7 +40,14 @@ import {
   type RunStatus,
   RunStore,
 } from "./run-store.ts";
-import { claimLink, indexRun, removeRun, resolveRunModels, setRunStatus } from "./settings.ts";
+import {
+  claimLink,
+  indexRun,
+  removeRun,
+  resolveRunModels,
+  retireReplaced,
+  setRunStatus,
+} from "./settings.ts";
 import { type RunSpend, type SpendCall, spendOf, stageOfKey } from "./spend.ts";
 import { spendMeter } from "./spend-meter.ts";
 
@@ -321,7 +328,13 @@ export class RunObject extends DurableObject<Env> {
         });
         return true;
       });
-      if (started) await this.started();
+      if (started) {
+        await this.started();
+        // A question asked again from the page of an older run takes its place now that it runs.
+        await retireReplaced(this.env.DB, this.requireRun().id).catch((error: unknown) => {
+          console.warn("The run this one replaces could not be deleted.", error);
+        });
+      }
     } catch (error) {
       console.error("A run that may start could not start; it is tried again.", error);
       await this.retryLater();

@@ -33,7 +33,8 @@
   --sans:
     "Instrument Sans Variable", "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  --gutter: 3.1rem;
+  /* The margin of the marks: their column (12px) and the same small space on each side. */
+  --gutter: calc(12px + 0.6rem);
   --page-pad: 1.15rem;
 
   color-scheme: light;
@@ -47,7 +48,8 @@
 
 @media (min-width: 900px) {
   :root {
-    --gutter: 5.25rem;
+    /* two columns of marks (12px, 5px apart) */
+    --gutter: calc(29px + 0.6rem);
     --page-pad: 2.5rem;
     font-size: 112.5%; /* 18px */
   }
@@ -314,86 +316,144 @@ a.button {
   font-weight: 500;
 }
 
-/* Header ------------------------------------------------------------------------------------- */
+/* Header: one row of round buttons with the name in the middle, a double rule under it ------- */
 
 .site-header {
-  display: flex;
-  flex-wrap: wrap;
+  max-width: 74rem;
+  margin: 0 auto;
+  padding: 1.1rem var(--page-pad) 0;
+}
+
+.header-bar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 0.25rem 0.75rem;
-  padding: 0.6rem var(--page-pad);
-  border-bottom: 1px solid var(--rule);
+  gap: 0.75rem;
+}
+
+.header-start,
+.header-end {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header-end {
+  justify-self: end;
+}
+
+.round-button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--rule);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.round-button svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.round-button:hover,
+.round-button[aria-expanded="true"] {
+  background: var(--paper-raised);
+}
+
+.local-tag {
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--notice);
+  color: var(--notice);
+  font-size: 0.69rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  line-height: 1;
 }
 
 .wordmark {
   font-family: var(--serif);
-  font-weight: 650;
-  font-size: 1.3rem;
-  letter-spacing: -0.01em;
+  font-weight: 450;
+  font-size: clamp(1.6rem, 6vw, 2.4rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
   text-decoration: none;
-}
-
-.local-tag {
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-  box-shadow: inset 0 0 0 1px var(--notice);
-  color: var(--notice);
-}
-
-.site-nav {
-  margin-left: auto;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 0 0.75rem;
-  font-size: 0.92rem;
-}
-
-.site-nav ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 1rem;
-}
-
-/* A narrow phone: the menu takes its own row under the name, links on the left, the account on
-   the right. */
-@media (max-width: 599px) {
-  .site-nav {
-    flex-basis: 100%;
-    justify-content: space-between;
-    margin-left: 0;
-  }
-}
-
-.site-nav a {
-  display: inline-block;
-  padding: 0.55rem 0;
-  text-decoration: none;
-  color: var(--ink-soft);
-}
-
-.site-nav a[aria-current="page"] {
   color: var(--ink);
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 0.35em;
 }
 
-.who {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
+/* The menu of the account: a card under the profile button. */
+.account {
+  position: relative;
 }
 
-.who-name {
-  font-weight: 600;
-  max-width: 8rem;
+.account-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  min-width: 13rem;
+  padding: 0.4rem;
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  background: var(--paper-raised);
+  box-shadow: 6px 6px 0 0 var(--ink);
+}
+
+.account-menu[hidden] {
+  display: none;
+}
+
+.account-name {
+  padding: 0.4rem 0.6rem 0.5rem;
+  margin-bottom: 0.25rem;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.85rem;
+  color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.account-item {
+  display: block;
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.95rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.account-item:hover {
+  background: var(--paper);
+}
+
+.account-item[aria-current="page"] {
+  font-weight: 650;
+}
+
+.rule-double {
+  margin-top: 1rem;
+  border-top: 3px double var(--ink);
 }
 
 /* Pages ---------------------------------------------------------------------------------------- */
@@ -564,6 +624,60 @@ a.button {
   gap: 0.4rem 0.9rem;
 }
 
+/* The bar of the question: share, ask again, delete, help. */
+.run-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin-left: -0.55rem; /* the first icon lines up with the question */
+}
+
+/* A deleted question, as its owner sees it. */
+.run-deleted {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.75rem;
+}
+
+.run-deleted-badge {
+  padding: 0.05rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--error);
+  box-shadow: inset 0 0 0 1px var(--error);
+}
+
+.help-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.help-item {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+  font-size: 0.95rem;
+}
+
+.help-icon .icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (min-width: 900px) {
+  .help-sheet {
+    margin: auto;
+    width: min(34rem, 92vw);
+    border-radius: 10px;
+  }
+}
+
 /* A button that is only an icon, its name in aria-label. */
 .icon-button {
   display: inline-grid;
@@ -612,6 +726,15 @@ a.button {
   .run-grid {
     grid-template-columns: minmax(0, 1fr) 19rem;
     gap: 3.5rem;
+  }
+
+  /* Done: no side column; the seats sit under the bar of the question, the page is centered. */
+  .run-settled {
+    max-width: 54rem;
+  }
+
+  .run-settled .run-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .run-side {
@@ -709,6 +832,41 @@ a.button {
   border-bottom: 1px solid var(--rule);
   font-size: 0.95rem;
   font-weight: 500;
+}
+
+/* Done: one line of small marks and names, out of the reader's way. */
+.seats-compact {
+  padding-top: 0.6rem;
+  border-top-width: 1px;
+}
+
+.seats-compact .seat-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+}
+
+.seats-compact .seat {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.seats-compact .seat-avatar {
+  width: auto;
+  height: auto;
+  background: transparent;
+  box-shadow: none;
+}
+
+.seats-compact .seat-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+::view-transition-group(*) {
+  animation-duration: 0.45s;
+  animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1);
 }
 
 .run[data-status="running"] .stage-line::before {
@@ -880,7 +1038,7 @@ a.button {
 }
 
 .gutter {
-  padding-right: 0.55rem;
+  padding: 0 0.1rem;
 }
 
 .para-marked .gutter {
@@ -923,7 +1081,7 @@ a.button {
 
 .mark {
   display: grid;
-  justify-items: end;
+  justify-items: center;
   gap: 0.2rem;
   width: 100%;
   padding: 0.3rem 0.2rem;
@@ -941,31 +1099,17 @@ a.button {
   background: var(--paper-raised);
 }
 
+/* The marks of who holds a paragraph, top to bottom: one column on a phone, two on a wider screen. */
 .support {
   display: inline-grid;
-  grid-template-columns: repeat(2, auto);
-  gap: 2px 3px;
-}
-
-.badge {
-  font-size: 0.72rem;
-  font-weight: 650;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.mark-contested .badge {
-  text-decoration: underline dashed;
-  text-underline-offset: 0.2em;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(4, auto);
+  gap: 4px 5px;
 }
 
 @media (min-width: 900px) {
   .support {
-    grid-template-columns: repeat(4, auto);
-  }
-
-  .badge {
-    font-size: 0.78rem;
+    grid-template-rows: repeat(2, auto);
   }
 }
 
@@ -2023,6 +2167,10 @@ a.button {
 .status-expired {
   color: var(--error);
   box-shadow: inset 0 0 0 1px var(--error);
+}
+
+.my-runs-deleted {
+  margin-top: 2.5rem;
 }
 
 .my-run-actions {

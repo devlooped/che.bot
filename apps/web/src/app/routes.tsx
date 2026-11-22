@@ -26,13 +26,13 @@ export { runPath } from "@chebot/protocol";
 export interface NavItem {
   to: string;
   label: string;
-  /** Shown only when this says so (a signed-in user, an admin). */
-  show?: (user: AuthUser | null) => boolean;
+  /** Shown only when this says so (an admin). */
+  show?: (user: AuthUser) => boolean;
 }
 
-export const navItems: NavItem[] = [
-  { to: "/", label: t.nav.ask },
-  { to: "/mis-preguntas", label: t.nav.myRuns, show: (user) => user !== null },
+/** The pages of the menu of the signed-in user, in the header; "Salir" comes after them. */
+export const accountItems: NavItem[] = [
+  { to: "/mis-preguntas", label: t.nav.myRuns },
   // Hidden from others; the page refuses them too, and the API answers them 403.
   { to: "/admin", label: t.nav.admin, show: isAdmin },
 ];

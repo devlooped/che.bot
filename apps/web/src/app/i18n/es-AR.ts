@@ -43,7 +43,7 @@ const names = (models: readonly ModelId[]) => list(models.map((m) => MODEL_NAMES
 
 export const esAR = {
   locale: "es-AR",
-  appName: "che.bot",
+  appName: "che.bot🤌",
   money,
   list,
   date: formatDate,
@@ -57,6 +57,7 @@ export const esAR = {
     signOut: "Salir",
     signedInAs: (name: string) => `Entraste como ${name}`,
     menu: "Navegación",
+    account: "Tu cuenta",
     myRuns: "Mis preguntas",
     admin: "Administración",
   },
@@ -85,6 +86,7 @@ export const esAR = {
     network: "No pudimos conectarnos. Revisá tu conexión y probá de nuevo.",
     generic: "Algo salió mal. Probá de nuevo en un rato.",
     runNotFound: "No encontramos esta pregunta. Puede que la hayan borrado.",
+    runDeleted: "Quien hizo esta pregunta la borró.",
     signInFailed: "No pudimos hacerte entrar. Probá de nuevo.",
   },
 
@@ -230,9 +232,6 @@ export const esAR = {
   answer: {
     title: "La respuesta",
     draftNote: "Todavía se está escribiendo: lo que ves puede cambiar.",
-    legend:
-      "Las marcas al margen señalan lo que no fue unánime o se discutió. Tocá una para ver quién sostuvo qué.",
-    badge: (n: number, of: number) => `${n} de ${of}`,
     markLabel: (n: number, of: number, status: string) =>
       `${status}: lo sostienen ${n} de ${of}. Ver la discusión`,
     statusName: {
@@ -665,10 +664,14 @@ export const esAR = {
     remove: "Borrar",
     confirmTitle: "¿Borrar esta pregunta?",
     confirmBody:
-      "La respuesta y su link van a dejar de funcionar: nadie la va a poder abrir, tampoco vos. No se puede deshacer.",
+      "La respuesta y su link dejan de funcionar para los demás. Vos la seguís viendo en Borradas, desde donde la podés recuperar.",
     confirm: "Sí, borrar",
     removing: "Borrando…",
-    removed: "Borraste la pregunta.",
+    removed: "Borraste la pregunta: está en Borradas.",
+    deletedTitle: "Borradas",
+    deletedLede: "Solo vos las ves. Al recuperar una, su link vuelve a funcionar para todos.",
+    restore: "Recuperar",
+    restored: "Recuperaste la pregunta.",
   },
 
   admin: {
@@ -728,6 +731,37 @@ export const esAR = {
     title: "Pregunta",
     takesMinutes:
       "Puede tardar varios minutos. Podés cerrar esta página y volver por el link cuando quieras.",
+    actions: "Acciones de la pregunta",
+    refresh: "Volver a preguntar",
+    refreshTitle: "¿Volver a hacer esta pregunta?",
+    refreshBody: (free: boolean) =>
+      `Los cuatro la responden de nuevo, con los modelos del panel de hoy y lo que se sepa hoy${free ? "" : ", y se paga como una pregunta nueva"}. Cuando empiece, esta respuesta se borra y su link lleva a la nueva. Si te arrepentís, la recuperás desde Mis preguntas.`,
+    refreshConfirm: "Sí, volver a preguntar",
+    refreshing: "Preparando…",
+    remove: "Borrar la pregunta",
+    restore: "Recuperar",
+    restoring: "Recuperando…",
+    deleted: "Borrada",
+    deletedNote: "Solo vos la ves. Si la recuperás, su link vuelve a funcionar para todos.",
+    deletedTitle: "Esta pregunta ya no está",
+    deletedBody: "Quien la hizo la borró, así que su respuesta ya no se puede leer.",
+  },
+
+  help: {
+    open: "Cómo se usa esta página",
+    title: "Cómo se usa esta página",
+    share:
+      "Compartir: copia el link de la respuesta (en el celular, abre el menú para compartir). Cualquiera que tenga el link la puede leer.",
+    refresh:
+      "Volver a preguntar: los cuatro responden otra vez con el panel de hoy y la respuesta nueva reemplaza a esta. Solo aparece para quien hizo la pregunta.",
+    remove:
+      "Borrar: la pregunta deja de verse para los demás. Solo aparece para quien la hizo, que la puede recuperar desde Mis preguntas.",
+    seats:
+      "Los cuatro modelos: mientras trabajan, cada uno muestra en qué anda; cuando terminan, quedan en una línea.",
+    marks:
+      "Las marcas al margen señalan lo que no fue unánime o se discutió. Tocá una para ver quién sostuvo qué.",
+    sections:
+      "Abajo de la respuesta, las fuentes, cómo se armó, el historial y el panel se abren y se cierran tocando su título.",
   },
 
   notFound: {

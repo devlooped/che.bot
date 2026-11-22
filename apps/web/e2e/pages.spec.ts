@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { fromApp, newUser, signIn, signInAs, t, uniqueQuestion } from "./helpers.ts";
 
-test("Mis preguntas lists a question; its link opens; deleting asks first, and the link then says it does not exist", async ({
+test("Mis preguntas lists a question; its link opens; deleting asks first, hides it from others, and it can be restored", async ({
   page,
   request,
+  browser,
 }) => {
   const user = newUser();
   const question = uniqueQuestion();
@@ -13,6 +14,7 @@ test("Mis preguntas lists a question; its link opens; deleting asks first, and t
 
   await signIn(page, user);
   await page.goto("/");
+  await page.getByRole("button", { name: t.nav.account }).click();
   await page.getByRole("link", { name: t.nav.myRuns }).click();
   await expect(page.getByRole("heading", { level: 1, name: t.myRuns.title })).toBeVisible();
   const row = page.getByTestId("my-run").filter({ hasText: question });
@@ -34,12 +36,27 @@ test("Mis preguntas lists a question; its link opens; deleting asks first, and t
 
   await row.getByRole("button", { name: t.myRuns.remove }).click();
   await dialog.getByRole("button", { name: t.myRuns.confirm }).click();
-  await expect(row).toHaveCount(0);
+  const deleted = page
+    .getByTestId("deleted-runs")
+    .getByTestId("my-run")
+    .filter({ hasText: question });
+  await expect(deleted).toHaveCount(1);
   await expect(page.getByText(t.myRuns.empty)).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: t.myRuns.removed })).toHaveCount(1);
 
+  // Anyone else is told that its author deleted it; its author still reads it, marked.
+  const stranger = await browser.newPage();
+  await stranger.goto(link);
+  await expect(stranger.getByRole("heading", { name: t.run.deletedTitle })).toBeVisible();
+  await stranger.close();
   await page.goto(link);
-  await expect(page.getByRole("heading", { name: t.errors.runNotFound })).toBeVisible();
+  await expect(page.getByTestId("run-deleted")).toContainText(t.run.deleted);
+
+  await page.getByRole("button", { name: t.run.restore }).click();
+  await expect(page.getByTestId("run-deleted")).toHaveCount(0);
+  await page.goto("/mis-preguntas");
+  await expect(row).toHaveCount(1);
+  await expect(page.getByTestId("deleted-runs")).toHaveCount(0);
 });
 
 test("Mis preguntas asks a signed-out reader to sign in, and is not in the menu", async ({
@@ -56,6 +73,7 @@ test("an admin changes a price and the next quote shows it", async ({ page }, in
   const admin = newUser(["Admin"]);
   await signIn(page, admin);
   await page.goto("/");
+  await page.getByRole("button", { name: t.nav.account }).click();
   await page.getByRole("link", { name: t.nav.admin }).click();
   await expect(page.getByRole("heading", { level: 1, name: t.admin.title })).toBeVisible();
 
@@ -110,6 +128,7 @@ test("someone who is not an admin does not see the admin page", async ({ page })
   const user = newUser();
   await signIn(page, user);
   await page.goto("/");
+  await page.getByRole("button", { name: t.nav.account }).click();
   await expect(page.getByRole("link", { name: t.nav.myRuns })).toBeVisible();
   await expect(page.getByRole("link", { name: t.nav.admin })).toHaveCount(0);
   await page.goto("/admin");
@@ -122,6 +141,7 @@ test("someone who is not an admin does not see the admin page", async ({ page })
 test("Salir ends the session: the page offers to sign in again", async ({ page }) => {
   await signIn(page, newUser());
   await page.goto("/mis-preguntas");
+  await page.getByRole("button", { name: t.nav.account }).click();
   await expect(page.getByRole("link", { name: t.nav.myRuns })).toBeVisible();
   await page.getByRole("button", { name: t.nav.signOut }).click();
   await page.waitForURL((url) => url.pathname === "/");

@@ -17,6 +17,7 @@ export type ApiErrorKind =
   | "not_found"
   | "invalid"
   | "cannot_rerun"
+  | "deleted"
   | "network"
   | "other";
 
@@ -29,6 +30,8 @@ export class ApiError extends Error {
     readonly fields: Record<string, string> = {},
     /** Why the API refused, when it says (`reason`: "daily_cap"). */
     readonly reason: string | null = null,
+    /** The run asked again in place of a deleted one (`replacedBy` of a 410), if any. */
+    readonly replacedBy: string | null = null,
   ) {
     super(message);
     this.name = "ApiError";
@@ -71,6 +74,8 @@ export interface RunSummary {
   charts: number;
   /** The public link (runPath), once the helper named the run. */
   link: string | null;
+  /** Its owner deleted it: only they read it, and may restore it. */
+  deleted: boolean;
 }
 
 /** A row of GET /api/me/runs. */
@@ -84,6 +89,8 @@ export interface MyRun {
   amount: number | null;
   /** The public link; null until the helper named the run. */
   link: string | null;
+  /** When the user deleted it (ISO 8601); null when it is not deleted. */
+  deletedAt: string | null;
 }
 
 /** The family and effort of a role (an effort of null: the model's own). */
@@ -140,6 +147,7 @@ interface ErrorBody {
   error?: string;
   reason?: string;
   errors?: Record<string, string>;
+  replacedBy?: string | null;
 }
 
 function kindOf(status: number, path: string, body: ErrorBody): ApiErrorKind {
@@ -149,6 +157,7 @@ function kindOf(status: number, path: string, body: ErrorBody): ApiErrorKind {
     return path.startsWith("/api/admin/") ? "not_admin" : "not_yours";
   }
   if (status === 404) return "not_found";
+  if (status === 410) return "deleted";
   if (status === 409 && path.endsWith("/rerun")) return "cannot_rerun";
   if (status === 429) return "too_many";
   if (status === 413) return "too_long";
@@ -177,19 +186,22 @@ export function createApi(base = "") {
       body.error ?? response.statusText,
       body.errors ?? {},
       body.reason ?? null,
+      body.replacedBy ?? null,
     );
   }
 
   return {
     /** The signed-in user, or null. */
     me: () => call<AuthUser | null>("/api/me"),
-    /** A quote for a question. */
-    ask: (question: string) =>
-      call<Quote>("/api/runs", { method: "POST", body: JSON.stringify({ question }) }),
+    /** A quote for a question; `replaces`, a run of the user's it takes the place of once it starts. */
+    ask: (question: string, replaces?: string) =>
+      call<Quote>("/api/runs", { method: "POST", body: JSON.stringify({ question, replaces }) }),
     pay: (runId: string) => call<RunSummary>(`/api/runs/${runId}/pay`, { method: "POST" }),
     /** The free rerun of a paid run that failed. */
     rerun: (runId: string) => call<RunSummary>(`/api/runs/${runId}/rerun`, { method: "POST" }),
+    /** Deletes a run of the user's; `restore` undoes it. */
     remove: (runId: string) => call<null>(`/api/runs/${runId}`, { method: "DELETE" }),
+    restore: (runId: string) => call<null>(`/api/runs/${runId}/restore`, { method: "POST" }),
     myRuns: () => call<{ runs: MyRun[] }>("/api/me/runs").then((r) => r.runs),
     models: () => call<AdminModels>("/api/admin/models"),
     /** Changes some roles; null puts a role back on its default. */

@@ -58,7 +58,7 @@ export function Panel({ view }: { view: RunView }) {
   );
 }
 
-/** The notes about how the run went, before the text: what a reader should know first. */
+/** The notes about how the run went: the first thing "Cómo se armó la respuesta" says. */
 export function Notes({ notes }: { notes: readonly string[] }) {
   if (notes.length === 0) return null;
   return (

@@ -5,7 +5,18 @@ import { describe, expect, test, vi } from "vitest";
 import { type RunObject, runStub } from "../src/worker/run-object.ts";
 import { RunStore } from "../src/worker/run-store.ts";
 import type { RunSpend } from "../src/worker/spend.ts";
-import { api, as, ask, contrib, eventsOf, fakes, paidRun, quoted, runAlarms } from "./helpers.ts";
+import {
+  api,
+  as,
+  ask,
+  contrib,
+  eventsOf,
+  fakes,
+  paidRun,
+  QUESTION,
+  quoted,
+  runAlarms,
+} from "./helpers.ts";
 
 const user = () => `user-${crypto.randomUUID()}`;
 
@@ -73,44 +84,105 @@ describe("the runs of a user", () => {
 });
 
 describe("deleting a run", () => {
-  test("only its owner or an admin deletes it; a deleted run answers 404 and stores nothing", async () => {
+  test("only its owner deletes it, and only they read it until they restore it", async () => {
     fakes();
     const owner = user();
+    const stranger = user();
     const { id, stub } = await paidRun(owner);
-    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    const listed = async () =>
+      (
+        (await (await api("/api/me/runs", { headers: as(owner) })).json()) as {
+          runs: { id: string; deletedAt: string | null }[];
+        }
+      ).runs;
     expect((await api(`/api/runs/${id}`, { method: "DELETE" })).status).toBe(401);
-    expect((await api(`/api/runs/${id}`, { method: "DELETE", headers: as(user()) })).status).toBe(
+    expect((await api(`/api/runs/${id}`, { method: "DELETE", headers: as(stranger) })).status).toBe(
       403,
     );
     expect((await api(`/api/runs/${id}`, { method: "DELETE", headers: as(owner) })).status).toBe(
       204,
     );
-    expect((await api(`/api/runs/${id}`)).status).toBe(404);
-    expect((await api(`/api/runs/${id}/events`)).status).toBe(404);
-    expect((await api(`/api/runs/${id}/snapshots/1`)).status).toBe(404);
+
+    // Anyone else is told that its author deleted it, on every read.
+    for (const path of ["", "/events", "/snapshots/1"])
+      for (const headers of [{}, as(stranger), as(stranger, ["Admin"])]) {
+        const read = await api(`/api/runs/${id}${path}`, { headers });
+        expect(read.status, path).toBe(410);
+        expect(await read.json()).toMatchObject({ reason: "deleted", replacedBy: null });
+      }
+    // Its owner reads it as before, marked deleted, and it goes on.
+    const mine = await api(`/api/runs/${id}`, { headers: as(owner) });
+    expect(await mine.json()).toMatchObject({ id, mine: true, deleted: true });
+    expect((await api(`/api/runs/${id}/events`, { headers: as(owner) })).status).toBe(200);
+    expect((await listed()).map((r) => [r.id, r.deletedAt !== null])).toEqual([[id, true]]);
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
     expect((await api(`/api/runs/${id}`, { method: "DELETE", headers: as(owner) })).status).toBe(
-      404,
+      204,
     );
-    const { runs } = (await (await api("/api/me/runs", { headers: as(owner) })).json()) as {
-      runs: unknown[];
-    };
-    expect(runs).toEqual([]);
-    expect(await runDurableObjectAlarm(stub)).toBe(false);
-    const tables = await runInDurableObject(stub, (_: RunObject, state) =>
-      state.storage.sql.exec("SELECT name FROM sqlite_master WHERE type = 'table'").toArray(),
-    );
-    expect(tables.filter((t) => !String(t.name).startsWith("_cf_"))).toEqual([]);
+
+    const restore = (headers: Record<string, string>) =>
+      api(`/api/runs/${id}/restore`, { method: "POST", headers });
+    expect((await restore({})).status).toBe(401);
+    expect((await restore(as(stranger))).status).toBe(403);
+    expect((await restore(as(owner))).status).toBe(204);
+    expect(await (await api(`/api/runs/${id}`)).json()).toMatchObject({ id, deleted: false });
+    expect((await listed()).map((r) => r.deletedAt)).toEqual([null]);
   });
 
-  test("an admin deletes another user's run", async () => {
+  test("an admin deletes another user's run for good: it answers 404 and stores nothing", async () => {
     fakes();
-    const { id } = await quoted(user());
+    const { id, stub } = await paidRun(user());
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
     const deleted = await api(`/api/runs/${id}`, {
       method: "DELETE",
       headers: as(user(), ["Admin"]),
     });
     expect(deleted.status).toBe(204);
     expect((await api(`/api/runs/${id}`)).status).toBe(404);
+    expect((await api(`/api/runs/${id}/events`)).status).toBe(404);
+    expect((await api(`/api/runs/${id}/snapshots/1`)).status).toBe(404);
+    expect(await runDurableObjectAlarm(stub)).toBe(false);
+    const tables = await runInDurableObject(stub, (_: RunObject, state) =>
+      state.storage.sql.exec("SELECT name FROM sqlite_master WHERE type = 'table'").toArray(),
+    );
+    expect(tables.filter((t) => !String(t.name).startsWith("_cf_"))).toEqual([]);
+  });
+});
+
+describe("asking a question again", () => {
+  test("the new run replaces the old one once it starts; the old one leads to it", async () => {
+    fakes();
+    const owner = user();
+    const { id: old } = await quoted(owner);
+    const again = (headers: Record<string, string>, replaces: unknown) =>
+      api("/api/runs", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify({ question: QUESTION, replaces }),
+      });
+    expect((await again(contrib(user()), old)).status).toBe(404);
+    expect((await again(contrib(owner), "not-a-run")).status).toBe(400);
+    const asked = await again(as(owner, ["Admin"]), old);
+    expect(asked.status).toBe(201);
+    const { runId } = (await asked.json()) as { runId: string };
+
+    // Until the new run starts, the old one stays.
+    expect((await api(`/api/runs/${old}`)).status).toBe(200);
+    const paid = await api(`/api/runs/${runId}/pay`, {
+      method: "POST",
+      headers: as(owner, ["Admin"]),
+    });
+    expect(paid.status).toBe(202);
+    const gone = await api(`/api/runs/${old}`);
+    expect(gone.status).toBe(410);
+    expect(await gone.json()).toMatchObject({ reason: "deleted", replacedBy: runId });
+    expect(await (await api(`/api/runs/${old}`, { headers: as(owner) })).json()).toMatchObject({
+      deleted: true,
+    });
+
+    // Restored, it is no longer replaced.
+    await api(`/api/runs/${old}/restore`, { method: "POST", headers: as(owner) });
+    expect((await api(`/api/runs/${old}`)).status).toBe(200);
   });
 });
 
