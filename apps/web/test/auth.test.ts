@@ -315,7 +315,7 @@ describe("the session", () => {
     expect((await api(`/api/runs/${runId}`, { method: "DELETE", headers: owner })).status).toBe(
       204,
     );
-    expect((await api(`/api/runs/${runId}`)).status).toBe(404);
+    expect((await api(`/api/runs/${runId}`)).status).toBe(410);
     expect(provider.calls).toEqual([]);
   });
 });

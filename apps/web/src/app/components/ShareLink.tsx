@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { t } from "../i18n/index.ts";
+import { CheckIcon, ShareIcon } from "./Icons.tsx";
 
 /**
  * Shares the public link of a run: the share sheet on a touch device (a phone, a tablet), the
@@ -27,18 +28,7 @@ export function ShareLink({ url, describedBy }: { url: string; describedBy?: str
             .catch(() => {});
         }}
       >
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-          {copied ? (
-            <path d="M5 12.5l4.5 4.5L19 7.5" />
-          ) : (
-            <>
-              <circle cx="18" cy="5" r="2.6" />
-              <circle cx="6" cy="12" r="2.6" />
-              <circle cx="18" cy="19" r="2.6" />
-              <path d="M8.3 10.8l7.4-4.4M8.3 13.2l7.4 4.4" />
-            </>
-          )}
-        </svg>
+        {copied ? <CheckIcon /> : <ShareIcon />}
       </button>
       <span className="sr-only" role="status">
         {copied ? t.common.linkCopied : ""}

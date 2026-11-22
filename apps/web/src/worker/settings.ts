@@ -53,6 +53,8 @@ export interface RunListItem {
   amount: number | null;
   /** The public link; null until the helper named the run. */
   link: string | null;
+  /** When its owner deleted it (ISO 8601); null when it is not deleted. */
+  deletedAt: string | null;
 }
 
 /** Adds a run to the list once; a second call changes nothing. */
@@ -146,11 +148,71 @@ export async function removeRun(db: D1Database, id: string): Promise<void> {
   await db.prepare("DELETE FROM runs WHERE id = ?").bind(id).run();
 }
 
-/** The runs of an owner, newest first. */
+/** Who owns a run of the list, and whether they deleted it; null when it is not in the list. */
+export interface RunVisibility {
+  owner: string;
+  deleted: boolean;
+  /** The run asked again in its place (migration 0003), whose link the old one leads to. */
+  replacedBy: string | null;
+}
+
+export async function visibilityOf(db: D1Database, id: string): Promise<RunVisibility | null> {
+  const row = await db
+    .prepare("SELECT owner, deleted_at, replaced_by FROM runs WHERE id = ?")
+    .bind(id)
+    .first<{ owner: string; deleted_at: string | null; replaced_by: string | null }>();
+  return row
+    ? { owner: row.owner, deleted: row.deleted_at !== null, replacedBy: row.replaced_by }
+    : null;
+}
+
+/**
+ * Deletes the run `id` of `owner`, or restores it: the run itself stays as it is. A restored run
+ * is no longer replaced. False when the owner has no such run.
+ */
+export async function setRunDeleted(
+  db: D1Database,
+  id: string,
+  owner: string,
+  deleted: boolean,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      deleted
+        ? "UPDATE runs SET deleted_at = COALESCE(deleted_at, ?) WHERE id = ? AND owner = ?"
+        : "UPDATE runs SET deleted_at = NULL, replaced_by = NULL WHERE id = ? AND owner = ?",
+    )
+    .bind(...(deleted ? [new Date().toISOString(), id, owner] : [id, owner]))
+    .run();
+  return result.meta.changes > 0;
+}
+
+/** Records that the new run `id` asks again the question of the run `replaces`. */
+export async function setReplaces(db: D1Database, id: string, replaces: string): Promise<void> {
+  await db.prepare("UPDATE runs SET replaces = ? WHERE id = ?").bind(replaces, id).run();
+}
+
+/**
+ * Once the run `id` started, deletes the run it replaces, of the same owner, unless it is deleted
+ * already: its link leads to `id` from now on.
+ */
+export async function retireReplaced(db: D1Database, id: string): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE runs SET deleted_at = ?1, replaced_by = ?2
+       WHERE deleted_at IS NULL
+         AND id = (SELECT replaces FROM runs WHERE id = ?2)
+         AND owner = (SELECT owner FROM runs WHERE id = ?2)`,
+    )
+    .bind(new Date().toISOString(), id)
+    .run();
+}
+
+/** The runs of an owner, newest first, the deleted ones included. */
 export async function listRuns(db: D1Database, owner: string): Promise<RunListItem[]> {
   const { results } = await db
     .prepare(
-      `SELECT id, created_at, question, class, status, amount, link FROM runs
+      `SELECT id, created_at, question, class, status, amount, link, deleted_at FROM runs
        WHERE owner = ? ORDER BY created_at DESC, id`,
     )
     .bind(owner)
@@ -162,6 +224,7 @@ export async function listRuns(db: D1Database, owner: string): Promise<RunListIt
       status: string;
       amount: number | null;
       link: string | null;
+      deleted_at: string | null;
     }>();
   return results.map((row) => ({
     id: row.id,
@@ -171,6 +234,7 @@ export async function listRuns(db: D1Database, owner: string): Promise<RunListIt
     status: row.status,
     amount: row.amount,
     link: row.link,
+    deletedAt: row.deleted_at,
   }));
 }
 

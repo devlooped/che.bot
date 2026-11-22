@@ -1,5 +1,5 @@
 import type { Suggestion } from "@chebot/protocol";
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useId, useRef } from "react";
 import { t } from "../i18n/index.ts";
 import { type LayerView, patchText } from "../view/chart.ts";
 import type { Discussion, ParagraphView, Position } from "../view/derive.ts";
@@ -90,7 +90,7 @@ function DiscussionBlock({ discussion, added }: { discussion: Discussion; added:
 }
 
 /** A sheet over the page: a modal dialog that closes with Escape, its button or the backdrop. */
-function Sheet({
+export function Sheet({
   title,
   className,
   onClose,
@@ -102,6 +102,7 @@ function Sheet({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     const dialog = ref.current;
     if (dialog && !dialog.open) dialog.showModal();
@@ -111,7 +112,7 @@ function Sheet({
     <dialog
       ref={ref}
       className={`sheet ${className}`}
-      aria-labelledby="discussion-title"
+      aria-labelledby={titleId}
       onClose={onClose}
       onClick={(e) => {
         if (e.target === ref.current) ref.current?.close();
@@ -119,7 +120,7 @@ function Sheet({
     >
       <div className="sheet-body">
         <div className="sheet-head">
-          <h3 id="discussion-title" className="sheet-title">
+          <h3 id={titleId} className="sheet-title">
             {title}
           </h3>
           <button type="button" className="button button-text" onClick={() => ref.current?.close()}>

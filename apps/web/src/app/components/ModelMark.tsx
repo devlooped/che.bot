@@ -65,12 +65,15 @@ export function WithMarks({ text }: { text: string }) {
   });
 }
 
-/** The marks of who holds a paragraph, in the margin; the badge beside them says how many of four. */
+/**
+ * The marks of who holds a paragraph, in the margin, as large as those of the seats: how many
+ * there are says how many of four hold it.
+ */
 export function Support({ support }: { support: readonly ModelId[] }) {
   return (
     <span className="support" aria-hidden="true">
       {MODELS_BY_NAME.filter((m) => support.includes(m)).map((m) => (
-        <ModelMark key={m} model={m} size={9} />
+        <ModelMark key={m} model={m} size={12} />
       ))}
     </span>
   );

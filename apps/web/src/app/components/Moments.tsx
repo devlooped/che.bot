@@ -4,13 +4,15 @@ import { t } from "../i18n/index.ts";
 import { momentsByBatch } from "../view/derive.ts";
 import { Fold } from "./Fold.tsx";
 import { WithMarks } from "./ModelMark.tsx";
+import { Notes } from "./RunDetails.tsx";
 
 /**
- * The moments feed: the plain one-liners of the run, a group per stage, oldest first. On a phone
- * only the latest group shows until the reader asks for the rest. While the run goes it sits beside
- * the answer; once done it is a closed section of the main column, after the sources and the panel.
+ * The moments feed: the plain one-liners of the run, a group per stage, oldest first, after the
+ * notes of what went wrong (flagNotes). On a phone only the latest group shows until the reader
+ * asks for the rest. While the run goes it sits beside the answer; once done it is a closed
+ * section of the main column, after the sources.
  */
-export function Moments({ view }: { view: RunView }) {
+export function Moments({ view, notes }: { view: RunView; notes: readonly string[] }) {
   const [all, setAll] = useState(false);
   const groups = momentsByBatch(view);
   const done = view.status === "completed";
@@ -19,6 +21,7 @@ export function Moments({ view }: { view: RunView }) {
   if (groups.length === 0 && view.status === "failed") return null;
   const feed = (
     <>
+      <Notes notes={notes} />
       {groups.length === 0 ? (
         <p className="muted">{t.moments.empty}</p>
       ) : (

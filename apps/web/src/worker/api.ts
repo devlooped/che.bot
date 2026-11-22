@@ -7,7 +7,15 @@ import { type Identity, isAdmin, mayAsk, type User } from "./identity.ts";
 import { questionOf, quoteQuestion } from "./quote.ts";
 import { runStub } from "./run-object.ts";
 import { fromThisOrigin } from "./session.ts";
-import { findLink, linkOfRun, listRuns, readPrices } from "./settings.ts";
+import {
+  findLink,
+  linkOfRun,
+  listRuns,
+  readPrices,
+  setReplaces,
+  setRunDeleted,
+  visibilityOf,
+} from "./settings.ts";
 import { spendMeter } from "./spend-meter.ts";
 
 // The HTTP API, the sign-in routes of auth0.ts under /auth/, and the pages of runs under /r/. Who
@@ -17,12 +25,15 @@ import { spendMeter } from "./spend-meter.ts";
 //                                    redirects for good to the run's link once it has one
 //   GET    /api/links/:ref            anyone: the UUID and the link of a run, by its link
 //   GET    /api/me                    anyone: the signed-in user, or null
-//   POST   /api/runs                  signed in, Admin or Contrib role until launch: the quote
+//   POST   /api/runs                  signed in, Admin or Contrib role until launch: the quote;
+//                                    `replaces`, a run of the caller's that the new one replaces
 //   POST   /api/runs/:id/pay          the owner (an admin owner runs free, with no job)
 //   POST   /api/runs/:id/rerun        the owner, after a paid run failed
-//   DELETE /api/runs/:id              the owner or an admin
-//   GET    /api/runs/:id[/events|/ws|/snapshots/:v]   anyone with the link (`mine` for the owner)
-//   GET    /api/runs/:id/charts/:chart/:v.svg  the render of a chart at version v, anyone with the link
+//   DELETE /api/runs/:id              the owner, who may restore it; an admin, for good
+//   POST   /api/runs/:id/restore      the owner, after deleting it
+//   GET    /api/runs/:id[/events|/ws|/snapshots/:v]   anyone with the link (`mine` for the owner);
+//                                    a deleted run, its owner only: 410 for anyone else
+//   GET    /api/runs/:id/charts/:chart/:v.svg  the render of a chart at version v, as above
 //   GET    /api/runs/:id/spend        admin: what the run's model calls cost so far
 //   GET    /api/me/runs               signed in
 //   GET|PUT /api/admin/models|prices  admin
@@ -45,7 +56,7 @@ const error = (status: number, message: string, extra: Record<string, unknown> =
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const UUID_ONLY = new RegExp(`^${UUID}$`, "i");
 const RUN_PATH = new RegExp(
-  `^/api/runs/(${UUID})(/events|/ws|/pay|/rerun|/spend|/snapshots/(\\d+)|/charts/(c\\d+)/(\\d+)\\.svg)?$`,
+  `^/api/runs/(${UUID})(/events|/ws|/pay|/rerun|/restore|/spend|/snapshots/(\\d+)|/charts/(c\\d+)/(\\d+)\\.svg)?$`,
   "i",
 );
 
@@ -146,6 +157,14 @@ async function ask(request: Request, env: Env, identity: Identity): Promise<Resp
   if (read instanceof Response) return read;
   const parsed = questionOf(read.body);
   if ("error" in parsed) return error(400, parsed.error);
+  // Asking again from the page of a run: the new run takes its place once it starts.
+  const replaces = (read.body as { replaces?: unknown }).replaces ?? null;
+  if (replaces !== null) {
+    if (typeof replaces !== "string" || !UUID_ONLY.test(replaces))
+      return error(400, "replaces is the id of a run.");
+    if ((await visibilityOf(env.DB, replaces.toLowerCase()))?.owner !== user.userId)
+      return error(404, "No such run.");
+  }
   const meter = spendMeter(env);
   const budget = resolveConfig(deps.runConfig(env)).budgetUsd;
   if (!(await meter.status(budget)).open)
@@ -153,6 +172,7 @@ async function ask(request: Request, env: Env, identity: Identity): Promise<Resp
       reason: "daily_cap",
     });
   const quote = await quoteQuestion(env, user.userId, parsed.question);
+  if (typeof replaces === "string") await setReplaces(env.DB, quote.runId, replaces.toLowerCase());
   if (quote.costUsd > 0)
     await meter.settle(`${quote.runId}:classify`, quote.costUsd).catch((e: unknown) => {
       console.warn("The cost of a classification could not be recorded.", e);
@@ -254,25 +274,51 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   const sub = match[2] ?? "";
   const stub = runStub(env, id);
 
+  // A run its owner deleted is theirs alone: anyone else is told so, and led to the run that
+  // replaced it, if any.
+  const visibility = method === "GET" ? await visibilityOf(env.DB, id) : null;
+  if (visibility?.deleted && !(identity.kind === "user" && identity.userId === visibility.owner))
+    return error(410, "Its author deleted this run.", {
+      reason: "deleted",
+      replacedBy: visibility.replacedBy,
+    });
+
   if (sub === "") {
     if (method === "GET") {
       const summary = await stub.summary();
       if (!summary) return error(404, "No such run.");
-      // `mine` tells the page whether to offer the owner's actions (pay, run again).
+      // `mine` tells the page whether to offer the owner's actions (pay, run again, delete).
       const mine = identity.kind === "user" && (await stub.owner()) === identity.userId;
-      return json(200, { ...summary, mine });
+      return json(200, { ...summary, mine, deleted: visibility?.deleted ?? false });
     }
     if (method === "DELETE") {
       const user = requireUser(identity);
       if (user instanceof Response) return user;
       const owner = await stub.owner();
       if (owner === null) return error(404, "No such run.");
-      if (owner !== user.userId && !isAdmin(user)) return error(403, "Not your run.");
+      // The owner's delete hides the run and can be undone; an admin's removes it for good.
+      if (owner === user.userId)
+        return (await setRunDeleted(env.DB, id, owner, true))
+          ? new Response(null, { status: 204 })
+          : error(404, "No such run.");
+      if (!isAdmin(user)) return error(403, "Not your run.");
       return (await stub.remove())
         ? new Response(null, { status: 204 })
         : error(404, "No such run.");
     }
     return error(405, "Method not allowed.");
+  }
+
+  if (sub === "/restore") {
+    if (method !== "POST") return error(405, "Method not allowed.");
+    const user = requireUser(identity);
+    if (user instanceof Response) return user;
+    const owner = await stub.owner();
+    if (owner === null) return error(404, "No such run.");
+    if (owner !== user.userId) return error(403, "Not your run.");
+    return (await setRunDeleted(env.DB, id, owner, false))
+      ? new Response(null, { status: 204 })
+      : error(404, "No such run.");
   }
 
   if (sub === "/pay") {
