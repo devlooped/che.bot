@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { fromApp, newUser, signIn, signInAs, t, uniqueQuestion } from "./helpers.ts";
+import { finishedRun, fromApp, newUser, signIn, signInAs, t, uniqueQuestion } from "./helpers.ts";
 
 test("Mis preguntas lists a question; its link opens; deleting asks first, hides it from others, and it can be restored", async ({
   page,
@@ -57,6 +57,38 @@ test("Mis preguntas lists a question; its link opens; deleting asks first, hides
   await page.goto("/mis-preguntas");
   await expect(row).toHaveCount(1);
   await expect(page.getByTestId("deleted-runs")).toHaveCount(0);
+});
+
+test("the home page shows a question asked as a card with its picture, and a quote not", async ({
+  page,
+  request,
+}) => {
+  const asked = uniqueQuestion();
+  const quoted = uniqueQuestion();
+  await finishedRun(request, asked);
+  expect(
+    (await request.post("/api/runs", { headers: fromApp, data: { question: quoted } })).status(),
+  ).toBe(201);
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 2, name: t.home.title })).toBeVisible();
+  const card = page.getByTestId("question-card").filter({ hasText: asked });
+  // Other tests ask at the same time: the card may be on a later page.
+  await expect(page.getByTestId("question-card").first()).toBeVisible();
+  const more = page.getByRole("button", { name: t.home.more });
+  while ((await card.count()) === 0 && (await more.count()) > 0) {
+    await more.click();
+    await expect(page.getByRole("button", { name: t.home.loadingMore })).toHaveCount(0);
+  }
+  await expect(card).toHaveCount(1);
+  await expect(card).toContainText(t.home.asked(t.day(Date.now())));
+  const picture = card.locator("img");
+  await expect(picture).toBeVisible();
+  expect(await picture.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  await expect(page.getByTestId("question-card").filter({ hasText: quoted })).toHaveCount(0);
+
+  await card.getByRole("link", { name: asked }).click();
+  await expect(page.getByRole("heading", { level: 1, name: asked })).toBeVisible();
 });
 
 test("Mis preguntas asks a signed-out reader to sign in, and is not in the menu", async ({

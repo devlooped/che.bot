@@ -17,6 +17,7 @@ export type ApiErrorKind =
   | "not_found"
   | "invalid"
   | "cannot_rerun"
+  | "cannot_cancel"
   | "deleted"
   | "network"
   | "other";
@@ -76,7 +77,26 @@ export interface RunSummary {
   link: string | null;
   /** Its owner deleted it: only they read it, and may restore it. */
   deleted: boolean;
+  /** The version of the picture of the question (imagePath); null before it has one. */
+  image: string | null;
 }
+
+/** A card of the home page (GET /api/runs): a question that was asked. */
+export interface PublicRun {
+  id: string;
+  /** ISO 8601. */
+  createdAt: string;
+  question: string;
+  /** Running, completed or failed: the questions that were paid and started. */
+  status: RunStatus;
+  link: string | null;
+  /** The version of its picture; null before it has one. */
+  image: string | null;
+}
+
+/** The picture of a run at a version: a URL that never changes, cached for good. */
+export const imagePath = (runId: string, version: string) =>
+  `/api/runs/${runId}/image?v=${encodeURIComponent(version)}`;
 
 /** A row of GET /api/me/runs. */
 export interface MyRun {
@@ -159,6 +179,7 @@ function kindOf(status: number, path: string, body: ErrorBody): ApiErrorKind {
   if (status === 404) return "not_found";
   if (status === 410) return "deleted";
   if (status === 409 && path.endsWith("/rerun")) return "cannot_rerun";
+  if (status === 409 && path.endsWith("/cancel")) return "cannot_cancel";
   if (status === 429) return "too_many";
   if (status === 413) return "too_long";
   if (status === 503 && body.reason === "daily_cap") return "daily_limit";
@@ -202,7 +223,17 @@ export function createApi(base = "") {
     /** Deletes a run of the user's; `restore` undoes it. */
     remove: (runId: string) => call<null>(`/api/runs/${runId}`, { method: "DELETE" }),
     restore: (runId: string) => call<null>(`/api/runs/${runId}/restore`, { method: "POST" }),
+    /** Stops a run of the user's that is in progress and deletes it for good. */
+    cancel: (runId: string) => call<null>(`/api/runs/${runId}/cancel`, { method: "POST" }),
     myRuns: () => call<{ runs: MyRun[] }>("/api/me/runs").then((r) => r.runs),
+    /** Public: the questions asked, newest first; `after`, the `next` of the page before. */
+    runs: (after?: string | null) =>
+      call<{ runs: PublicRun[]; next: string | null }>(
+        after ? `/api/runs?after=${encodeURIComponent(after)}` : "/api/runs",
+      ),
+    /** Admin: draws the picture of a run again, with today's models; its new version. */
+    redraw: (runId: string) =>
+      call<{ image: string }>(`/api/runs/${runId}/image`, { method: "POST" }).then((r) => r.image),
     models: () => call<AdminModels>("/api/admin/models"),
     /** Changes some roles; null puts a role back on its default. */
     saveModels: (settings: Record<string, ModelChoice | null>) =>

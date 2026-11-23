@@ -43,7 +43,7 @@ describe("the link", () => {
       runs: { id: string; link: string | null }[];
     };
     expect(list.runs).toEqual([expect.objectContaining({ id, link })]);
-    const spend = (await stub.spend())?.rows.agent.find((r) => r.label === "helper");
+    const spend = (await stub.spend())?.rows.stage.find((r) => r.label === "link");
     expect(spend).toMatchObject({ calls: 1, costUsd: 0.001 });
   });
 

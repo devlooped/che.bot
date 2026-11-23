@@ -47,6 +47,7 @@ export const esAR = {
   money,
   list,
   date: formatDate,
+  day: formatDay,
   models: MODEL_NAMES,
   modelNames: names,
 
@@ -83,6 +84,7 @@ export const esAR = {
     notYours: "Esta pregunta es de otra cuenta.",
     notAdmin: "Esta página es solo para quienes administran che.bot.",
     cannotRerun: "Esta pregunta ya no se puede volver a intentar.",
+    cannotCancel: "Esta pregunta ya terminó: no se puede cancelar.",
     invalid: "No se guardó: revisá los valores marcados.",
     network: "No pudimos conectarnos. Revisá tu conexión y probá de nuevo.",
     generic: "Algo salió mal. Probá de nuevo en un rato.",
@@ -109,6 +111,20 @@ export const esAR = {
       "Pagás con un QR de Mercado Pago.",
       "Grok, Claude, ChatGPT y Gemini responden por separado y después discuten hasta armar una sola respuesta, con gráficos cuando los números se entienden mejor así.",
     ],
+  },
+
+  home: {
+    title: "Lo que se preguntó",
+    lede: "Todas las preguntas son públicas: tocá una para leer la respuesta y cómo se armó.",
+    empty: "Todavía no se hizo ninguna pregunta.",
+    failed: "No pudimos cargar las preguntas.",
+    more: "Ver más preguntas",
+    loadingMore: "Cargando más preguntas…",
+    asked: (date: string) => `Preguntada el ${date}`,
+    draw: "Hacer la imagen",
+    redraw: "Rehacer la imagen",
+    drawing: "Dibujando la imagen…",
+    drawn: "La imagen nueva está lista.",
   },
 
   quote: {
@@ -315,9 +331,12 @@ export const esAR = {
     },
     classifier: "Clasificador",
     helper: "Ayudante",
+    image: "Ilustrador",
     stages: {
       classify: "Clasificación",
       link: "Enlace",
+      illustration: "Idea de la imagen",
+      image: "Imagen",
       draft: "Respuestas",
       merge: "Unión de las respuestas",
       "chart-merge": "Unión de los gráficos",
@@ -328,7 +347,7 @@ export const esAR = {
       edit: "Redacción final",
       "edit-check": "Control de la redacción",
     } as Record<string, string>,
-    note: "Lo que Vercel AI Gateway informó por cada llamada, en dólares, sumando todos los intentos, la clasificación de la pregunta y la elección de su enlace. Una llamada en curso suma cuando termina.",
+    note: "Lo que Vercel AI Gateway informó por cada llamada, en dólares, sumando todos los intentos, la clasificación de la pregunta, la elección de su enlace y su imagen. Una llamada en curso suma cuando termina.",
   },
 
   flags: {
@@ -688,12 +707,15 @@ export const esAR = {
       utility: "Asistente",
       classifier: "Clasificador",
       helper: "Ayudante",
+      image: "Ilustrador",
     } as Record<string, string>,
     roleWhat: {
       panel: "Escribe una de las cuatro respuestas, propone cambios y vota.",
       utility: "Junta las respuestas, busca propuestas repetidas y escribe los resúmenes.",
       classifier: "Decide si una pregunta es simple o compleja, y con eso el precio.",
-      helper: "Resume la pregunta en hasta cinco palabras para su enlace, una vez pagada.",
+      helper:
+        "Una vez pagada la pregunta, la resume en hasta cinco palabras para su enlace y escribe la idea de su imagen.",
+      image: "Dibuja la imagen de cada pregunta, para su tarjeta en el inicio.",
     },
     family: "Modelo",
     effort: "Esfuerzo",
@@ -740,6 +762,13 @@ export const esAR = {
     refreshConfirm: "Sí, volver a preguntar",
     refreshing: "Preparando…",
     remove: "Borrar la pregunta",
+    cancel: "Cancelar la pregunta",
+    cancelTitle: "¿Cancelar esta pregunta?",
+    cancelBody:
+      "Se detiene y se borra por completo: la pregunta, lo que se llevaba respondido y su link. No se puede recuperar.",
+    cancelConfirm: "Sí, cancelar y borrar",
+    cancelling: "Cancelando…",
+    keepGoing: "No, que siga",
     restore: "Recuperar",
     restoring: "Recuperando…",
     deleted: "Borrada",
@@ -757,6 +786,8 @@ export const esAR = {
       "Volver a preguntar: los cuatro responden otra vez con el panel de hoy y la respuesta nueva reemplaza a esta. Solo aparece para quien hizo la pregunta.",
     remove:
       "Borrar: la pregunta deja de verse para los demás. Solo aparece para quien la hizo, que la puede recuperar desde Mis preguntas.",
+    cancel:
+      "Cancelar: mientras la pregunta está en curso, la detiene y la borra por completo, sin vuelta atrás. Solo aparece para quien la hizo.",
     seats:
       "Los cuatro modelos: mientras trabajan, cada uno muestra en qué anda; cuando terminan, quedan en una línea.",
     marks:
@@ -792,6 +823,17 @@ const dateFormat = new Intl.DateTimeFormat("es-AR", {
   minute: "2-digit",
   hourCycle: "h23",
 });
+
+const dayFormat = new Intl.DateTimeFormat("es-AR", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
+/** "16 nov 2026" (as Intl words it for es-AR). */
+function formatDay(iso: string | number): string {
+  return dayFormat.format(new Date(iso));
+}
 
 /** "16 de noviembre de 2026, 14:30" (as Intl words it for es-AR). */
 function formatDate(iso: string | number): string {

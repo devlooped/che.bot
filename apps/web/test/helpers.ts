@@ -6,6 +6,7 @@ import {
   type CatalogModel,
   type Classification,
   type ClassifyRequest,
+  FakeImageProvider,
   FakeProvider,
   type FakeScript,
 } from "@chebot/providers";
@@ -184,6 +185,8 @@ export function fakes(
     catalog?: CatalogModel[];
     /** Another script than the prose run's, such as a chart run's. */
     respond?: FakeScript["respond"];
+    /** The image model; a PNG of one pixel by default. */
+    images?: FakeImageProvider;
   } = {},
 ) {
   const provider = new FakeProvider(
@@ -192,10 +195,12 @@ export function fakes(
       : script(options.calls),
   );
   const catalog = options.catalog ?? CATALOG;
+  const images = options.images ?? new FakeImageProvider();
   const jobs = new FakeJobs();
   const classifier = new FakeClassifier();
   const restore = overrideDeps({
     provider: () => provider,
+    images: () => images,
     catalog: async () => catalog,
     classifier: () => classifier,
     jobs: () => jobs,
@@ -214,7 +219,7 @@ export function fakes(
       ),
     ]);
   });
-  return { provider, catalog, jobs, classifier };
+  return { provider, images, catalog, jobs, classifier };
 }
 
 /** A user at the fake tenant: who signs in, and what their tokens say. */

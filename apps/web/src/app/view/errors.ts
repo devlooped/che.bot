@@ -15,6 +15,8 @@ export function errorText(error: unknown): string {
       return t.errors.notAdmin;
     case "cannot_rerun":
       return t.errors.cannotRerun;
+    case "cannot_cancel":
+      return t.errors.cannotCancel;
     case "invalid":
       return t.errors.invalid;
     case "too_many":

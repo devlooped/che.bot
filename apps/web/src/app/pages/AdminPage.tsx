@@ -105,7 +105,9 @@ function Models({ initial }: { initial: AdminModels }) {
             ? t.admin.roleWhat.utility
             : r.role === "helper"
               ? t.admin.roleWhat.helper
-              : t.admin.roleWhat.classifier;
+              : r.role === "image"
+                ? t.admin.roleWhat.image
+                : t.admin.roleWhat.classifier;
         const err = fields[r.role];
         return (
           <fieldset key={r.role} className={`role${seat ? ` ink-${seat}` : ""}`} data-testid="role">
@@ -134,7 +136,7 @@ function Models({ initial }: { initial: AdminModels }) {
                   ))}
                 </select>
               </div>
-              {r.kind !== "decision" && (
+              {r.kind === "language" && (
                 <div className="field">
                   <label htmlFor={`${id}-effort`} className="field-label">
                     {t.admin.effort}

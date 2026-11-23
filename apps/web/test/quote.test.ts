@@ -74,9 +74,9 @@ describe("the quote", () => {
     expect(provider.calls).toEqual([]);
   });
 
-  test("only POST; the body is a question", async () => {
+  test("only GET and POST; the body is a question", async () => {
     fakes();
-    expect((await api("/api/runs", { headers: contrib(user()) })).status).toBe(405);
+    expect((await api("/api/runs", { method: "PUT", headers: contrib(user()) })).status).toBe(405);
     const bad = await api("/api/runs", { method: "POST", headers: contrib(user()), body: "{" });
     expect(bad.status).toBe(400);
     expect((await ask(contrib(user()), 42)).status).toBe(400);
@@ -178,9 +178,10 @@ describe("the guardrails", () => {
   });
 });
 
-/** What a run spent, as its state counts it, and the helper's link beside it. */
+/** What a run spent, as its state counts it, and the helper's link and the picture beside it. */
 const spentOf = (stub: DurableObjectStub<RunObject>) =>
   runInDurableObject(stub, (_: RunObject, state) => {
     const run = new RunStore(state.storage.sql).run();
-    return (run?.state?.spentUsd ?? 0) + (run?.helper?.costUsd ?? 0);
+    const picture = run?.imageCalls.reduce((sum, call) => sum + call.costUsd, 0) ?? 0;
+    return (run?.state?.spentUsd ?? 0) + (run?.helper?.costUsd ?? 0) + picture;
   });

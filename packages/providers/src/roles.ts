@@ -37,11 +37,24 @@ export const MODEL_ROLES = [
     defaultId: "anthropic/claude-haiku-5.5",
     defaultEffort: "medium",
   },
+  // Draws the picture of a paid question, for its card on the home page; the helper writes the
+  // prompt (images.ts).
+  {
+    key: "image",
+    kind: "image",
+    defaultId: "spacexai/grok-imagine-image-2.0",
+    defaultEffort: null,
+  },
 ] as const;
 
 export type ModelRole = (typeof MODEL_ROLES)[number];
 export type RoleKey = ModelRole["key"];
 export type RoleKind = ModelRole["kind"];
+
+/** Only a language model takes a reasoning effort; a decision or an image model takes none. */
+export function takesEffort(kind: string): boolean {
+  return kind === "language";
+}
 
 export const ROLE_KEYS: readonly RoleKey[] = MODEL_ROLES.map((role) => role.key);
 

@@ -3,6 +3,7 @@ import { type FormEvent, useState } from "react";
 import { MAX_QUESTION_CHARS } from "../api.ts";
 import { useSession } from "../auth/context.tsx";
 import { ModelMark } from "../components/ModelMark.tsx";
+import { QuestionCards } from "../components/QuestionCards.tsx";
 import { t } from "../i18n/index.ts";
 import { navigate } from "../router/index.tsx";
 import { runPath } from "../routes.tsx";
@@ -10,6 +11,7 @@ import { errorText } from "../view/errors.ts";
 
 const count = new Intl.NumberFormat(t.locale);
 
+/** The home page: asking, then every question asked, as cards, then how it works. */
 export function AskPage() {
   const { ready, user, api, signIn, failed } = useSession();
   const [question, setQuestion] = useState("");
@@ -34,68 +36,72 @@ export function AskPage() {
   }
 
   return (
-    <main className="page ask">
-      <section className="hero">
-        <ul className="hero-seats" aria-hidden="true">
-          {MODELS_BY_NAME.map((m) => (
-            <li key={m} className={`ink-${m}`}>
-              <ModelMark model={m} size={14} />
-              {t.models[m]}
-            </li>
-          ))}
-        </ul>
-        <h1 className="hero-title">{t.ask.headline}</h1>
-        <p className="hero-lede">{t.ask.lede}</p>
-      </section>
-
-      {!ready ? (
-        <p className="muted">{t.common.loading}</p>
-      ) : user ? (
-        <form className="ask-form" onSubmit={submit} noValidate>
-          <label htmlFor="question" className="ask-label">
-            {t.ask.label}
-          </label>
-          <textarea
-            id="question"
-            name="question"
-            className="ask-box"
-            rows={5}
-            maxLength={MAX_QUESTION_CHARS}
-            placeholder={t.ask.placeholder}
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            aria-describedby="question-count question-note"
-          />
-          <span id="question-count" className="fine ask-count">
-            {t.ask.counter(count.format(question.length), count.format(MAX_QUESTION_CHARS))}
-          </span>
-          <div className="ask-row">
-            <button type="submit" className="button button-primary" disabled={sending}>
-              {sending ? t.ask.submitting : t.ask.submit}
-            </button>
-          </div>
-          {error && (
-            <p className="error" role="alert">
-              {error}
-            </p>
-          )}
-          <p id="question-note" className="fine">
-            {t.ask.publicNote}
-          </p>
-        </form>
-      ) : (
-        <section className="signin-card">
-          <p>{t.ask.signInLede}</p>
-          {failed && (
-            <p className="error" role="alert">
-              {t.errors.signInFailed}
-            </p>
-          )}
-          <button type="button" className="button button-primary" onClick={() => signIn("/")}>
-            {t.ask.signInToAsk}
-          </button>
+    <main className="page home">
+      <div className="ask">
+        <section className="hero">
+          <ul className="hero-seats" aria-hidden="true">
+            {MODELS_BY_NAME.map((m) => (
+              <li key={m} className={`ink-${m}`}>
+                <ModelMark model={m} size={14} />
+                {t.models[m]}
+              </li>
+            ))}
+          </ul>
+          <h1 className="hero-title">{t.ask.headline}</h1>
+          <p className="hero-lede">{t.ask.lede}</p>
         </section>
-      )}
+
+        {!ready ? (
+          <p className="muted">{t.common.loading}</p>
+        ) : user ? (
+          <form className="ask-form" onSubmit={submit} noValidate>
+            <label htmlFor="question" className="ask-label">
+              {t.ask.label}
+            </label>
+            <textarea
+              id="question"
+              name="question"
+              className="ask-box"
+              rows={5}
+              maxLength={MAX_QUESTION_CHARS}
+              placeholder={t.ask.placeholder}
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              aria-describedby="question-count question-note"
+            />
+            <span id="question-count" className="fine ask-count">
+              {t.ask.counter(count.format(question.length), count.format(MAX_QUESTION_CHARS))}
+            </span>
+            <div className="ask-row">
+              <button type="submit" className="button button-primary" disabled={sending}>
+                {sending ? t.ask.submitting : t.ask.submit}
+              </button>
+            </div>
+            {error && (
+              <p className="error" role="alert">
+                {error}
+              </p>
+            )}
+            <p id="question-note" className="fine">
+              {t.ask.publicNote}
+            </p>
+          </form>
+        ) : (
+          <section className="signin-card">
+            <p>{t.ask.signInLede}</p>
+            {failed && (
+              <p className="error" role="alert">
+                {t.errors.signInFailed}
+              </p>
+            )}
+            <button type="button" className="button button-primary" onClick={() => signIn("/")}>
+              {t.ask.signInToAsk}
+            </button>
+          </section>
+        )}
+      </div>
+
+      <QuestionCards />
 
       <section className="how" aria-labelledby="how-title">
         <h2 id="how-title" className="section-title">

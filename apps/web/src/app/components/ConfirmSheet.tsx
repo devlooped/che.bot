@@ -11,6 +11,7 @@ export function ConfirmSheet({
   body,
   confirm,
   confirming,
+  dismiss = t.common.cancel,
   danger = false,
   busy,
   error,
@@ -23,6 +24,8 @@ export function ConfirmSheet({
   confirm: string;
   /** The text of the confirm button while the action waits for the API. */
   confirming: string;
+  /** The text of the safe choice, when "Cancelar" would read as the action itself. */
+  dismiss?: string;
   danger?: boolean;
   busy: boolean;
   error: string | null;
@@ -62,7 +65,7 @@ export function ConfirmSheet({
             autoFocus
             onClick={() => ref.current?.close()}
           >
-            {t.common.cancel}
+            {dismiss}
           </button>
           <button
             type="button"

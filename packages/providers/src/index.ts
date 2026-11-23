@@ -3,6 +3,7 @@ export * from "./classify.ts";
 export * from "./fake.ts";
 export * from "./families.ts";
 export * from "./gateway.ts";
+export * from "./images.ts";
 export * from "./provider.ts";
 export * from "./resolve.ts";
 export * from "./roles.ts";

@@ -7,6 +7,9 @@ import {
   expiredEvent,
   type FailureReason,
   failRun,
+  fallbackIllustration,
+  illustrationPrompt,
+  illustrationSchema,
   type LoggedEvent,
   linkOf,
   nextStep,
@@ -29,13 +32,15 @@ import {
   slugPrompt,
   slugSchema,
 } from "@chebot/protocol";
-import { ProviderError } from "@chebot/providers";
+import { type ImageResult, type ModelRef, ProviderError } from "@chebot/providers";
 import { deps } from "./deps.ts";
 import type { Env } from "./env.ts";
 import { type JobSnapshot, JobsError } from "./jobs.ts";
 import {
   attemptPrefix,
   type CallCost,
+  type ImageCall,
+  type RunImage,
   type RunRecord,
   type RunStatus,
   RunStore,
@@ -46,6 +51,7 @@ import {
   removeRun,
   resolveRunModels,
   retireReplaced,
+  setRunImage,
   setRunStatus,
 } from "./settings.ts";
 import { type RunSpend, type SpendCall, spendOf, stageOfKey } from "./spend.ts";
@@ -72,6 +78,7 @@ const JOB_NAMES: Record<QuestionClass, string> = {
 const JOB_MESSAGES = {
   done: "La respuesta está lista.",
   failed: "La corrida falló; se puede volver a correr gratis.",
+  cancelled: "Quien hizo la pregunta la canceló.",
 } as const;
 
 /** The helper's calls for the link of a run, at most: one per tick until a link is claimed. */
@@ -83,6 +90,38 @@ export const HELPER_TIMEOUT_MS = 30_000;
  * that second has the same words.
  */
 export const LINK_SECONDS = 3;
+
+/** The tries at the picture of a run, at most: one per tick until it has one. */
+export const IMAGE_TRIES = 2;
+/** A drawing of the image model gives up after this long. */
+export const IMAGE_TIMEOUT_MS = 120_000;
+/** The media types a picture may have: what an image model draws, and the SVG of the local mode. */
+export const IMAGE_TYPES: ReadonlySet<string> = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+  "image/svg+xml",
+]);
+/** A larger picture is not kept. */
+export const MAX_IMAGE_BYTES = 8_000_000;
+
+/** The models that make the picture: the helper writes the prompt, the image model draws it. */
+export interface ImageModels {
+  helper: ModelRef | null;
+  image: ModelRef;
+}
+
+/** What a call that failed cost, as far as the provider reported it. */
+function failedCost(model: ModelRef, error: unknown): CallCost {
+  const failure = ProviderError.isInstance(error) ? error : null;
+  return {
+    model: model.id,
+    costUsd: failure?.costUsd ?? 0,
+    inputTokens: failure?.usage?.inputTokens ?? 0,
+    outputTokens: failure?.usage?.outputTokens ?? 0,
+  };
+}
 
 /** The wait before the next try after `retries` failed tries in a row: 2 s doubling, at most 5 min. */
 export const backoffMs = (retries: number) => Math.min(2_000 * 2 ** retries, 300_000);
@@ -133,7 +172,15 @@ export interface RunSummary {
   charts: number;
   /** The public link (run-link.ts of the protocol), once the helper named the run. */
   link: string | null;
+  /** The version of the picture of the question (GET /api/runs/:id/image); null before it has one. */
+  image: string | null;
 }
+
+/** What the owner's cancel did: `ended` when the run is no longer in progress. */
+export type CancelResult = "ok" | "not_found" | "ended";
+
+/** A run still in progress: not paid yet, waiting for its payment, or running. */
+export const IN_PROGRESS: readonly RunStatus[] = ["quoted", "awaiting_payment", "running"];
 
 export type RerunResult =
   | { ok: true; summary: RunSummary }
@@ -537,7 +584,8 @@ export class RunObject extends DurableObject<Env> {
     if (step.kind === "done") return;
     this.store.append(beginStep(state, step), Date.now(), prefix);
     this.broadcast();
-    // The helper names the question beside the first steps, so the run does not wait for it.
+    // The helper names the question and its picture is drawn beside the first steps, so the run
+    // does not wait for them.
     const [entries] = await Promise.all([
       runCalls(state, step, {
         provider: deps.provider(this.env),
@@ -546,6 +594,7 @@ export class RunObject extends DurableObject<Env> {
         now: Date.now,
       }),
       this.nameRun(run),
+      this.illustrate(run),
     ]);
     const now = Date.now();
     const reduced = reduce(
@@ -587,13 +636,7 @@ export class RunObject extends DurableObject<Env> {
       cost = { model: model.id, costUsd: result.costUsd, ...result.usage };
     } catch (error) {
       console.warn(`The helper could not name run ${run.id} (try ${tries}).`, error);
-      const failure = ProviderError.isInstance(error) ? error : null;
-      cost = {
-        model: model.id,
-        costUsd: failure?.costUsd ?? 0,
-        inputTokens: failure?.usage?.inputTokens ?? 0,
-        outputTokens: failure?.usage?.outputTokens ?? 0,
-      };
+      cost = failedCost(model, error);
     }
     if (cost.costUsd > 0)
       await spendMeter(this.env)
@@ -615,6 +658,111 @@ export class RunObject extends DurableObject<Env> {
         outputTokens: (before?.outputTokens ?? 0) + cost.outputTokens,
       } satisfies CallCost),
     });
+  }
+
+  /**
+   * Gives the run its picture, for its card on the home page, beside the first steps as `nameRun`
+   * does: a try per tick until it has one, at most IMAGE_TRIES. A run whose models predate the
+   * image role gets none, unless an admin draws it (`redraw`). Never throws.
+   */
+  private async illustrate(run: RunRecord): Promise<void> {
+    const image = run.models?.image;
+    if (run.image !== null || run.imageTries >= IMAGE_TRIES || !image) return;
+    await this.draw(run, { helper: run.models?.helper ?? null, image });
+  }
+
+  /**
+   * Admin: draws the picture of the run again, with these models (today's settings), in place of
+   * the one it has. False when there is no run or the drawing failed.
+   */
+  async redraw(models: ImageModels): Promise<boolean> {
+    const run = this.store.run();
+    return run ? this.draw(run, models) : false;
+  }
+
+  /**
+   * One try at the picture: the helper writes the prompt (the question itself when it cannot), the
+   * image model draws it, and the run keeps it with a new version, which the list of runs gets for
+   * the home page. Its cost goes to the run's spend and the SpendMeter. True when it drew one.
+   */
+  private async draw(run: RunRecord, models: ImageModels): Promise<boolean> {
+    const tries = run.imageTries + 1;
+    this.store.updateRun({ image_tries: tries });
+    const calls: ImageCall[] = [];
+    let prompt = fallbackIllustration(run.question);
+    if (models.helper)
+      try {
+        const result = await deps.provider(this.env).generate({
+          callKey: `illustration:${tries}`,
+          model: models.helper,
+          ...illustrationPrompt({ question: run.question }),
+          schema: illustrationSchema,
+          maxOutputTokens: 2_000,
+          signal: AbortSignal.timeout(HELPER_TIMEOUT_MS),
+        });
+        prompt = result.output.prompt;
+        calls.push({
+          stage: "illustration",
+          model: models.helper.id,
+          costUsd: result.costUsd,
+          ...result.usage,
+        });
+      } catch (error) {
+        console.warn(`The helper could not write the picture of run ${run.id}.`, error);
+        calls.push({ stage: "illustration", ...failedCost(models.helper, error) });
+      }
+    let drawn: ImageResult | null = null;
+    try {
+      drawn = await deps.images(this.env).generate({
+        callKey: `image:${tries}`,
+        model: models.image,
+        prompt,
+        aspectRatio: "1:1",
+        signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
+      });
+      calls.push({
+        stage: "image",
+        model: models.image.id,
+        costUsd: drawn.costUsd,
+        inputTokens: 0,
+        outputTokens: 0,
+      });
+    } catch (error) {
+      console.warn(`The picture of run ${run.id} could not be drawn (try ${tries}).`, error);
+      calls.push({ stage: "image", ...failedCost(models.image, error) });
+    }
+    const costUsd = calls.reduce((sum, call) => sum + call.costUsd, 0);
+    if (costUsd > 0)
+      await spendMeter(this.env)
+        .settle(`${run.id}:image:${tries}`, costUsd)
+        .catch((error: unknown) => {
+          console.warn(`The cost of the picture of run ${run.id} could not be recorded.`, error);
+        });
+    let image: RunImage | null = null;
+    if (drawn && IMAGE_TYPES.has(drawn.mediaType) && drawn.bytes.byteLength <= MAX_IMAGE_BYTES)
+      image = { bytes: drawn.bytes, mediaType: drawn.mediaType, version: Date.now().toString(36) };
+    else if (drawn)
+      console.warn(
+        `The picture of run ${run.id} is not kept: ${drawn.mediaType}, ${drawn.bytes.byteLength} bytes.`,
+      );
+    // The run may have been deleted while the models answered.
+    const kept = this.ctx.storage.transactionSync(() => {
+      const current = this.store.run();
+      if (!current) return false;
+      this.store.updateRun({ image_calls: JSON.stringify([...current.imageCalls, ...calls]) });
+      if (image) this.store.saveImage(image);
+      return image !== null;
+    });
+    if (!kept || !image) return false;
+    await setRunImage(this.env.DB, run.id, image.version).catch((error: unknown) => {
+      console.error(`The picture of run ${run.id} could not be listed in D1.`, error);
+    });
+    return true;
+  }
+
+  /** The picture of the run; null when there is no run or no picture. */
+  async image(): Promise<RunImage | null> {
+    return this.store.image();
   }
 
   /** Claims the first free link of the run's words; null when none is, or D1 fails. */
@@ -744,6 +892,8 @@ export class RunObject extends DurableObject<Env> {
     if (run.classify)
       calls.push({ agent: "classifier", stage: "classify", running: false, ...run.classify });
     if (run.helper) calls.push({ agent: "helper", stage: "link", running: false, ...run.helper });
+    for (const call of run.imageCalls)
+      calls.push({ agent: call.stage === "image" ? "image" : "helper", running: false, ...call });
     const inFlight = new Map<string, SpendCall>();
     if (run.status === "running" && run.state) {
       const step = nextStep(run.state, Date.now());
@@ -803,20 +953,27 @@ export class RunObject extends DurableObject<Env> {
   }
 
   /**
+   * The owner cancels a run in progress (IN_PROGRESS): it stops and is deleted for good, as
+   * `remove` does. A run that already ended is left alone.
+   */
+  async cancel(): Promise<CancelResult> {
+    const run = this.store.run();
+    if (!run) return "not_found";
+    if (!IN_PROGRESS.includes(run.status)) return "ended";
+    return (await this.remove()) ? "ok" : "not_found";
+  }
+
+  /**
    * Deletes the run: its row in the list, then everything the object stores. False when there is
-   * none. On the way out, a job still waiting for payment is cancelled and a reservation is
-   * settled with what was spent, both best effort.
+   * none. On the way out, its payment job is ended (`endJob`) and a reservation is settled with
+   * what was spent, both best effort. A step in flight finds the run gone and stores nothing.
    */
   async remove(): Promise<boolean> {
     const run = this.store.run();
     if (!run) return false;
-    if (run.status === "awaiting_payment" && !run.free && run.paidAt === null)
-      await deps
-        .jobs(this.env)
-        .cancel(run.id)
-        .catch((error: unknown) => {
-          console.warn(`The job of deleted run ${run.id} could not be cancelled.`, error);
-        });
+    await this.endJob(run).catch((error: unknown) => {
+      console.warn(`The job of deleted run ${run.id} could not be ended.`, error);
+    });
     if (run.reservedAttempt >= run.attempt && run.settledAttempt < run.attempt)
       await spendMeter(this.env)
         .settle(`${run.id}:${run.attempt}`, run.state?.spentUsd ?? 0)
@@ -835,6 +992,27 @@ export class RunObject extends DurableObject<Env> {
     await this.ctx.storage.deleteAll();
     this.store.forget();
     return true;
+  }
+
+  /**
+   * The payment job of a run being deleted, if it is still open: a job waiting for payment is
+   * cancelled; a paid one (or one paid while it was cancelled) is ended as done when the run
+   * completed, else as cancelled: a deleted run cannot run again.
+   */
+  private async endJob(run: RunRecord): Promise<void> {
+    if (run.free || run.jobClosed !== null) return;
+    const jobs = deps.jobs(this.env);
+    if (run.status === "awaiting_payment" && run.paidAt === null) {
+      try {
+        await jobs.cancel(run.id);
+        return;
+      } catch (error) {
+        if (!(error instanceof JobsError && error.status === 409)) throw error;
+        if (!paidByJob(await jobs.get(run.id))) return;
+      }
+    } else if (run.paidAt === null) return;
+    if (run.status === "completed") await jobs.finish(run.id, "done", JOB_MESSAGES.done);
+    else await jobs.finish(run.id, "failed", JOB_MESSAGES.cancelled);
   }
 
   private requireRun(): RunRecord {
@@ -864,6 +1042,7 @@ export class RunObject extends DurableObject<Env> {
       // a run state from before the charts of an answer has no `charts`
       charts: run.state?.charts ? chartIds(run.state).length : 0,
       link: run.link,
+      image: run.image,
     };
   }
 

@@ -6,7 +6,7 @@ import { runPath } from "../routes.tsx";
 import { errorText } from "../view/errors.ts";
 import { ConfirmSheet } from "./ConfirmSheet.tsx";
 import { Sheet } from "./Discussion.tsx";
-import { HelpIcon, RefreshIcon, ShareIcon, TrashIcon } from "./Icons.tsx";
+import { HelpIcon, RefreshIcon, ShareIcon, StopIcon, TrashIcon } from "./Icons.tsx";
 import { ShareLink } from "./ShareLink.tsx";
 
 /** How the page works: the buttons of the bar, the seats, the margin marks, the sections. */
@@ -15,6 +15,7 @@ function HelpSheet({ onClose }: { onClose: () => void }) {
     { icon: <ShareIcon />, text: t.help.share },
     { icon: <RefreshIcon />, text: t.help.refresh },
     { icon: <TrashIcon />, text: t.help.remove },
+    { icon: <StopIcon />, text: t.help.cancel },
     { icon: null, text: t.help.seats },
     { icon: null, text: t.help.marks },
     { icon: null, text: t.help.sections },
@@ -33,11 +34,12 @@ function HelpSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-type Open = "help" | "refresh" | "remove" | null;
+type Open = "help" | "refresh" | "remove" | "cancel" | null;
 
 /**
- * The bar under the question: share it, and the help of the page, for everyone; ask it again and
- * delete it, for its owner, who alone sees a deleted question, and restores it here.
+ * The bar under the question: share it, and the help of the page, for everyone; for its owner,
+ * cancel it while it is in progress (it is deleted for good), else ask it again and delete it: they
+ * alone see a deleted question, and restore it here.
  */
 export function RunActions({
   runId,
@@ -45,6 +47,7 @@ export function RunActions({
   url,
   mine,
   deleted,
+  inProgress,
   answered,
   free,
   onChange,
@@ -54,6 +57,8 @@ export function RunActions({
   url: string;
   mine: boolean;
   deleted: boolean;
+  /** Not paid yet, waiting for its payment, or running: its owner may cancel it. */
+  inProgress: boolean;
   /** The run ended with an answer or failed: asking it again makes sense. */
   answered: boolean;
   /** The owner runs free (an admin): asking again costs nothing. */
@@ -104,6 +109,13 @@ export function RunActions({
       onChange();
     });
 
+  /** Gone for good: nothing is left to show here. */
+  const cancel = () =>
+    act(async () => {
+      await api.cancel(runId);
+      navigate("/");
+    });
+
   const restore = () =>
     act(async () => {
       await api.restore(runId);
@@ -125,7 +137,18 @@ export function RunActions({
             <RefreshIcon />
           </button>
         )}
-        {mine && !deleted && (
+        {mine && !deleted && inProgress && (
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={t.run.cancel}
+            title={t.run.cancel}
+            onClick={(e) => show("cancel", e.currentTarget)}
+          >
+            <StopIcon />
+          </button>
+        )}
+        {mine && !deleted && !inProgress && (
           <button
             type="button"
             className="icon-button"
@@ -186,6 +209,21 @@ export function RunActions({
           busy={busy}
           error={error}
           onConfirm={remove}
+          onClose={close}
+        />
+      )}
+      {open === "cancel" && (
+        <ConfirmSheet
+          title={t.run.cancelTitle}
+          question={question}
+          body={t.run.cancelBody}
+          confirm={t.run.cancelConfirm}
+          confirming={t.run.cancelling}
+          dismiss={t.run.keepGoing}
+          danger
+          busy={busy}
+          error={error}
+          onConfirm={cancel}
           onClose={close}
         />
       )}

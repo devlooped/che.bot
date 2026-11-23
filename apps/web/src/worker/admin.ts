@@ -6,6 +6,7 @@ import {
   MODEL_ROLES,
   modelFamily,
   modelRole,
+  takesEffort,
 } from "@chebot/providers";
 import { deps } from "./deps.ts";
 import type { Env } from "./env.ts";
@@ -76,7 +77,7 @@ export type Validation<T> = { ok: true; value: T } | { ok: false; errors: Record
 /**
  * The changes of a PUT /api/admin/models body, `{ settings: { [role]: { family, effort } | null } }`:
  * a known role, a family of the catalog of the role's kind (a version is read as its family), and
- * an effort the family offers (none for a decision model). Null puts the role back on its default.
+ * an effort the family offers (none for a decision or an image model). Null puts the role back on its default.
  * Any error refuses the whole body.
  */
 export function parseModelSettings(
@@ -116,8 +117,8 @@ export function parseModelSettings(
       continue;
     }
     const chosen = effort ?? null;
-    if (role.kind === "decision" && chosen !== null) {
-      errors[key] = "A decision model takes no effort.";
+    if (!takesEffort(role.kind) && chosen !== null) {
+      errors[key] = `A ${role.kind} model takes no effort.`;
       continue;
     }
     if (chosen !== null && !option.efforts.includes(chosen)) {

@@ -145,6 +145,11 @@ export const editorCheckSchema = z.object({
 /** The helper's words for the link of a run (see run-link.ts). */
 export const slugSchema = z.object({ words: z.array(z.string()) });
 
+/** The helper's prompt for the picture of a question (see illustrationPrompt). */
+export const illustrationSchema = z.object({
+  prompt: z.string().min(10).max(2_000).describe("The prompt of the illustration, in English."),
+});
+
 export const momentsSchema = z.object({
   sentences: z.array(z.string()).describe("At most 3 short sentences."),
 });

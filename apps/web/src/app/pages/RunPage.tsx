@@ -131,6 +131,14 @@ function RunView({ runId }: { runId: string }) {
   const line = stageLine(view, summary?.status === "awaiting_payment");
   const live = connection === "live" || connection === "polling";
   const final = view.status === "completed";
+  // The stream says first when a run ends; the summary, whether it was quoted before any event.
+  const ended =
+    view.status === "completed" || view.status === "failed" || view.status === "expired";
+  const inProgress =
+    !ended &&
+    (summary?.status === "quoted" ||
+      summary?.status === "awaiting_payment" ||
+      summary?.status === "running");
 
   async function pay() {
     setPaying(true);
@@ -187,6 +195,7 @@ function RunView({ runId }: { runId: string }) {
             url={new URL(path, window.location.origin).href}
             mine={summary?.mine ?? false}
             deleted={summary?.deleted ?? false}
+            inProgress={inProgress}
             answered={view.status === "completed" || view.status === "failed"}
             free={isAdmin(user)}
             onChange={refresh}

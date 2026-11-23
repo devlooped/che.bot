@@ -13,6 +13,7 @@ import {
   eventsOf,
   fakes,
   paidRun,
+  paying,
   QUESTION,
   quoted,
   runAlarms,
@@ -149,6 +150,67 @@ describe("deleting a run", () => {
   });
 });
 
+describe("cancelling a run in progress", () => {
+  const cancel = (id: string, headers: Record<string, string> = {}) =>
+    api(`/api/runs/${id}/cancel`, { method: "POST", headers });
+
+  /** The tables of the object, but the runtime's own. */
+  const tablesOf = (stub: ReturnType<typeof runStub>) =>
+    runInDurableObject(stub, (_: RunObject, state) =>
+      state.storage.sql.exec("SELECT name FROM sqlite_master WHERE type = 'table'").toArray(),
+    ).then((tables) => tables.filter((t) => !String(t.name).startsWith("_cf_")));
+
+  test("only its owner cancels a running run: it stops, its paid job ends, nothing is left", async () => {
+    const { jobs } = fakes();
+    const owner = user();
+    const { id, stub } = await paidRun(owner);
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    expect((await cancel(id)).status).toBe(401);
+    expect((await cancel(id, as(user(), ["Admin"]))).status).toBe(403);
+    expect((await cancel(id, as(owner))).status).toBe(204);
+
+    expect((await api(`/api/runs/${id}`, { headers: as(owner) })).status).toBe(404);
+    expect((await api(`/api/runs/${id}/events`)).status).toBe(404);
+    const listed = (await (await api("/api/me/runs", { headers: as(owner) })).json()) as {
+      runs: unknown[];
+    };
+    expect(listed.runs).toEqual([]);
+    expect(jobs.jobs.get(id)).toMatchObject({
+      status: "failed",
+      message: "Quien hizo la pregunta la canceló.",
+    });
+    expect(await runDurableObjectAlarm(stub)).toBe(false);
+    expect(await tablesOf(stub)).toEqual([]);
+    expect((await cancel(id, as(owner))).status).toBe(404);
+  });
+
+  test("a quoted run, and one waiting for its payment, whose job is cancelled", async () => {
+    const { jobs } = fakes();
+    const owner = user();
+    const first = await quoted(owner);
+    expect((await cancel(first.id, as(owner))).status).toBe(204);
+    expect((await api(`/api/runs/${first.id}`)).status).toBe(404);
+
+    const second = await paying(owner);
+    expect(await runDurableObjectAlarm(second.stub)).toBe(true);
+    expect(jobs.jobs.get(second.id)?.status).toBe("pending");
+    expect((await cancel(second.id, as(owner))).status).toBe(204);
+    expect(jobs.jobs.has(second.id)).toBe(false);
+    expect(await tablesOf(second.stub)).toEqual([]);
+  });
+
+  test("a run that ended is not cancelled", async () => {
+    fakes();
+    const owner = user();
+    const { id, stub } = await paidRun(owner);
+    await runAlarms(stub);
+    const refused = await cancel(id, as(owner));
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ reason: "ended" });
+    expect((await api(`/api/runs/${id}`)).status).toBe(200);
+  });
+});
+
 describe("asking a question again", () => {
   test("the new run replaces the old one once it starts; the old one leads to it", async () => {
     fakes();
@@ -240,14 +302,15 @@ describe("the spend of a run", () => {
     });
     expect(inFlight.rows.stage.find((r) => r.label === "draft")).toMatchObject({ running: 1 });
 
-    // The drafts land: four calls of the panel, each with its cost, and the helper's link.
+    // The drafts land: four calls of the panel, each with its cost, the helper's link and the
+    // picture of the question.
     await runDurableObjectAlarm(stub);
     const drafted = await spendOf(id, admin);
     expect(drafted.running).toBe(0);
     expect(drafted.rows.stage.find((r) => r.label === "draft")).toMatchObject({ calls: 4 });
     expect(drafted.rows.stage.find((r) => r.label === "link")).toMatchObject({ calls: 1 });
     expect(drafted.rows.agent.map((r) => r.label).sort()).toEqual(
-      ["claude", "classifier", "gemini", "grok", "helper", "openai"].sort(),
+      ["claude", "classifier", "gemini", "grok", "helper", "image", "openai"].sort(),
     );
 
     // At the end, the total is what the run spent plus the classification, in every pivot.
@@ -255,8 +318,9 @@ describe("the spend of a run", () => {
     const done = await spendOf(id, admin);
     const ended = (await eventsOf(stub)).find((e) => e.type === "run.completed");
     if (ended?.type !== "run.completed") throw new Error("the run did not complete");
-    // the classification and the helper's link, US$0.001 each, are beside the run's own spend
-    expect(done.totalUsd).toBeCloseTo(ended.spentUsd + 0.002, 9);
+    // the classification, the helper's link and the prompt of the picture, US$0.001 each, and the
+    // picture, US$0.04, are beside the run's own spend
+    expect(done.totalUsd).toBeCloseTo(ended.spentUsd + 0.003 + 0.04, 9);
     for (const rows of Object.values(done.rows))
       expect(rows.reduce((sum, r) => sum + r.costUsd, 0)).toBeCloseTo(done.totalUsd, 9);
     expect(done.rows.agent.map((r) => r.label)).toContain("utility");

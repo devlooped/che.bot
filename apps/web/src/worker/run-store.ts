@@ -13,6 +13,18 @@ import type {
 // ledger of its model calls. Every method is synchronous (the storage API is); the caller groups
 // writes in `transactionSync` where they must land together.
 
+/**
+ * The picture of the question, in chunks: a value of the storage holds at most 2 MB, and an image
+ * model may draw more.
+ */
+const IMAGE_CHUNKS = `CREATE TABLE IF NOT EXISTS image_chunks (
+  n INTEGER PRIMARY KEY,
+  bytes BLOB NOT NULL
+)`;
+
+/** The size of a chunk of the picture. */
+const CHUNK_BYTES = 1_000_000;
+
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS run (
      id TEXT PRIMARY KEY,
@@ -42,7 +54,11 @@ const SCHEMA = [
      classify TEXT,
      link TEXT,
      helper TEXT,
-     link_tries INTEGER NOT NULL DEFAULT 0
+     link_tries INTEGER NOT NULL DEFAULT 0,
+     image TEXT,
+     image_type TEXT,
+     image_tries INTEGER NOT NULL DEFAULT 0,
+     image_calls TEXT
    )`,
   `CREATE TABLE IF NOT EXISTS events (
      seq INTEGER PRIMARY KEY,
@@ -66,6 +82,7 @@ const SCHEMA = [
      doc TEXT NOT NULL,
      seq INTEGER NOT NULL
    )`,
+  IMAGE_CHUNKS,
 ];
 
 /**
@@ -77,6 +94,10 @@ const ADDED_COLUMNS: readonly [string, string][] = [
   ["link", "TEXT"],
   ["helper", "TEXT"],
   ["link_tries", "INTEGER NOT NULL DEFAULT 0"],
+  ["image", "TEXT"],
+  ["image_type", "TEXT"],
+  ["image_tries", "INTEGER NOT NULL DEFAULT 0"],
+  ["image_calls", "TEXT"],
 ];
 
 /** A model call made beside the protocol (the classification, the link): what it cost. */
@@ -85,6 +106,18 @@ export interface CallCost {
   costUsd: number;
   inputTokens: number;
   outputTokens: number;
+}
+
+/** A call for the picture of the run: the helper's prompt ("illustration") or the drawing ("image"). */
+export interface ImageCall extends CallCost {
+  stage: "illustration" | "image";
+}
+
+/** The picture of a run: its bytes, their media type and its version (a new one per drawing). */
+export interface RunImage {
+  bytes: Uint8Array;
+  mediaType: string;
+  version: string;
 }
 
 /** Where a run is: before payment, running, or ended. */
@@ -139,6 +172,12 @@ export interface RunRecord {
   helper: CallCost | null;
   /** The helper's calls for the link so far. */
   linkTries: number;
+  /** The version of the picture of the question; null before it has one. */
+  image: string | null;
+  /** The tries at the picture so far (illustrate of RunObject). */
+  imageTries: number;
+  /** The calls for the picture so far, every try. */
+  imageCalls: ImageCall[];
 }
 
 interface RunRow extends Record<string, SqlStorageValue> {
@@ -170,6 +209,10 @@ interface RunRow extends Record<string, SqlStorageValue> {
   link: string | null;
   helper: string | null;
   link_tries: number;
+  image: string | null;
+  image_type: string | null;
+  image_tries: number;
+  image_calls: string | null;
 }
 
 /** The columns of the run row that `updateRun` may set. */
@@ -200,11 +243,13 @@ export class RunStore {
       this.sql
         .exec("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'run'")
         .toArray().length > 0;
-    if (this.created) this.addColumns();
+    if (this.created) this.upgrade();
     return this.created;
   }
 
-  private addColumns(): void {
+  /** Brings the tables of an object created by an earlier version up to date. */
+  private upgrade(): void {
+    this.sql.exec(IMAGE_CHUNKS);
     const have = new Set(
       this.sql
         .exec<{ name: string }>("SELECT name FROM pragma_table_info('run')")
@@ -258,7 +303,44 @@ export class RunStore {
       link: row.link,
       helper: row.helper ? (JSON.parse(row.helper) as CallCost) : null,
       linkTries: row.link_tries,
+      image: row.image,
+      imageTries: row.image_tries,
+      imageCalls: row.image_calls ? (JSON.parse(row.image_calls) as ImageCall[]) : [],
     };
+  }
+
+  /** Stores the picture of the run in place of the one it had, with its new version. */
+  saveImage(image: RunImage): void {
+    this.sql.exec("DELETE FROM image_chunks");
+    for (let n = 0; n * CHUNK_BYTES < image.bytes.byteLength; n++)
+      this.sql.exec(
+        "INSERT INTO image_chunks (n, bytes) VALUES (?, ?)",
+        n,
+        image.bytes.subarray(n * CHUNK_BYTES, (n + 1) * CHUNK_BYTES),
+      );
+    this.updateRun({ image: image.version, image_type: image.mediaType });
+  }
+
+  /** The picture of the run; null before it has one. */
+  image(): RunImage | null {
+    if (!this.exists()) return null;
+    const row = this.sql
+      .exec<{ image: string | null; image_type: string | null }>(
+        "SELECT image, image_type FROM run LIMIT 1",
+      )
+      .toArray()[0];
+    if (!row?.image || !row.image_type) return null;
+    const chunks = this.sql
+      .exec<{ bytes: ArrayBuffer }>("SELECT bytes FROM image_chunks ORDER BY n")
+      .toArray()
+      .map((chunk) => new Uint8Array(chunk.bytes));
+    const bytes = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0));
+    let at = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, at);
+      at += chunk.byteLength;
+    }
+    return { bytes, mediaType: row.image_type, version: row.image };
   }
 
   insertRun(run: {

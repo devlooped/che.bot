@@ -5,8 +5,10 @@ import {
   type Classification,
   type ClassifyRequest,
   classify,
+  createGatewayImages,
   createGatewayProvider,
   gatewayCatalog,
+  type ImageProvider,
   type ModelProvider,
 } from "@chebot/providers";
 import type { JWTVerifyGetKey } from "jose";
@@ -28,6 +30,8 @@ export interface Classifier {
 export interface Deps {
   /** The model calls of a run. */
   provider(env: Env): ModelProvider;
+  /** The picture of a question (the image role). */
+  images(env: Env): ImageProvider;
   /** The Gateway catalog; cached per isolate. */
   catalog(env: Env): Promise<CatalogModel[]>;
   classifier(env: Env): Classifier;
@@ -76,6 +80,7 @@ export const lazyRenderer: ChartRenderer = {
 
 const defaults: Deps = {
   provider: (env) => createGatewayProvider({ apiKey: env.AI_GATEWAY_API_KEY }),
+  images: (env) => createGatewayImages({ apiKey: env.AI_GATEWAY_API_KEY }),
   catalog: () => gatewayCatalog(),
   classifier: (env) => ({ classify: (req) => classify(req, { apiKey: env.AI_GATEWAY_API_KEY }) }),
   jobs: (env) => createJobsClient({ url: env.JOBS_URL, token: env.JOBS_TOKEN }),

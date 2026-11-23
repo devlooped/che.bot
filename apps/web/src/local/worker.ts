@@ -19,6 +19,7 @@ import {
 } from "../worker/session.ts";
 import { LOCAL_CATALOG } from "./catalog.ts";
 import { LOCAL_RUN_CONFIG } from "./config.ts";
+import { localImages } from "./images.ts";
 import { localJobs } from "./jobs.ts";
 import { LOCAL_MODE_MARKER } from "./marker.ts";
 import { scenario } from "./scenario.ts";
@@ -53,6 +54,7 @@ const SIMPLE_UP_TO_CHARS = 80;
 // dev server sees the fakes too (the Worker and its objects share this isolate in local dev).
 overrideDeps({
   provider: () => new FakeProvider(scenario()),
+  images: () => localImages,
   catalog: async () => LOCAL_CATALOG,
   classifier: () => ({
     async classify(req) {

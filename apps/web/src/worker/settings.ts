@@ -144,6 +144,77 @@ export async function findLink(
   return row ?? null;
 }
 
+/** Records the version of the picture of the run `id`. */
+export async function setRunImage(db: D1Database, id: string, version: string): Promise<void> {
+  await db.prepare("UPDATE runs SET image = ? WHERE id = ?").bind(version, id).run();
+}
+
+/** A card of the home page: a question that was asked, and its picture. */
+export interface PublicRun {
+  id: string;
+  createdAt: string;
+  question: string;
+  status: string;
+  link: string | null;
+  /** The version of its picture; null before it has one. */
+  image: string | null;
+}
+
+/** The statuses of a question that was asked: paid (or an admin's) and started. */
+export const ASKED_STATUSES = ["running", "completed", "failed"] as const;
+
+/**
+ * The questions that were asked, newest first, except the deleted ones: `limit` of them, before
+ * the run `before` when it is given (the last of the page before).
+ */
+export async function listPublicRuns(
+  db: D1Database,
+  limit: number,
+  before: { createdAt: string; id: string } | null,
+): Promise<PublicRun[]> {
+  const statuses = ASKED_STATUSES.map(() => "?").join(", ");
+  const { results } = await db
+    .prepare(
+      `SELECT id, created_at, question, status, link, image FROM runs
+       WHERE deleted_at IS NULL AND status IN (${statuses})
+         ${before ? "AND (created_at < ? OR (created_at = ? AND id > ?))" : ""}
+       ORDER BY created_at DESC, id LIMIT ?`,
+    )
+    .bind(
+      ...ASKED_STATUSES,
+      ...(before ? [before.createdAt, before.createdAt, before.id] : []),
+      limit,
+    )
+    .all<{
+      id: string;
+      created_at: string;
+      question: string;
+      status: string;
+      link: string | null;
+      image: string | null;
+    }>();
+  return results.map((row) => ({
+    id: row.id,
+    createdAt: row.created_at,
+    question: row.question,
+    status: row.status,
+    link: row.link,
+    image: row.image,
+  }));
+}
+
+/** The date and id of a run of the list, for the page after it; null when it is not there. */
+export async function cursorOf(
+  db: D1Database,
+  id: string,
+): Promise<{ createdAt: string; id: string } | null> {
+  const row = await db
+    .prepare("SELECT created_at, id FROM runs WHERE id = ?")
+    .bind(id)
+    .first<{ created_at: string; id: string }>();
+  return row ? { createdAt: row.created_at, id: row.id } : null;
+}
+
 export async function removeRun(db: D1Database, id: string): Promise<void> {
   await db.prepare("DELETE FROM runs WHERE id = ?").bind(id).run();
 }

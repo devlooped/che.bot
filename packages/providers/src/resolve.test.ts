@@ -21,7 +21,21 @@ test("without settings every role resolves to its default, with its default effo
     utility: { id: "anthropic/claude-haiku-5.5", effort: null },
     classifier: { id: "typesafe-ai/jev", effort: null },
     helper: { id: "anthropic/claude-haiku-5.5", effort: "medium" },
+    image: { id: "spacexai/grok-imagine-image-2.0", effort: null },
   });
+});
+
+test("an image role resolves from the image models only, without effort", () => {
+  const catalog = [
+    ...defaults,
+    entry("spacexai/grok-imagine-image-2.1", "image"),
+    entry("spacexai/grok-imagine-image-3.0"), // a language model of the same family is not one
+  ];
+  const snapshot = resolveModels(
+    [{ role: "image", modelId: "spacexai/grok-imagine-image", effort: "high" }],
+    catalog,
+  );
+  expect(snapshot.image).toEqual({ id: "spacexai/grok-imagine-image-2.1", effort: null });
 });
 
 test("a setting with an old version resolves to the newest model of its family", () => {

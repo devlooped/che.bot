@@ -78,6 +78,7 @@ suggestions and votes, a change of position, an accepted change and one without 
 that does not answer, the editor), a classifier (up to 80 characters is simple), a jobs service
 whose QR appears at once (`POST /api/local/pay/:id`, or the "Simular el pago" button, plays the
 payment and calls the hook), a Gateway catalog with a few more families for the admin page, and a
+image model that draws an SVG of a few shapes from the prompt, a
 sign-in that picks a test user (`Contrib`, `Admin`, or no role) and sets the same session cookie as
 the real sign-in (`POST /api/local/sign-in`; "Salir" only clears it). The production entry never imports
 `src/local`, and `pnpm build` fails if anything of it is in the output (`scripts/check-build.mjs`).
@@ -105,16 +106,29 @@ The states around the happy path are played the same way, to see and test them:
 | Voted layers, and one without agreement  | The inflation chart: the title and the explanation accepted, bars instead of the line two against two                   |
 | Earlier versions of the charts           | "Cómo cambió la respuesta" on a finished answer: three versions, the marks of each chart moving                         |
 
-The pages: `/` asks, `/r/:id` follows a run and replays how its text and its charts formed,
+The pages: `/` asks, then shows every question asked as a card with its picture (all of them are
+public; newest first, 24 at a time), `/r/:id` follows a run and replays how its text and its charts formed,
 `/mis-preguntas` lists
 the user's questions (copy a link, delete one, restore a deleted one), and `/admin` sets the model
 of each role and the two prices (admins only; the menu of the account hides it from others).
 
-On the page of a run, its owner asks the question again or deletes it. Asking again is a new run of
-the same text, quoted and paid as any other, with the models of today; once it starts, the old run
+On the page of a run, its owner cancels it while it is in progress (quoted, waiting for its
+payment or running): after a confirmation it stops and is deleted for good, its payment job
+cancelled or ended. Once it ended, its owner asks the question again or deletes it. Asking again
+is a new run of the same text, quoted and paid as any other, with the models of today; once it
+starts, the old run
 is deleted and its link leads to the new one. A deleted run stays (`deleted_at` in the list, see
 `migrations/0003_run_deleted.sql`): its owner still reads it and may restore it, and anyone else
 is told that its author deleted it (410).
+
+Beside its first steps, a paid run gets its picture, as the covers of grokeado: the helper writes
+the prompt of a square editorial illustration of what the question is about (no text, no logos, no
+faces of real people, nothing that suggests an answer; the question itself when the helper fails),
+and the model of the `image` role draws it (Grok Imagine by default, `spacexai/grok-imagine-image`;
+`/admin` changes it like any other role). Two tries at most, one per tick. The run keeps the picture
+in its object, in chunks of 1 MB (a value of the storage holds 2 MB), and its version in the `image`
+column of the list (`migrations/0004_run_image.sql`); its cost goes to the run's spend. A run asked
+before the pictures has none until an admin draws it from its card on the home page.
 
 A run is a UUID inside: its object, its payment job, its row in the list. Once it is paid and
 starts, the helper model (Claude Haiku at medium effort by default) sums the question up in at
@@ -138,20 +152,24 @@ needs `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET` and `SESSION_SECR
 `AI_GATEWAY_API_KEY` to ask, and `JOBS_URL` and `JOBS_TOKEN` to pay (the jobs service calls the
 hook back on the origin of the page, which it cannot reach on localhost).
 
-| Route                                                                           | Who may call it                                                                                                         |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `GET /auth/login?returnTo=/path`, `/auth/callback`, `/auth/logout`              | anyone: the sign-in, see below                                                                                          |
-| `GET /api/me` → `{id, name, admin, mayAsk}` or `null`                           | anyone: the signed-in user                                                                                              |
-| `POST /api/runs {question, replaces?}` → `201 {runId, class, amount, currency}` | signed in; the `Admin` or `Contrib` role until `LAUNCHED` is `"true"`; `replaces`, a run of theirs                      |
-| `POST /api/runs/:id/pay` → `202`                                                | the owner; an `Admin` owner runs free, with no payment job                                                              |
-| `POST /api/runs/:id/rerun` → `202`                                              | the owner, once, after a paid run failed                                                                                |
-| `DELETE /api/runs/:id`                                                          | the owner, who may restore it; an admin, for good                                                                       |
-| `POST /api/runs/:id/restore` → `204`                                            | the owner, after deleting it                                                                                            |
-| `GET /api/runs/:id`, `/events?after=`, `/ws?after=`, `/snapshots/:v`            | anyone with the link (`mine` in the summary: the caller owns it); a deleted run, its owner only (`410` for anyone else) |
-| `GET /api/runs/:id/charts/:chart/:v.svg`                                        | anyone with the link: the render of a chart (`c1`) at version `v`                                                       |
-| `GET /api/me/runs`                                                              | signed in                                                                                                               |
-| `GET`, `PUT /api/admin/models`, `/api/admin/prices`                             | `Admin`                                                                                                                 |
-| `POST /api/pay/hook`                                                            | the jobs service, with the run's own token as Bearer                                                                    |
+| Route                                                                           | Who may call it                                                                                                               |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `GET /auth/login?returnTo=/path`, `/auth/callback`, `/auth/logout`              | anyone: the sign-in, see below                                                                                                |
+| `GET /api/me` → `{id, name, admin, mayAsk}` or `null`                           | anyone: the signed-in user                                                                                                    |
+| `GET /api/runs?after=:id` → `{runs, next}`                                      | anyone: the questions asked (running, completed or failed, not deleted), newest first; `next` is the `after` of the next page |
+| `POST /api/runs {question, replaces?}` → `201 {runId, class, amount, currency}` | signed in; the `Admin` or `Contrib` role until `LAUNCHED` is `"true"`; `replaces`, a run of theirs                            |
+| `POST /api/runs/:id/pay` → `202`                                                | the owner; an `Admin` owner runs free, with no payment job                                                                    |
+| `POST /api/runs/:id/rerun` → `202`                                              | the owner, once, after a paid run failed                                                                                      |
+| `DELETE /api/runs/:id`                                                          | the owner, who may restore it; an admin, for good                                                                             |
+| `POST /api/runs/:id/restore` → `204`                                            | the owner, after deleting it                                                                                                  |
+| `POST /api/runs/:id/cancel` → `204`                                             | the owner, while the run is in progress (`409` once it ended): deletes it for good                                            |
+| `GET /api/runs/:id`, `/events?after=`, `/ws?after=`, `/snapshots/:v`            | anyone with the link (`mine` in the summary: the caller owns it); a deleted run, its owner only (`410` for anyone else)       |
+| `GET /api/runs/:id/charts/:chart/:v.svg`                                        | anyone with the link: the render of a chart (`c1`) at version `v`                                                             |
+| `GET /api/runs/:id/image?v=`                                                    | anyone with the link: the picture of the question (immutable with its version `v`)                                            |
+| `POST /api/runs/:id/image` → `{image}`                                          | `Admin`: draws the picture again with today's models, also for a run asked before the pictures                                |
+| `GET /api/me/runs`                                                              | signed in                                                                                                                     |
+| `GET`, `PUT /api/admin/models`, `/api/admin/prices`                             | `Admin`                                                                                                                       |
+| `POST /api/pay/hook`                                                            | the jobs service, with the run's own token as Bearer                                                                          |
 
 Nobody asks for a chart: the drafts propose them, and the summary of a run says how many charts its
 answer has (`charts`).

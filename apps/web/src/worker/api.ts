@@ -8,10 +8,13 @@ import { questionOf, quoteQuestion } from "./quote.ts";
 import { runStub } from "./run-object.ts";
 import { fromThisOrigin } from "./session.ts";
 import {
+  cursorOf,
   findLink,
   linkOfRun,
+  listPublicRuns,
   listRuns,
   readPrices,
+  resolveRunModels,
   setReplaces,
   setRunDeleted,
   visibilityOf,
@@ -25,15 +28,19 @@ import { spendMeter } from "./spend-meter.ts";
 //                                    redirects for good to the run's link once it has one
 //   GET    /api/links/:ref            anyone: the UUID and the link of a run, by its link
 //   GET    /api/me                    anyone: the signed-in user, or null
+//   GET    /api/runs?after=:id        anyone: the questions asked, newest first (the home page)
 //   POST   /api/runs                  signed in, Admin or Contrib role until launch: the quote;
 //                                    `replaces`, a run of the caller's that the new one replaces
 //   POST   /api/runs/:id/pay          the owner (an admin owner runs free, with no job)
 //   POST   /api/runs/:id/rerun        the owner, after a paid run failed
 //   DELETE /api/runs/:id              the owner, who may restore it; an admin, for good
 //   POST   /api/runs/:id/restore      the owner, after deleting it
+//   POST   /api/runs/:id/cancel       the owner, while the run is in progress: deletes it for good
 //   GET    /api/runs/:id[/events|/ws|/snapshots/:v]   anyone with the link (`mine` for the owner);
 //                                    a deleted run, its owner only: 410 for anyone else
 //   GET    /api/runs/:id/charts/:chart/:v.svg  the render of a chart at version v, as above
+//   GET    /api/runs/:id/image[?v=]   the picture of the question, as above
+//   POST   /api/runs/:id/image        admin: draws the picture again, with today's models
 //   GET    /api/runs/:id/spend        admin: what the run's model calls cost so far
 //   GET    /api/me/runs               signed in
 //   GET|PUT /api/admin/models|prices  admin
@@ -56,7 +63,7 @@ const error = (status: number, message: string, extra: Record<string, unknown> =
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const UUID_ONLY = new RegExp(`^${UUID}$`, "i");
 const RUN_PATH = new RegExp(
-  `^/api/runs/(${UUID})(/events|/ws|/pay|/rerun|/restore|/spend|/snapshots/(\\d+)|/charts/(c\\d+)/(\\d+)\\.svg)?$`,
+  `^/api/runs/(${UUID})(/events|/ws|/pay|/rerun|/restore|/cancel|/spend|/image|/snapshots/(\\d+)|/charts/(c\\d+)/(\\d+)\\.svg)?$`,
   "i",
 );
 
@@ -185,6 +192,29 @@ async function ask(request: Request, env: Env, identity: Identity): Promise<Resp
   });
 }
 
+/** The questions of a page of the home page. */
+export const PUBLIC_PAGE = 24;
+
+/**
+ * GET /api/runs: the questions that were asked, newest first, PUBLIC_PAGE at a time; `after`, the
+ * last run of the page before. `next` is the run to ask after for the next page, null at the end.
+ */
+async function publicRuns(env: Env, url: URL): Promise<Response> {
+  const after = url.searchParams.get("after");
+  let before: { createdAt: string; id: string } | null = null;
+  if (after !== null) {
+    if (!UUID_ONLY.test(after)) return error(400, "after is the id of a run.");
+    before = await cursorOf(env.DB, after.toLowerCase());
+    if (!before) return error(404, "No such run.");
+  }
+  const runs = await listPublicRuns(env.DB, PUBLIC_PAGE + 1, before);
+  const page = runs.slice(0, PUBLIC_PAGE);
+  return json(200, {
+    runs: page,
+    next: runs.length > PUBLIC_PAGE ? (page.at(-1)?.id ?? null) : null,
+  });
+}
+
 /** POST /api/pay/hook: `{ id }` of the jobs service's webhook, `Authorization: Bearer <run token>`. */
 async function payHook(request: Request, env: Env): Promise<Response> {
   const token = /^Bearer\s+(\S+)$/i.exec(request.headers.get("authorization")?.trim() ?? "")?.[1];
@@ -240,6 +270,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   }
 
   if (url.pathname === "/api/runs") {
+    if (method === "GET") return publicRuns(env, url);
     if (method !== "POST") return error(405, "Method not allowed.");
     return ask(request, env, identity);
   }
@@ -321,6 +352,20 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       : error(404, "No such run.");
   }
 
+  if (sub === "/cancel") {
+    if (method !== "POST") return error(405, "Method not allowed.");
+    const user = requireUser(identity);
+    if (user instanceof Response) return user;
+    const owner = await stub.owner();
+    if (owner === null) return error(404, "No such run.");
+    if (owner !== user.userId) return error(403, "Not your run.");
+    const result = await stub.cancel();
+    if (result === "ok") return new Response(null, { status: 204 });
+    return result === "not_found"
+      ? error(404, "No such run.")
+      : json(409, { error: "This run is no longer in progress.", reason: "ended" });
+  }
+
   if (sub === "/pay") {
     if (method !== "POST") return error(405, "Method not allowed.");
     const user = requireUser(identity);
@@ -338,6 +383,18 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     return result.reason === "not_found"
       ? error(404, "No such run.")
       : error(503, "The daily limit was reached. Try again tomorrow.", { reason: "daily_cap" });
+  }
+
+  if (sub === "/image" && method === "POST") {
+    const admin = requireAdmin(identity);
+    if (admin instanceof Response) return admin;
+    const models = await resolveRunModels(env);
+    if (!models.image) return error(503, "No image model is set.");
+    const drawn = await stub.redraw({ helper: models.helper ?? null, image: models.image });
+    if (drawn) return json(200, { image: (await stub.summary())?.image ?? null });
+    return (await stub.summary())
+      ? error(502, "The picture could not be drawn.")
+      : error(404, "No such run.");
   }
 
   if (sub === "/rerun") {
@@ -375,6 +432,22 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       return error(426, "Expected a WebSocket upgrade.");
     if (afterOf(url) === null) return error(400, "after is a sequence number.");
     return stub.fetch(request);
+  }
+
+  if (sub === "/image") {
+    const image = await stub.image();
+    if (!image) return error(404, "No picture.");
+    // A versioned URL never changes: a picture drawn again has another version.
+    const versioned = url.searchParams.get("v") === image.version;
+    return new Response(image.bytes, {
+      headers: {
+        "content-type": image.mediaType,
+        // the SVG of the local mode runs nothing either way
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
+        "x-content-type-options": "nosniff",
+        "cache-control": versioned ? "public, max-age=31536000, immutable" : "public, max-age=300",
+      },
+    });
   }
 
   if (match[4] !== undefined) {

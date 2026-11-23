@@ -197,6 +197,9 @@ export function respond(req: GenerateRequest<unknown>): FakeOutcome {
     // The helper's words for the link of a run (the RunObject of apps/web).
     case "link":
       return out({ words: ["Capital", "de", "Australia", "población", "Canberra"] });
+    // The helper's prompt for the picture of a run.
+    case "illustration":
+      return out({ prompt: "A quiet map of Australia with the city of Canberra marked by a pin." });
     default:
       return { kind: "error", message: `unscripted ${req.callKey}` };
   }

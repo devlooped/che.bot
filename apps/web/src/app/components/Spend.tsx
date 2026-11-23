@@ -18,6 +18,7 @@ function labelOf(pivot: SpendPivot, label: string): string {
   if (label === "utility") return t.panel.utility;
   if (label === "classifier") return t.spend.classifier;
   if (label === "helper") return t.spend.helper;
+  if (label === "image") return t.spend.image;
   return label;
 }
 

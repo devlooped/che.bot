@@ -42,6 +42,14 @@ export const RefreshIcon = () => (
   </Icon>
 );
 
+/** A square in a circle: stop a question in progress. */
+export const StopIcon = () => (
+  <Icon>
+    <circle cx="12" cy="12" r="8.5" />
+    <rect x="9" y="9" width="6" height="6" rx="0.8" />
+  </Icon>
+);
+
 export const TrashIcon = () => (
   <Icon>
     <path d="M4.5 6.5h15M9.5 6.5V4.5h5v2M6.5 6.5l.9 13h9.2l.9-13M10.2 10v6.5M13.8 10v6.5" />

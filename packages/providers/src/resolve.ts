@@ -1,7 +1,7 @@
 import type { CatalogModel } from "./catalog.ts";
 import { latestModel, modelFamily } from "./families.ts";
 import type { ModelRef } from "./provider.ts";
-import { MODEL_ROLES, type RoleKey } from "./roles.ts";
+import { MODEL_ROLES, type RoleKey, takesEffort } from "./roles.ts";
 
 /** A row of model_settings: the role and the family it uses (an old version is read as its family). */
 export interface ModelSetting {
@@ -33,8 +33,7 @@ export function resolveModels(
       throw new Error(
         `No ${role.kind} model of the family ${family} in the catalog (${role.key}).`,
       );
-    // A decision model takes no reasoning effort.
-    const effort = role.kind === "decision" ? null : setting ? setting.effort : role.defaultEffort;
+    const effort = !takesEffort(role.kind) ? null : setting ? setting.effort : role.defaultEffort;
     return [role.key, { id: latest.id, effort }];
   });
   return Object.fromEntries(entries) as ModelSnapshot;

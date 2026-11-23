@@ -402,6 +402,10 @@ export function respond(req: GenerateRequest<unknown>): FakeOutcome {
       const question = req.prompt.replace(/^Question:\s*/, "").replace(/\[[^\]]*\]/g, "");
       return out({ words: question.split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 3) });
     }
+    case "illustration":
+      return out({
+        prompt: `An editorial illustration about: ${req.prompt.replace(/^Question:\s*/, "")}`,
+      });
   }
   return { kind: "error", message: `The local scenario has no answer for ${req.callKey}.` };
 }
