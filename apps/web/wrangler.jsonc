@@ -5,6 +5,12 @@
   "main": "./src/worker/index.ts",
   "compatibility_date": "2026-11-01",
   "observability": { "enabled": true },
+  // The public hostnames, as Custom Domains of the zone che.bot (in this account): a deploy creates
+  // their DNS records and certificates.
+  "routes": [
+    { "pattern": "www.che.bot", "custom_domain": true },
+    { "pattern": "che.bot", "custom_domain": true }
+  ],
   // The built single-page app. With the Cloudflare Vite plugin the directory is the client build
   // (the plugin writes it into the deploy config); /api/*, the sign-in routes /auth/* and the pages
   // of runs /r/* (which may redirect to a run's link) always reach the Worker, and any other path
