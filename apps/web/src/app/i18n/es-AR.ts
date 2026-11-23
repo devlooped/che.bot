@@ -58,6 +58,7 @@ export const esAR = {
     signedInAs: (name: string) => `Entraste como ${name}`,
     menu: "Navegación",
     account: "Tu cuenta",
+    darkTheme: "Modo oscuro",
     myRuns: "Mis preguntas",
     admin: "Administración",
   },

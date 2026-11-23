@@ -4,7 +4,25 @@ import type { AuthUser } from "../auth/types.ts";
 import { t } from "../i18n/index.ts";
 import { Link, usePath } from "../router/index.tsx";
 import { accountItems } from "../routes.tsx";
-import { HomeIcon, PlusIcon, ProfileIcon } from "./Icons.tsx";
+import { setTheme, useTheme } from "../theme.ts";
+import { HomeIcon, MoonIcon, PlusIcon, ProfileIcon, SunIcon } from "./Icons.tsx";
+
+/** The switch between the light page (the default) and the dark one: pressed when dark. */
+function ThemeSwitch() {
+  const dark = useTheme() === "dark";
+  return (
+    <button
+      type="button"
+      className="round-button"
+      aria-label={t.nav.darkTheme}
+      title={t.nav.darkTheme}
+      aria-pressed={dark}
+      onClick={() => setTheme(dark ? "light" : "dark")}
+    >
+      {dark ? <SunIcon /> : <MoonIcon />}
+    </button>
+  );
+}
 
 /**
  * The profile button of a signed-in user and its menu: their pages and "Salir". It closes with
@@ -78,7 +96,8 @@ function AccountMenu({ user, onSignOut }: { user: AuthUser; onSignOut: () => voi
 
 /**
  * The header of every page, in one row: the round home button, the name in the middle, then the
- * round buttons to ask and of the account; a double rule under it.
+ * round buttons of the theme, to ask (to sign in first, for someone signed out) and of the
+ * account; a double rule under it.
  */
 export function Header() {
   const { ready, user, local, signIn, signOut } = useSession();
@@ -95,7 +114,19 @@ export function Header() {
           {t.appName}
         </Link>
         <div className="header-end">
-          <Link to="/" className="round-button" aria-label={t.nav.ask} title={t.nav.ask}>
+          <ThemeSwitch />
+          <Link
+            to="/"
+            className="round-button"
+            aria-label={t.nav.ask}
+            title={t.nav.ask}
+            onClick={(e) => {
+              // Asking needs a session: someone signed out signs in first, and comes back to ask.
+              if (!ready || user) return;
+              e.preventDefault();
+              signIn("/");
+            }}
+          >
             <PlusIcon />
           </Link>
           {ready &&

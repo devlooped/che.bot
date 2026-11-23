@@ -1,4 +1,5 @@
 import { CHART_THEME, type Chart, clone, WEB_FIELDS } from "@chebot/protocol";
+import type { Theme } from "../theme.ts";
 
 // The Vega-Lite spec the browser draws (step 41), composed from the chart block of a version: its
 // layers and the app's fixed theme, as `chartSpec` composes it for the render gate, with what the
@@ -13,9 +14,31 @@ export const DATA_NAME = "table";
 /** A row of the data set: the fields of the chart, and for web charts `note` and `at`. */
 export type Datum = Record<string, string | number | null>;
 
-/** Colors of the drawing that are not the models': the ranges and the notes (from CHART_THEME). */
-const RANGE_COLOR = CHART_THEME.rule.color;
-const NOTE_COLOR = CHART_THEME.title.color;
+/**
+ * The colors of the fixed theme on the dark page: the tokens of styles.css for the dark theme, and
+ * lighter tones of the same hues for the marks.
+ */
+const DARK = {
+  background: "#1c232b",
+  axis: {
+    labelColor: "#c3ccd3",
+    titleColor: "#e4e9ec",
+    domainColor: "#6f7c88",
+    tickColor: "#6f7c88",
+    gridColor: "#34404b",
+  },
+  legend: { labelColor: "#c3ccd3", titleColor: "#e4e9ec" },
+  title: { color: "#e4e9ec" },
+  range: { category: ["#93abff", "#ff8597", "#57cfa5", "#e5ad55", "#9ba7b1", "#c39cf5"] },
+  mark: { color: "#93abff" },
+  rule: { color: "#ff8597" },
+} as const;
+
+/** Colors of the drawing that are not the models': the ranges and the notes. */
+const colorsOf = (theme: Theme) => {
+  const source = theme === "dark" ? DARK : CHART_THEME;
+  return { range: source.rule.color, note: source.title.color };
+};
 
 /** The channel that draws a field in an encoding ("x", "y"), or null. */
 function channelOf(encoding: Record<string, unknown>, field: string, among: string[]) {
@@ -66,9 +89,18 @@ export function withLocalDates(rows: readonly Datum[], fields: ReadonlySet<strin
   });
 }
 
-/** The page's adjustments to the fixed theme: the size of its text and no automatic labels. */
-function pageConfig(): Record<string, unknown> {
-  const theme = clone(CHART_THEME) as unknown as Record<string, unknown>;
+/** The page's adjustments to the fixed theme: its colors, the size of its text, no automatic labels. */
+function pageConfig(scheme: Theme): Record<string, unknown> {
+  const base = clone(CHART_THEME) as unknown as Record<string, unknown>;
+  const theme =
+    scheme === "dark"
+      ? {
+          ...base,
+          ...DARK,
+          axis: { ...(base.axis as object), ...DARK.axis },
+          title: { ...(base.title as object), ...DARK.title },
+        }
+      : base;
   return {
     ...theme,
     // The figure has a label of its own and the table is its text: the automatic descriptions of
@@ -87,7 +119,12 @@ function pageConfig(): Record<string, unknown> {
  * to that of its box. Web charts get the range and note layers when their encoding draws `key` and `value`
  * on two axes; any other encoding is drawn as the models wrote it.
  */
-export function browserSpec(chart: Chart, height: number): Record<string, unknown> {
+export function browserSpec(
+  chart: Chart,
+  height: number,
+  theme: Theme = "light",
+): Record<string, unknown> {
+  const colors = colorsOf(theme);
   const main: Record<string, unknown> = { mark: chart.mark, encoding: clone(chart.encoding) };
   // A line draws its points too: the reader can see where each month is and which one is marked.
   if (chart.mark === "line") main.mark = { type: "line", point: true };
@@ -98,7 +135,7 @@ export function browserSpec(chart: Chart, height: number): Record<string, unknow
     autosize: { type: "fit-x", contains: "padding" },
     data: { name: DATA_NAME },
     ...(chart.transform.length > 0 ? { transform: clone(chart.transform) } : {}),
-    config: pageConfig(),
+    config: pageConfig(theme),
   };
   const axes = webChannels(chart);
   if (!axes) return Object.assign(spec, main);
@@ -116,7 +153,7 @@ export function browserSpec(chart: Chart, height: number): Record<string, unknow
     main,
     {
       transform: [valid(WEB_FIELDS.low)],
-      mark: { type: "rule", strokeWidth: 3, color: RANGE_COLOR, strokeCap: "round" },
+      mark: { type: "rule", strokeWidth: 3, color: colors.range, strokeCap: "round" },
       encoding: {
         [dimension]: dim,
         [measure]: at(WEB_FIELDS.low),
@@ -130,7 +167,7 @@ export function browserSpec(chart: Chart, height: number): Record<string, unknow
         type: "point",
         shape: measure === "y" ? "M-1,0L1,0" : "M0,-1L0,1",
         filled: false,
-        stroke: RANGE_COLOR,
+        stroke: colors.range,
         strokeWidth: 3,
         strokeCap: "round",
         size: 140,
@@ -142,7 +179,7 @@ export function browserSpec(chart: Chart, height: number): Record<string, unknow
       transform: [{ filter: "isValid(datum.note)" }],
       mark: {
         type: "text",
-        color: NOTE_COLOR,
+        color: colors.note,
         fontWeight: 700,
         fontSize: 13,
         ...(measure === "y" ? { dy: -14 } : { dx: 14 }),

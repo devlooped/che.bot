@@ -138,6 +138,17 @@ test("someone who is not an admin does not see the admin page", async ({ page })
   expect(api.status()).toBe(403);
 });
 
+test("the + of someone signed out signs them in first, then opens the page to ask", async ({
+  page,
+}) => {
+  await page.goto("/mis-preguntas");
+  await expect(page.getByRole("button", { name: t.nav.signIn }).first()).toBeVisible();
+  await page.getByRole("link", { name: t.nav.ask }).click();
+  await page.getByRole("button", { name: t.local.users.contrib }).click();
+  await page.waitForURL((url) => url.pathname === "/");
+  await expect(page.getByLabel(t.ask.label)).toBeVisible();
+});
+
 test("Salir ends the session: the page offers to sign in again", async ({ page }) => {
   await signIn(page, newUser());
   await page.goto("/mis-preguntas");

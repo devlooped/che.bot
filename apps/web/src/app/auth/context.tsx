@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { type Api, createApi } from "../api.ts";
+import { navigate } from "../router/index.tsx";
 import { loadLocalMode } from "./load.ts";
 import type { AuthUser, LocalMode } from "./types.ts";
 
@@ -46,7 +47,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [picking, setPicking] = useState(false);
+  /** Where the local picker, while open, goes once someone signs in; null when closed. */
+  const [picking, setPicking] = useState<string | null>(null);
 
   const refresh = useCallback(
     () =>
@@ -74,7 +76,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(
     (returnTo = `${window.location.pathname}${window.location.search}`) => {
       setFailed(false);
-      if (local) setPicking(true);
+      if (local) setPicking(returnTo);
       else window.location.assign(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
     },
     [local],
@@ -90,11 +92,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   return (
     <SessionContext.Provider value={value}>
       {children}
-      {Picker && picking && (
+      {Picker && picking !== null && (
         <Picker
-          onClose={() => setPicking(false)}
+          onClose={() => setPicking(null)}
           onSignedIn={() => {
-            setPicking(false);
+            if (picking !== `${window.location.pathname}${window.location.search}`)
+              navigate(picking);
+            setPicking(null);
             refresh();
           }}
         />

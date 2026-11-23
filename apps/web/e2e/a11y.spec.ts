@@ -121,3 +121,18 @@ test("an answer with charts: their data and notes, a layer's discussion, the his
   await page.getByRole("button", { name: t.history.next }).click();
   expect(await violations(page)).toEqual([]);
 });
+
+test("the dark theme: an answer with charts, kept after a reload", async ({ page, request }) => {
+  const runId = await finishedRun(request, CHART_QUESTION);
+  await page.goto(`/r/${runId}`);
+  const toggle = page.getByRole("button", { name: t.nav.darkTheme });
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.getByTestId("stage-line")).toHaveText(DONE);
+  for (const chart of await page.getByTestId("chart").all())
+    await expect(chart.locator("svg").first()).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+});

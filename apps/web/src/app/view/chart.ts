@@ -18,6 +18,7 @@ import {
 } from "@chebot/protocol";
 import { browserSpec, type Datum, temporalFields, withLocalDates } from "../chart/spec.ts";
 import { t } from "../i18n/index.ts";
+import type { Theme } from "../theme.ts";
 import { type Discussion, discussionOf } from "./discussion.ts";
 
 // What the page shows of each chart of an answer (step 41), from the replayed view and
@@ -111,7 +112,7 @@ export interface ChartView {
   /** The data set of the drawing (the dates of the axis as local times). */
   data: Datum[];
   /** The spec of the drawing at a height in pixels. */
-  spec: (height: number) => Record<string, unknown>;
+  spec: (height: number, theme: Theme) => Record<string, unknown>;
   label: string;
 }
 
@@ -486,7 +487,7 @@ export function chartViewOf(view: RunView, id: string, version?: number): ChartV
     layers: layersOf(view, chart, first),
     dissent,
     data,
-    spec: (height) => browserSpec(chart, height),
+    spec: (height, theme) => browserSpec(chart, height, theme),
     label: t.chart.label(title),
   };
 }

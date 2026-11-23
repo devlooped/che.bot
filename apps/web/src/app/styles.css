@@ -14,6 +14,11 @@
   --rule-strong: #8b98a2;
   --ok: #0b6b50;
   --error: #a3122d;
+  /* The hover of a button of ink or of the error color, and the shadow of a sheet. */
+  --ink-strong: #000;
+  --error-strong: #7d0d22;
+  --shadow: rgba(23, 32, 43, 0.18);
+  --backdrop: rgba(23, 32, 43, 0.38);
 
   /* Chrome: focus and links to sources, the local mode and warnings, a live process. */
   --accent: #2d52c7;
@@ -44,6 +49,35 @@
   color: var(--ink);
   background: var(--paper);
   -webkit-text-size-adjust: 100%;
+}
+
+/* Dark: the same tokens on a dark paper; every ink keeps 4.5:1 or more on the paper and the tints.
+   The fills of the models stay; their inks are lighter tones of the same hues. */
+:root[data-theme="dark"] {
+  --paper: #13181e;
+  --paper-raised: #1c232b;
+  --ink: #e4e9ec;
+  --ink-soft: #c3ccd3;
+  --muted: #9ba7b1;
+  --rule: #34404b;
+  --rule-strong: #6f7c88;
+  --ok: #5fd3a9;
+  --error: #ff8597;
+  --ink-strong: #fff;
+  --error-strong: #ffb0bc;
+  --shadow: rgba(0, 0, 0, 0.5);
+  --backdrop: rgba(0, 0, 0, 0.6);
+
+  --accent: #93abff;
+  --notice: #e5ad55;
+  --live: #57cfa5;
+
+  --ink-grok: #a3dc6a;
+  --ink-claude: #f8a65e;
+  --ink-openai: #86c9f3;
+  --ink-gemini: #bf9cf2;
+
+  color-scheme: dark;
 }
 
 @media (min-width: 900px) {
@@ -278,7 +312,7 @@ a {
 }
 
 .button-primary:hover:not(:disabled) {
-  background: #000;
+  background: var(--ink-strong);
 }
 
 .button-quiet {
@@ -297,7 +331,7 @@ a {
 }
 
 .button-danger:hover:not(:disabled) {
-  background: #7d0d22;
+  background: var(--error-strong);
 }
 
 a.button {
@@ -1782,13 +1816,13 @@ a.button {
   max-width: 100%;
   max-height: 88vh;
   border-radius: 14px 14px 0 0;
-  box-shadow: 0 -8px 40px rgba(23, 32, 43, 0.18);
+  box-shadow: 0 -8px 40px var(--shadow);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
 .sheet::backdrop {
-  background: rgba(23, 32, 43, 0.38);
+  background: var(--backdrop);
 }
 
 .sheet[open] {
@@ -1845,7 +1879,7 @@ a.button {
     max-height: 100vh;
     width: min(31rem, 92vw);
     border-radius: 0;
-    box-shadow: -8px 0 40px rgba(23, 32, 43, 0.16);
+    box-shadow: -8px 0 40px var(--shadow);
   }
 
   .discussion-sheet[open] {

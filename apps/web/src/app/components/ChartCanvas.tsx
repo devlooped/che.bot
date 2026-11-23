@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Drawing } from "../chart/embed.ts";
 import type { Datum } from "../chart/spec.ts";
 import { t } from "../i18n/index.ts";
+import { type Theme, useTheme } from "../theme.ts";
 
 /** The height of the drawing for the width of its container: lower on a phone. */
 function heightFor(width: number): number {
@@ -27,7 +28,7 @@ export function ChartCanvas({
   data,
   label,
 }: {
-  spec: (height: number) => Record<string, unknown>;
+  spec: (height: number, theme: Theme) => Record<string, unknown>;
   data: readonly Datum[];
   label: string;
 }) {
@@ -35,6 +36,8 @@ export function ChartCanvas({
   const painter = useRef<Painter | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [size, setSize] = useState({ width: 0, height: 260 });
+  // a new theme is a new spec: the chart is drawn again in its colors
+  const theme = useTheme();
 
   // The drawing takes the width of its box, and a height for it (a phone gets a lower chart).
   useEffect(() => {
@@ -69,7 +72,7 @@ export function ChartCanvas({
     };
   }, []);
 
-  const specified = { ...spec(size.height), width: size.width };
+  const specified = { ...spec(size.height, theme), width: size.width };
   const key = JSON.stringify(specified);
   const rows = JSON.stringify(data);
 

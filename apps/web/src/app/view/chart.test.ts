@@ -122,12 +122,34 @@ describe("an answer with charts", () => {
   });
 
   it("composes a spec that Vega-Lite compiles, with one title on the axis of the values", () => {
-    const spec = chartViewOf(web, "c1")?.spec(300) ?? {};
+    const spec = chartViewOf(web, "c1")?.spec(300, "light") ?? {};
     expect(spec.title).toBeUndefined();
     const compiled = compile(spec as never).spec as { axes?: { title?: unknown }[] };
     const titles = (compiled.axes ?? []).map((a) => a.title).filter(Boolean);
     expect(titles).toContain("Inflación mensual (%)");
     expect(titles.join(" ")).not.toMatch(/low|high|\bat\b/);
+  });
+
+  it("draws the dark theme in its own colors, the sizes of the light one kept", () => {
+    type Themed = {
+      config: {
+        background: string;
+        axis: { labelColor: string; labelFontSize: number };
+        title: { fontSize: number };
+        rule: { color: string };
+      };
+      layer: { mark: { color?: string } }[];
+    };
+    const view = chartViewOf(web, "c1");
+    const light = view?.spec(300, "light") as unknown as Themed;
+    const dark = view?.spec(300, "dark") as unknown as Themed;
+    expect(dark.config.background).toBe("#1c232b");
+    expect(dark.config.axis.labelColor).toBe("#c3ccd3");
+    expect(dark.config.axis.labelFontSize).toBe(light.config.axis.labelFontSize);
+    expect(dark.config.title.fontSize).toBe(light.config.title.fontSize);
+    expect(dark.layer[1]?.mark.color).toBe("#ff8597");
+    expect(light.layer[1]?.mark.color).toBe(light.config.rule.color);
+    expect(() => compile(dark as never)).not.toThrow();
   });
 });
 

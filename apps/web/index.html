@@ -4,6 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>che.bot</title>
+    <script>
+      // The theme the reader chose (src/app/theme.ts), before the first paint: light by default.
+      try {
+        if (localStorage.getItem("che.theme") === "dark")
+          document.documentElement.dataset.theme = "dark";
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
