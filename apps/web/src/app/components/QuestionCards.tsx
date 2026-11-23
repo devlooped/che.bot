@@ -146,9 +146,9 @@ export function QuestionCards() {
 
   return (
     <section className="feed" aria-labelledby="feed-title" aria-busy={runs === null || loading}>
-      <h2 id="feed-title" className="feed-title">
+      <h1 id="feed-title" className="feed-title">
         {t.home.title}
-      </h2>
+      </h1>
       <p className="muted feed-lede">{t.home.lede}</p>
       {runs === null ? (
         !error && <p className="muted">{t.common.loading}</p>

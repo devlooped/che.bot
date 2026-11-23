@@ -29,7 +29,7 @@ test("nothing to ask for: the drafts put charts in the answer, each in its place
   page,
 }) => {
   await signIn(page, newUser());
-  await page.goto("/");
+  await page.goto("/new");
   await expect(page.getByRole("checkbox")).toHaveCount(0);
   await page.getByLabel(t.ask.label).fill(unique(CHART_QUESTION));
   await page.getByRole("button", { name: t.ask.submit }).click();

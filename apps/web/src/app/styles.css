@@ -636,12 +636,6 @@ a.button {
 
 /* Home: the questions asked, as cards ---------------------------------------------------------- */
 
-.feed {
-  margin-top: 3rem;
-  padding-top: 1.25rem;
-  border-top: 3px double var(--ink);
-}
-
 .feed-title {
   font-family: var(--serif);
   font-weight: 450;

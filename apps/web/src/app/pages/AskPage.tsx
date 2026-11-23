@@ -3,7 +3,6 @@ import { type FormEvent, useState } from "react";
 import { MAX_QUESTION_CHARS } from "../api.ts";
 import { useSession } from "../auth/context.tsx";
 import { ModelMark } from "../components/ModelMark.tsx";
-import { QuestionCards } from "../components/QuestionCards.tsx";
 import { t } from "../i18n/index.ts";
 import { navigate } from "../router/index.tsx";
 import { runPath } from "../routes.tsx";
@@ -11,7 +10,7 @@ import { errorText } from "../view/errors.ts";
 
 const count = new Intl.NumberFormat(t.locale);
 
-/** The home page: asking, then every question asked, as cards, then how it works. */
+/** The page to ask, the one of the + of the header: what che.bot does, the question, how it works. */
 export function AskPage() {
   const { ready, user, api, signIn, failed } = useSession();
   const [question, setQuestion] = useState("");
@@ -36,7 +35,7 @@ export function AskPage() {
   }
 
   return (
-    <main className="page home">
+    <main className="page">
       <div className="ask">
         <section className="hero">
           <ul className="hero-seats" aria-hidden="true">
@@ -94,14 +93,12 @@ export function AskPage() {
                 {t.errors.signInFailed}
               </p>
             )}
-            <button type="button" className="button button-primary" onClick={() => signIn("/")}>
+            <button type="button" className="button button-primary" onClick={() => signIn("/new")}>
               {t.ask.signInToAsk}
             </button>
           </section>
         )}
       </div>
-
-      <QuestionCards />
 
       <section className="how" aria-labelledby="how-title">
         <h2 id="how-title" className="section-title">

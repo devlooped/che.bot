@@ -3,6 +3,7 @@ import { type AuthUser, isAdmin } from "./auth/types.ts";
 import { t } from "./i18n/index.ts";
 import { AdminPage } from "./pages/AdminPage.tsx";
 import { AskPage } from "./pages/AskPage.tsx";
+import { HomePage } from "./pages/HomePage.tsx";
 import { MyRunsPage } from "./pages/MyRunsPage.tsx";
 import { RunPage } from "./pages/RunPage.tsx";
 
@@ -14,7 +15,8 @@ export interface Route {
 }
 
 export const routes: Route[] = [
-  { pattern: "/", page: AskPage },
+  { pattern: "/", page: HomePage },
+  { pattern: "/new", page: AskPage },
   { pattern: "/r/:id", page: RunPage },
   { pattern: "/mis-preguntas", page: MyRunsPage },
   { pattern: "/admin", page: AdminPage },

@@ -28,8 +28,11 @@ test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
-test("the ask page, signed out and signed in", async ({ page }) => {
+test("the home page, and the page to ask signed out and signed in", async ({ page }) => {
   await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1, name: t.home.title })).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+  await page.goto("/new");
   await expect(page.getByRole("button", { name: t.ask.signInToAsk })).toBeVisible();
   expect(await violations(page)).toEqual([]);
   await signIn(page, newUser());
@@ -63,7 +66,7 @@ test("a finished answer, its discussion, and its history", async ({ page, reques
 
 test("the price, the QR and an expired payment", async ({ page }) => {
   await signIn(page, newUser());
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByLabel(t.ask.label).fill(uniqueQuestion());
   await page.getByRole("button", { name: t.ask.submit }).click();
   await expect(page.getByTestId("quote")).toBeVisible();

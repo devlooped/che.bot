@@ -71,7 +71,7 @@ test("the home page shows a question asked as a card with its picture, and a quo
   ).toBe(201);
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 2, name: t.home.title })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: t.home.title })).toBeVisible();
   const card = page.getByTestId("question-card").filter({ hasText: asked });
   // Other tests ask at the same time: the card may be on a later page.
   await expect(page.getByTestId("question-card").first()).toBeVisible();
@@ -177,7 +177,7 @@ test("the + of someone signed out signs them in first, then opens the page to as
   await expect(page.getByRole("button", { name: t.nav.signIn }).first()).toBeVisible();
   await page.getByRole("link", { name: t.nav.ask }).click();
   await page.getByRole("button", { name: t.local.users.contrib }).click();
-  await page.waitForURL((url) => url.pathname === "/");
+  await page.waitForURL((url) => url.pathname === "/new");
   await expect(page.getByLabel(t.ask.label)).toBeVisible();
 });
 

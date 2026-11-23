@@ -116,7 +116,7 @@ export function Header() {
         <div className="header-end">
           <ThemeSwitch />
           <Link
-            to="/"
+            to="/new"
             className="round-button"
             aria-label={t.nav.ask}
             title={t.nav.ask}
@@ -124,7 +124,7 @@ export function Header() {
               // Asking needs a session: someone signed out signs in first, and comes back to ask.
               if (!ready || user) return;
               e.preventDefault();
-              signIn("/");
+              signIn("/new");
             }}
           >
             <PlusIcon />

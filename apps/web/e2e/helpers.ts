@@ -40,7 +40,7 @@ export async function signIn(page: Page, user: TestUser) {
 
 /** Asks through the page and lands on the run page; returns the run id. */
 export async function ask(page: Page, question = SCENARIO_QUESTION): Promise<string> {
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByLabel(t.ask.label).fill(question);
   await page.getByRole("button", { name: t.ask.submit }).click();
   await page.waitForURL(/\/r\/[0-9a-f-]{36}$/);

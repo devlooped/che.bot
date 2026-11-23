@@ -6,7 +6,7 @@ const price = t.money(10_000, "ARS");
 test("sign in, ask, see the class and the price, pay, and reach a finished answer", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("button", { name: t.ask.signInToAsk }).click();
   await page.getByRole("button", { name: t.local.users.contrib }).click();
   await expect(page.getByLabel(t.ask.label)).toBeVisible();
@@ -116,7 +116,7 @@ test("an admin runs without paying", async ({ page }) => {
 
 test("a refusal of the API reads in plain words", async ({ page }) => {
   await signIn(page, newUser([]));
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByLabel(t.ask.label).fill("¿Qué hora es en Tokio?");
   await page.getByRole("button", { name: t.ask.submit }).click();
   await expect(page.getByRole("alert")).toHaveText(t.errors.noAccess);

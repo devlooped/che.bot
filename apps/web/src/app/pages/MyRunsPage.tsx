@@ -171,7 +171,7 @@ export function MyRunsPage() {
           {active.length === 0 ? (
             <section className="empty">
               <p>{t.myRuns.empty}</p>
-              <Link to="/" className="button button-primary">
+              <Link to="/new" className="button button-primary">
                 {t.myRuns.askFirst}
               </Link>
             </section>
