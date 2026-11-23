@@ -24,7 +24,8 @@ import {
 //                                   the code verifier, verifies the ID token, and sets the session
 //   GET /auth/logout                clears the session and signs out of the tenant
 //
-// A failed sign-in clears the sign-in cookie and goes back to /?signin=failed, which the page words.
+// A failed sign-in clears the sign-in cookie and goes back to /new?signin=failed, which the page to
+// ask words beside its button to sign in.
 
 /** "tenant.us.auth0.com", whether AUTH0_DOMAIN carries a scheme or a trailing slash or not. */
 export function auth0Host(domain: string): string {
@@ -203,7 +204,7 @@ async function callback(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const failed = (why: string) => {
     console.warn(`Sign-in failed: ${why}`);
-    return redirect("/?signin=failed", [clearLoginCookie(url)]);
+    return redirect("/new?signin=failed", [clearLoginCookie(url)]);
   };
   const login = await pendingLogin(request, env);
   if (!login) return failed("no sign-in was started here, or it expired.");

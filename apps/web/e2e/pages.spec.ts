@@ -194,7 +194,7 @@ test("Salir ends the session: the page offers to sign in again", async ({ page }
 });
 
 test("a sign-in that failed says so in plain words, once", async ({ page }) => {
-  await page.goto("/?signin=failed");
+  await page.goto("/new?signin=failed");
   await expect(page.getByRole("alert")).toHaveText(t.errors.signInFailed);
-  await expect(page).toHaveURL((url) => url.pathname === "/" && url.search === "");
+  await expect(page).toHaveURL((url) => url.pathname === "/new" && url.search === "");
 });

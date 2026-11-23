@@ -180,7 +180,7 @@ describe("signing in", () => {
     for (const [why, who, options] of cases) {
       const { callback, session } = await signInThrough(tenant, who, options);
       expect(callback.status, why).toBe(302);
-      expect(callback.headers.get("location"), why).toBe("/?signin=failed");
+      expect(callback.headers.get("location"), why).toBe("/new?signin=failed");
       expect(session, why).toBeNull();
       expect(cookiesOf(callback).get(LOGIN_COOKIE)?.attributes, why).toMatch(/^Max-Age=0;/);
     }
