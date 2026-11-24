@@ -84,6 +84,11 @@ export function progressOptions(model: ModelRef): ProviderOptions {
     return {
       google: { ...google, thinkingConfig: { ...google.thinkingConfig, includeThoughts: true } },
     };
+  // Claude thinks adaptively at any effort, but leaves the text of its thinking out unless asked.
+  if (options.anthropic)
+    return {
+      anthropic: { ...options.anthropic, thinking: { type: "adaptive", display: "summarized" } },
+    };
   return options;
 }
 

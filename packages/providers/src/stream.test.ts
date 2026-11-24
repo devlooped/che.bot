@@ -3,7 +3,7 @@ import { expect, test } from "vitest";
 import { z } from "zod";
 import { createGatewayProvider, progressOptions } from "./gateway.ts";
 import { ProviderError } from "./provider.ts";
-import { assemble } from "./stream.ts";
+import { assemble, JsonProse } from "./stream.ts";
 
 type StreamResult = Awaited<ReturnType<MockLanguageModelV4["doStream"]>>;
 type Part = StreamResult["stream"] extends ReadableStream<infer P> ? P : never;
@@ -138,7 +138,30 @@ test("the reasoning of OpenAI and Gemini is asked for; a model without an effort
     google: { thinkingConfig: { thinkingLevel: "high", includeThoughts: true } },
   });
   expect(progressOptions({ id: "anthropic/claude-opus-5.5", effort: "medium" })).toEqual({
-    anthropic: { effort: "medium" },
+    anthropic: { effort: "medium", thinking: { type: "adaptive", display: "summarized" } },
   });
   expect(progressOptions({ id: "openai/gpt-6.1-sol", effort: null })).toBeUndefined();
+});
+
+test("the prose of the string values of a JSON output is told as it streams; keys, labels and URLs are not", () => {
+  const said: string[] = [];
+  const json = new JsonProse((text, first) => said.push(first ? `|${text}` : text));
+  const output = JSON.stringify({
+    answer: 'Mide 6.960,8 m.\n\nLo midió "UNCuyo" en 2012 ✓',
+    claims: [{ text: "La cifra oficial es del IGN.", confidence: "high" }],
+    sources: ["https://www.ign.gob.ar/una/pagina/larga"],
+    verdict: { kind: "fact", rating: "none" },
+  });
+  for (let i = 0; i < output.length; i += 7) json.push(output.slice(i, i + 7));
+  expect(said.join("")).toBe(
+    '|Mide 6.960,8 m.\n\nLo midió "UNCuyo" en 2012 ✓|La cifra oficial es del IGN.',
+  );
+});
+
+test("a unicode escape of JSON is decoded, even split across deltas", () => {
+  const said: string[] = [];
+  const json = new JsonProse((text) => said.push(text));
+  for (const delta of ['{"a":"La respuesta est', "\\u00", 'e1 lista, sin duda."}'])
+    json.push(delta);
+  expect(said.join("")).toBe("La respuesta está lista, sin duda.");
 });
