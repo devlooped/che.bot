@@ -1298,9 +1298,28 @@ a.button {
 }
 
 .progress-note {
+  position: relative;
   padding-left: 0.7rem;
-  border-left: 2px solid var(--ink-model);
   animation: fade-in 0.3s ease-out;
+}
+
+/* The rule in the seat's ink, a brighter band going up and down it while the call goes (still,
+   centered, with reduced motion). */
+.progress-note::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  border-radius: 1px;
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--ink-model) 30%, transparent) 38%,
+      var(--ink-model) 50%,
+      color-mix(in srgb, var(--ink-model) 30%, transparent) 62%
+    )
+    0 50% / 100% 200%;
+  animation: progress-sweep 1.6s ease-in-out infinite alternate;
 }
 
 .progress-name {
@@ -2788,6 +2807,15 @@ a.button {
 @keyframes fade-in {
   from {
     opacity: 0;
+  }
+}
+
+@keyframes progress-sweep {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 0 100%;
   }
 }
 
