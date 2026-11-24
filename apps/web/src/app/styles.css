@@ -1579,11 +1579,10 @@ a.button {
   background: var(--paper-raised);
 }
 
-/* The marks of who holds a paragraph: a single column on a phone, where the gutter is as wide as
-   one mark; on a wider screen two to a line, the first two on the first line, the rest below. */
+/* The marks of who holds a paragraph: one to a line on a narrow screen, where the gutter is as
+   wide as one mark; from 900px two to a line, the first two on the first line, the rest below. */
 .support {
   display: inline-grid;
-  grid-auto-flow: row;
   gap: 4px 5px;
 }
 
