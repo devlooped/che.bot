@@ -648,15 +648,9 @@ export class RunObject extends DurableObject<Env> {
     // The run may have been deleted while the helper answered.
     const current = this.store.run();
     if (!current) return;
-    const before = current.helper;
     this.store.updateRun({
       link,
-      helper: JSON.stringify({
-        model: model.id,
-        costUsd: (before?.costUsd ?? 0) + cost.costUsd,
-        inputTokens: (before?.inputTokens ?? 0) + cost.inputTokens,
-        outputTokens: (before?.outputTokens ?? 0) + cost.outputTokens,
-      } satisfies CallCost),
+      helper: JSON.stringify([...current.linkCalls, cost] satisfies CallCost[]),
     });
   }
 
@@ -891,7 +885,8 @@ export class RunObject extends DurableObject<Env> {
     const calls: SpendCall[] = [];
     if (run.classify)
       calls.push({ agent: "classifier", stage: "classify", running: false, ...run.classify });
-    if (run.helper) calls.push({ agent: "helper", stage: "link", running: false, ...run.helper });
+    for (const call of run.linkCalls)
+      calls.push({ agent: "helper", stage: "link", running: false, ...call });
     for (const call of run.imageCalls)
       calls.push({ agent: call.stage === "image" ? "image" : "helper", running: false, ...call });
     const inFlight = new Map<string, SpendCall>();

@@ -108,6 +108,16 @@ export interface CallCost {
   outputTokens: number;
 }
 
+/**
+ * The helper's calls for the link, from the `helper` column: a list of every try, or, in an object
+ * written before it kept them apart, one summed call.
+ */
+function linkCallsOf(json: string | null): CallCost[] {
+  if (!json) return [];
+  const parsed = JSON.parse(json) as CallCost | CallCost[];
+  return Array.isArray(parsed) ? parsed : [parsed];
+}
+
 /** A call for the picture of the run: the helper's prompt ("illustration") or the drawing ("image"). */
 export interface ImageCall extends CallCost {
   stage: "illustration" | "image";
@@ -168,9 +178,9 @@ export interface RunRecord {
   classify: CallCost | null;
   /** The words of the link (run-link.ts), once the helper chose them. */
   link: string | null;
-  /** What the helper's calls for the link cost, summed; null before the first. */
-  helper: CallCost | null;
-  /** The helper's calls for the link so far. */
+  /** The helper's calls for the link so far, every try. */
+  linkCalls: CallCost[];
+  /** How many times the helper was asked for the link (LINK_TRIES at most). */
   linkTries: number;
   /** The version of the picture of the question; null before it has one. */
   image: string | null;
@@ -301,7 +311,7 @@ export class RunStore {
       state: row.state ? (JSON.parse(row.state) as RunState) : null,
       classify: row.classify ? (JSON.parse(row.classify) as CallCost) : null,
       link: row.link,
-      helper: row.helper ? (JSON.parse(row.helper) as CallCost) : null,
+      linkCalls: linkCallsOf(row.helper),
       linkTries: row.link_tries,
       image: row.image,
       imageTries: row.image_tries,

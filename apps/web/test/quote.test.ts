@@ -183,5 +183,6 @@ const spentOf = (stub: DurableObjectStub<RunObject>) =>
   runInDurableObject(stub, (_: RunObject, state) => {
     const run = new RunStore(state.storage.sql).run();
     const picture = run?.imageCalls.reduce((sum, call) => sum + call.costUsd, 0) ?? 0;
-    return (run?.state?.spentUsd ?? 0) + (run?.helper?.costUsd ?? 0) + picture;
+    const link = run?.linkCalls.reduce((sum, call) => sum + call.costUsd, 0) ?? 0;
+    return (run?.state?.spentUsd ?? 0) + link + picture;
   });

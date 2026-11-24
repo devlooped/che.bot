@@ -71,6 +71,9 @@ describe("the link", () => {
     for (let n = 0; n < LINK_TRIES + 2; n++) await runDurableObjectAlarm(stub);
     expect(provider.calls.filter((c) => c.callKey.startsWith("link:"))).toHaveLength(LINK_TRIES);
     expect(await stub.summary()).toMatchObject({ link: null, status: "running" });
+    // The spend counts every try, not one call of their summed cost.
+    const spend = (await stub.spend())?.rows.stage.find((r) => r.label === "link");
+    expect(spend?.calls).toBe(LINK_TRIES);
   });
 
   test("the UUID page and the short link redirect for good to the link; the link resolves to the UUID", async () => {
@@ -103,8 +106,12 @@ test("an object created before the link columns gets them when it is read again"
   });
   await runInDurableObject(stub, (_: RunObject, state) => {
     const store = new RunStore(state.storage.sql);
-    expect(store.run()).toMatchObject({ owner: "ana", link: null, helper: null, linkTries: 0 });
+    expect(store.run()).toMatchObject({ owner: "ana", link: null, linkCalls: [], linkTries: 0 });
     store.updateRun({ link: "abc-una-prueba" });
     expect(store.run()?.link).toBe("abc-una-prueba");
+    // An object of before kept the helper's tries as one summed call.
+    const summed = { model: "haiku", costUsd: 0.003, inputTokens: 30, outputTokens: 3 };
+    store.updateRun({ helper: JSON.stringify(summed) });
+    expect(store.run()?.linkCalls).toEqual([summed]);
   });
 });
