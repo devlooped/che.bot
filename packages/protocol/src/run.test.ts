@@ -343,6 +343,19 @@ describe("stopping rules", () => {
     expect(nextStep(state, T0)).toEqual({ kind: "done" });
   });
 
+  test("the country of the person asking reaches every draft and round, and only when known", () => {
+    const rule = "The person asking lives in Argentina.";
+    const systems = (country: string | null) =>
+      drive({ mode: "thorough", country }, scripted)
+        .steps.flatMap((s) => s.calls)
+        .filter((c) => c.kind === "draft" || c.kind.startsWith("round"))
+        .map((c) => c.system);
+    const withCountry = systems(" Argentina ");
+    expect(withCountry.length).toBeGreaterThan(4);
+    for (const system of withCountry) expect(system).toContain(rule);
+    for (const system of systems(null)) expect(system).not.toContain("The person asking lives in");
+  });
+
   test("a driver error fails a running run once; an ended run is left as it is", () => {
     const { state: started } = createRun(
       { id: "run-1", question: "?", mode: "thorough", models: SNAPSHOT_MODELS },

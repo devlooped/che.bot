@@ -79,6 +79,7 @@ export async function quoteQuestion(
   env: Env,
   owner: string,
   question: string,
+  country: string | null = null,
 ): Promise<Quote & { costUsd: number }> {
   const classification = await classifyQuestion(env, question);
   const price = await priceOf(env.DB, classification.class);
@@ -87,6 +88,7 @@ export async function quoteQuestion(
     id,
     owner,
     question,
+    country,
     class: classification.class,
     probability: classification.probability,
     amount: price.amount,

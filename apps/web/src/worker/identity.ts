@@ -3,7 +3,7 @@ import type { Env } from "./env.ts";
 /** Who calls the API: a signed-in user with the roles of their session, or nobody. */
 export type Identity =
   | { kind: "anonymous" }
-  | { kind: "user"; userId: string; name: string; roles: string[] };
+  | { kind: "user"; userId: string; name: string; roles: string[]; country?: string | null };
 
 export type User = Extract<Identity, { kind: "user" }>;
 

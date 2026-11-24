@@ -13,6 +13,16 @@ export const LANGUAGE_RULE =
 export const VERDICT_RULE =
   "kind: claim when it asks to check something stated (a statement, a quote, a rumor, «¿Es cierto que...?»); question when it asks for a yes or a no; fact when it asks for a fact, a figure, a list, an explanation or advice. rating: for a claim, true, false, depends (misleading: true only in part, out of context or exaggerated) or unknown (the evidence does not settle it); for a question, true (yes), false (no), depends (it depends, or it is debated) or unknown (nobody can tell yet); for a fact, none.";
 
+/**
+ * The country of the person asking, for a question that names no place: "Censo 2025" or "Inflación
+ * de los últimos 10 años" are about it. Null when the country is not known.
+ */
+export function countryRule(country: string | null | undefined): string | null {
+  const name = country?.trim();
+  if (!name) return null;
+  return `The person asking lives in ${name}. When the question names no place and would have a different answer in another country (a census, inflation, prices, taxes, laws, elections, holidays), take it to be about ${name} and say so in a few words. When it names a place, or no place changes the answer, ignore this.`;
+}
+
 export const STRUCTURED_RULE =
   "Return only the structured object requested, with every field present. Leave a list empty rather than inventing content.";
 

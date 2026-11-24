@@ -1,6 +1,7 @@
 import type { Snapshot, Source } from "../model.ts";
 import { chartRoundRules, type DisputeView, renderCharts, renderDisputes } from "./chart.ts";
 import {
+  countryRule,
   LANGUAGE_RULE,
   type Prompt,
   renderDocument,
@@ -25,6 +26,8 @@ export interface ThreadView {
 
 export function roundPrompt(input: {
   question: string;
+  /** The country of the person asking, when known (countryRule). */
+  country?: string | null;
   round: 1 | 2 | 3;
   cap: number;
   snapshot: Snapshot;
@@ -49,6 +52,8 @@ export function roundPrompt(input: {
   const rules = [
     `You are one of four reviewers improving a shared answer to a user's question, in round ${round} of 3. You never edit the answer: you ${tasks.join(", ")}. Code applies the decisions once at the end of the round.`,
   ];
+  const country = countryRule(input.country);
+  if (country) rules.push(country);
   if (proposes) {
     rules.push(
       charts ? "Suggestions on the text:" : "Suggestions:",

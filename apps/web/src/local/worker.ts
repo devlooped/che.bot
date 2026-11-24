@@ -123,12 +123,16 @@ function ensureSchema(db: D1Database): Promise<void> {
   return schemaReady;
 }
 
-/** POST /api/local/sign-in `{ id, name, roles }`: the session of a test user, without Auth0. */
+/**
+ * POST /api/local/sign-in `{ id, name, roles, country? }`: the session of a test user, without
+ * Auth0.
+ */
 async function signIn(request: Request, env: Env): Promise<Response> {
   const body = (await request.json().catch(() => null)) as {
     id?: unknown;
     name?: unknown;
     roles?: unknown;
+    country?: unknown;
   } | null;
   const roles = Array.isArray(body?.roles) ? body.roles : [];
   if (
@@ -139,7 +143,8 @@ async function signIn(request: Request, env: Env): Promise<Response> {
   )
     return new Response("The body is { id, name, roles }.", { status: 400 });
   const url = new URL(request.url);
-  const user = { userId: body.id, name: body.name || body.id, roles };
+  const country = typeof body.country === "string" && body.country.trim() ? body.country : null;
+  const user = { userId: body.id, name: body.name || body.id, roles, country };
   return new Response(null, {
     status: 204,
     headers: { "set-cookie": await sessionCookie(url, env, user) },

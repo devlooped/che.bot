@@ -201,6 +201,8 @@ export interface RunState {
   v: 1;
   id: string;
   question: string;
+  /** The country of the person asking; null (or absent, in a run stored before it) when unknown. */
+  country?: string | null;
   mode: Mode;
   models: ModelSnapshot;
   config: RunConfig;
@@ -255,6 +257,8 @@ export interface RunState {
 export interface CreateRunInput {
   id: string;
   question: string;
+  /** The country of the person asking, when known: the drafts and rounds read it (countryRule). */
+  country?: string | null;
   mode: Mode;
   models: ModelSnapshot;
   config?: ConfigOverrides;
@@ -282,6 +286,7 @@ export function createRun(
     v: 1,
     id: input.id,
     question: input.question,
+    country: input.country?.trim() || null,
     mode: input.mode,
     models: input.models,
     config,
@@ -457,6 +462,7 @@ function draftStep(state: RunState): CallsStep {
   const maxResults = state.config.searchResultsPerDraft;
   const prompt = draftPrompt({
     question: state.question,
+    country: state.country,
     maxResults,
     maxCharts: CHART_LIMITS.charts,
     maxRows: CHART_LIMITS.rowsPerBrief,
@@ -554,6 +560,7 @@ function roundPromptFor(state: RunState, voter: ModelId, round: 1 | 2 | 3) {
     : null;
   return roundPrompt({
     question: state.question,
+    country: state.country,
     round,
     cap: round === 1 ? state.config.caps.round1 : state.config.caps.round2,
     snapshot,

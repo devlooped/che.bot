@@ -205,7 +205,7 @@ async function ask(request: Request, env: Env, identity: Identity): Promise<Resp
     return error(503, "The daily limit was reached. Try again tomorrow.", {
       reason: "daily_cap",
     });
-  const quote = await quoteQuestion(env, user.userId, parsed.question);
+  const quote = await quoteQuestion(env, user.userId, parsed.question, user.country ?? null);
   if (typeof replaces === "string") await setReplaces(env.DB, quote.runId, replaces.toLowerCase());
   if (quote.costUsd > 0)
     await meter.settle(`${quote.runId}:classify`, quote.costUsd).catch((e: unknown) => {

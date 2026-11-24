@@ -76,6 +76,20 @@ export function rolesOf(...payloads: JWTPayload[]): string[] {
 }
 
 /**
+ * The country claim, as a post-login Action of the tenant sets it: `country`, alone or at the end of
+ * a namespaced claim such as `https://che.bot/country`.
+ */
+const COUNTRY_CLAIM = /^(?:.*[/:.])?country$/i;
+
+/** The country of the user: the first country claim of the tokens with some text, or null. */
+export function countryOf(...payloads: JWTPayload[]): string | null {
+  for (const payload of payloads)
+    for (const [key, value] of Object.entries(payload))
+      if (COUNTRY_CLAIM.test(key) && typeof value === "string" && value.trim()) return value.trim();
+  return null;
+}
+
+/**
  * `returnTo` when it is a path of this origin, "/" for anything else. The path is checked after
  * the URL parser normalized it: "/.//evil.test" becomes "//evil.test", which a browser would read
  * as another host.
@@ -196,6 +210,7 @@ async function userOfCode(
     userId: payload.sub,
     name: text(payload.name) ?? text(payload.email) ?? payload.sub,
     roles: rolesOf(...sources),
+    country: countryOf(...sources),
   };
 }
 

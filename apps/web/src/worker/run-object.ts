@@ -144,6 +144,8 @@ export interface QuoteInput {
   id: string;
   owner: string;
   question: string;
+  /** The country of the person asking, from their sign-in; null when unknown. */
+  country?: string | null;
   class: QuestionClass;
   /** The probability of the classifier's choice; null when it gave none. */
   probability: number | null;
@@ -370,6 +372,7 @@ export class RunObject extends DurableObject<Env> {
           {
             id: run.id,
             question: run.question,
+            country: run.country,
             mode: "thorough",
             models,
             config,
@@ -509,6 +512,7 @@ export class RunObject extends DurableObject<Env> {
         {
           id: run.id,
           question: run.question,
+          country: run.country,
           mode: "thorough",
           models: run.models,
           config: {

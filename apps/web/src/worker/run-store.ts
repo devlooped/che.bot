@@ -61,7 +61,8 @@ const SCHEMA = [
      image_calls TEXT,
      tldr TEXT,
      tldr_tries INTEGER NOT NULL DEFAULT 0,
-     tldr_calls TEXT
+     tldr_calls TEXT,
+     country TEXT
    )`,
   `CREATE TABLE IF NOT EXISTS events (
      seq INTEGER PRIMARY KEY,
@@ -104,6 +105,7 @@ const ADDED_COLUMNS: readonly [string, string][] = [
   ["tldr", "TEXT"],
   ["tldr_tries", "INTEGER NOT NULL DEFAULT 0"],
   ["tldr_calls", "TEXT"],
+  ["country", "TEXT"],
 ];
 
 /** A model call made beside the protocol (the classification, the link): what it cost. */
@@ -149,6 +151,8 @@ export interface RunRecord {
   id: string;
   owner: string;
   question: string;
+  /** The country of the person asking, from their sign-in; null when the tenant gave none. */
+  country: string | null;
   class: QuestionClass;
   probability: number | null;
   amount: number;
@@ -238,6 +242,7 @@ interface RunRow extends Record<string, SqlStorageValue> {
   tldr: string | null;
   tldr_tries: number;
   tldr_calls: string | null;
+  country: string | null;
 }
 
 /** The columns of the run row that `updateRun` may set. */
@@ -303,6 +308,7 @@ export class RunStore {
       id: row.id,
       owner: row.owner,
       question: row.question,
+      country: row.country,
       class: row.class as QuestionClass,
       probability: row.probability,
       amount: row.amount,
@@ -375,6 +381,7 @@ export class RunStore {
     id: string;
     owner: string;
     question: string;
+    country?: string | null;
     class: QuestionClass;
     probability: number | null;
     amount: number;
@@ -383,11 +390,12 @@ export class RunStore {
     classify?: CallCost | null;
   }): void {
     this.sql.exec(
-      `INSERT INTO run (id, owner, question, class, probability, amount, currency, status, created_at, classify)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'quoted', ?, ?)`,
+      `INSERT INTO run (id, owner, question, country, class, probability, amount, currency, status, created_at, classify)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'quoted', ?, ?)`,
       run.id,
       run.owner,
       run.question,
+      run.country ?? null,
       run.class,
       run.probability,
       run.amount,

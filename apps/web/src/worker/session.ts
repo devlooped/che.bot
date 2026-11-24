@@ -96,7 +96,7 @@ export async function sessionCookie(
   const token = await sign(
     env,
     SESSION_AUDIENCE,
-    { sub: user.userId, name: user.name, roles: user.roles },
+    { sub: user.userId, name: user.name, roles: user.roles, country: user.country ?? null },
     SESSION_SECONDS,
   );
   return cookie(url, sessionCookieName(url), token, SESSION_SECONDS);
@@ -119,7 +119,8 @@ export async function sessionIdentity(
     ? claims.roles.filter((r): r is string => typeof r === "string")
     : [];
   const name = typeof claims.name === "string" && claims.name ? claims.name : claims.sub;
-  return { kind: "user", userId: claims.sub, name, roles };
+  const country = typeof claims.country === "string" && claims.country ? claims.country : null;
+  return { kind: "user", userId: claims.sub, name, roles, country };
 }
 
 /** What /auth/callback needs of the sign-in that /auth/login started. */

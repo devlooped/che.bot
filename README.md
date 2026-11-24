@@ -242,7 +242,11 @@ this origin). `/auth/callback` checks the state, exchanges the code with the cli
 code verifier, and verifies the ID token (RS256 against the tenant's JWKS, issuer
 `https://AUTH0_DOMAIN/`, audience `AUTH0_CLIENT_ID`, nonce, expiry); the roles are every claim named
 `roles` or `role`, or ending in `/roles` (such as `https://che.bot/roles`), of the ID token and of
-the access token when it is a JWT of the tenant. A failed sign-in comes back to `/new?signin=failed`.
+the access token when it is a JWT of the tenant. The country of the user is the first claim named
+`country`, or ending in `/country` (such as `https://che.bot/country`), of the same tokens; the
+session keeps it, each run stores it, and the drafts and rounds take a question that names no place
+(«Censo 2025», «Inflación de los últimos 10 años») to be about that country. A failed sign-in comes
+back to `/new?signin=failed`.
 `/auth/logout` clears the session and goes to the tenant's `/v2/logout`, which comes back to the
 origin. The Auth0 application must allow `<origin>/auth/callback` as a callback URL and `<origin>`
 as a logout URL, for every origin that serves the app.

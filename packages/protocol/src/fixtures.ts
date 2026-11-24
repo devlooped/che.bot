@@ -74,6 +74,7 @@ export function drive(
     {
       id: input.id ?? "run-1",
       question: input.question ?? "¿Cuál es la capital de Australia y cuánta gente vive ahí?",
+      country: input.country ?? null,
       mode: input.mode,
       models: input.models ?? SNAPSHOT_MODELS,
       ...(input.config ? { config: input.config } : {}),

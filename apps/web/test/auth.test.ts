@@ -2,7 +2,7 @@ import { runDurableObjectAlarm } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { generateKeyPair, jwtVerify, SignJWT } from "jose";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { auth0Host, auth0Jwks, rolesOf, safeReturnTo } from "../src/worker/auth0.ts";
+import { auth0Host, auth0Jwks, countryOf, rolesOf, safeReturnTo } from "../src/worker/auth0.ts";
 import { SESSION_SECONDS, sessionCookie } from "../src/worker/session.ts";
 import {
   api,
@@ -354,6 +354,27 @@ describe("the roles", () => {
       "Contrib",
     ]);
     expect(rolesOf({ sub: "x", scope: "openid" })).toEqual([]);
+  });
+});
+
+describe("the country", () => {
+  test("comes from a country claim, namespaced or not, of the first token that has one", () => {
+    expect(countryOf({ sub: "x", "https://che.bot/country": " Argentina " })).toBe("Argentina");
+    expect(countryOf({ country: "" }, { country: "AR" })).toBe("AR");
+    expect(countryOf({ sub: "x", country_code: "AR", country: 3 })).toBeNull();
+  });
+
+  test("lasts the session: a sign-in with a country keeps it, one without has none", async () => {
+    fakes();
+    const tenant = await fakeTenant();
+    const claims = (session: string) =>
+      jwtVerify(session, new TextEncoder().encode(env.SESSION_SECRET), {
+        audience: "chebot:session",
+      }).then((r) => r.payload);
+    const ana = await signInThrough(tenant, user({ "https://che.bot/country": "Argentina" }));
+    expect((await claims(ana.session ?? "")).country).toBe("Argentina");
+    const bob = await signInThrough(tenant, user({}));
+    expect((await claims(bob.session ?? "")).country).toBeNull();
   });
 });
 
