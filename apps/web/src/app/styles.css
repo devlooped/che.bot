@@ -775,10 +775,6 @@ a.button {
   .card-link:hover .card-picture img {
     transform: none;
   }
-
-  .card-actions .icon-button[aria-busy="true"] {
-    animation: none;
-  }
 }
 
 /* Run: layout ---------------------------------------------------------------------------------- */
@@ -886,7 +882,13 @@ a.button {
   stroke-linejoin: round;
 }
 
-/* Over the picture: ask it again (its owner), draw the picture again (an admin). */
+/* While what it does waits for the API (drawing a picture). */
+.icon-button[aria-busy="true"] {
+  cursor: progress;
+  animation: breathe 1.2s ease-in-out infinite;
+}
+
+/* Over the picture: ask it again (its owner), draw the picture again (its owner or an admin). */
 .card-actions {
   position: absolute;
   top: 0.75rem;
@@ -905,14 +907,6 @@ a.button {
 
 .card-actions .icon-button:hover {
   background: var(--paper);
-}
-
-.card-actions .icon-button:disabled {
-  cursor: progress;
-}
-
-.card-actions .icon-button[aria-busy="true"] {
-  animation: breathe 1.2s ease-in-out infinite;
 }
 
 .run-grid {

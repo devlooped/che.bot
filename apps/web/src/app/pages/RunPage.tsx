@@ -198,6 +198,8 @@ function RunView({ runId }: { runId: string }) {
             inProgress={inProgress}
             answered={view.status === "completed" || view.status === "failed"}
             free={isAdmin(user)}
+            drawable={started && ((summary?.mine ?? false) || isAdmin(user))}
+            hasImage={(summary?.image ?? null) !== null}
             onChange={refresh}
           />
           {view.status === "running" && <p className="fine">{t.run.takesMinutes}</p>}

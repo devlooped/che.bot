@@ -784,6 +784,8 @@ export const esAR = {
       "Compartir: copia el link de la respuesta (en el celular, abre el menú para compartir). Cualquiera que tenga el link la puede leer.",
     refresh:
       "Volver a preguntar: los cuatro responden otra vez con el panel de hoy y la respuesta nueva reemplaza a esta. Solo aparece para quien hizo la pregunta.",
+    image:
+      "Rehacer la imagen: dibuja de nuevo la imagen de la pregunta, la que se ve en su tarjeta del inicio. Solo aparece para quien hizo la pregunta.",
     remove:
       "Borrar: la pregunta deja de verse para los demás. Solo aparece para quien la hizo, que la puede recuperar desde Mis preguntas.",
     cancel:

@@ -92,18 +92,20 @@ describe("the picture of a question", () => {
     expect((await api(`/api/runs/${id}/image`)).status).toBe(404);
   });
 
-  test("an admin draws it again with today's model; anyone else may not", async () => {
+  test("an admin draws it again with today's model, and so does its owner; anyone else may not", async () => {
     const { images } = fakes({
       catalog: [...CATALOG, catalogEntry("openai/gpt-image-2", "image")],
     });
-    const { id, stub } = await paidRun(user());
+    const owner = user();
+    const { id, stub } = await paidRun(owner);
     await runDurableObjectAlarm(stub);
     const first = (await stub.summary())?.image;
     await env.DB.prepare(
       "INSERT INTO model_settings (role, model_id, effort, updated_at, updated_by) VALUES ('image', 'openai/gpt-image', NULL, '', 'test')",
     ).run();
-    const redraw = (headers: Record<string, string>) =>
-      api(`/api/runs/${id}/image`, { method: "POST", headers });
+    const redraw = (headers: Record<string, string>, run = id) =>
+      api(`/api/runs/${run}/image`, { method: "POST", headers });
+    expect((await redraw({})).status).toBe(401);
     expect((await redraw(as("someone"))).status).toBe(403);
     const response = await redraw(as("boss", ["Admin"]));
     expect(response.status).toBe(200);
@@ -111,6 +113,29 @@ describe("the picture of a question", () => {
     expect(image).not.toBe(first);
     expect(images.calls.at(-1)?.model.id).toBe("openai/gpt-image-2");
     expect((await list()).runs.find((r) => r.id === id)?.image).toBe(image);
+
+    const again = await redraw(as(owner));
+    expect(again.status).toBe(200);
+    const { image: mine } = (await again.json()) as { image: string };
+    expect(mine).not.toBe(image);
+    expect((await stub.summary())?.image).toBe(mine);
+  });
+
+  test("its owner draws none before the question is asked, nor past the daily cap", async () => {
+    // A cap of 20 USD (vitest.config.ts) and runs of a budget of 8: two runs going fill it.
+    const { images } = fakes({ config: { budgetUsd: 8 } });
+    const owner = user();
+    const redraw = (run: string) =>
+      api(`/api/runs/${run}/image`, { method: "POST", headers: as(owner) });
+    const quote = await quoted(owner);
+    expect((await redraw(quote.id)).status).toBe(409);
+
+    const { id } = await paidRun(owner);
+    await paidRun(user());
+    const refused = await redraw(id);
+    expect(refused.status).toBe(503);
+    expect(await refused.json()).toMatchObject({ reason: "daily_cap" });
+    expect(images.calls).toEqual([]);
   });
 });
 

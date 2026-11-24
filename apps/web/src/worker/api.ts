@@ -41,7 +41,8 @@ import { spendMeter } from "./spend-meter.ts";
 //                                    a deleted run, its owner only: 410 for anyone else
 //   GET    /api/runs/:id/charts/:chart/:v.svg  the render of a chart at version v, as above
 //   GET    /api/runs/:id/image[?v=]   the picture of the question, as above
-//   POST   /api/runs/:id/image        admin: draws the picture again, with today's models
+//   POST   /api/runs/:id/image        the owner, once it was asked, or an admin: draws the picture
+//                                    again, with today's models
 //   GET    /api/runs/:id/spend        admin: what the run's model calls cost so far
 //   GET    /api/me/runs               signed in
 //   GET|PUT /api/admin/models|prices  admin
@@ -389,8 +390,24 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   }
 
   if (sub === "/image" && method === "POST") {
-    const admin = requireAdmin(identity);
-    if (admin instanceof Response) return admin;
+    const user = requireUser(identity);
+    if (user instanceof Response) return user;
+    const owner = await stub.owner();
+    if (owner === null) return error(404, "No such run.");
+    // The owner draws theirs once it was asked, under the guardrails of asking; an admin, any.
+    if (!isAdmin(user)) {
+      if (owner !== user.userId) return error(403, "Not your run.");
+      const status = (await stub.summary())?.status;
+      if (status !== "running" && status !== "completed" && status !== "failed")
+        return json(409, { error: "This run was not asked yet.", reason: "not_started" });
+      if (!(await env.ASK_LIMITER.limit({ key: user.userId })).success)
+        return error(429, "Too many in a row. Wait a minute.");
+      const budget = resolveConfig(deps.runConfig(env)).budgetUsd;
+      if (!(await spendMeter(env).status(budget)).open)
+        return error(503, "The daily limit was reached. Try again tomorrow.", {
+          reason: "daily_cap",
+        });
+    }
     const models = await resolveRunModels(env);
     if (!models.image) return error(503, "No image model is set.");
     const drawn = await stub.redraw({ helper: models.helper ?? null, image: models.image });

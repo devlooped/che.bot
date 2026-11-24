@@ -8,10 +8,11 @@ import { runPath } from "../routes.tsx";
 import { errorText } from "../view/errors.ts";
 import { ConfirmSheet } from "./ConfirmSheet.tsx";
 import { ImageIcon, RefreshIcon } from "./Icons.tsx";
+import { useRedraw } from "./useRedraw.ts";
 
 /**
  * The buttons over the picture of a card: its owner asks the question again once it ended (the new
- * run takes its place, as on its page); an admin draws its picture again, with today's image model.
+ * run takes its place, as on its page); its owner or an admin draws its picture again.
  */
 function CardActions({
   run,
@@ -24,46 +25,33 @@ function CardActions({
 }) {
   const { api } = useSession();
   const [asking, setAsking] = useState(false);
-  const [busy, setBusy] = useState<"refresh" | "redraw" | null>(null);
-  const [said, setSaid] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const opener = useRef<HTMLButtonElement | null>(null);
+  const drawing = useRedraw(run.id, run.image !== null, onDrawn);
   const refreshable = run.mine && (run.status === "completed" || run.status === "failed");
-  if (!refreshable && !admin) return null;
+  // Every card is a question that was asked: its owner may draw its picture.
+  const drawable = run.mine || admin;
+  if (!refreshable && !drawable) return null;
 
   async function refresh() {
-    setBusy("refresh");
-    setError(null);
+    setRefreshing(true);
+    setRefreshError(null);
     try {
       const quote = await api.ask(run.question, run.id);
       navigate(runPath(quote.runId));
     } catch (e) {
-      setError(errorText(e));
-      setBusy(null);
-    }
-  }
-
-  async function redraw() {
-    setBusy("redraw");
-    setError(null);
-    setSaid("");
-    try {
-      onDrawn(await api.redraw(run.id));
-      setSaid(t.home.drawn);
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(null);
+      setRefreshError(errorText(e));
+      setRefreshing(false);
     }
   }
 
   function close() {
     setAsking(false);
-    setError(null);
+    setRefreshError(null);
     opener.current?.focus();
   }
 
-  const drawLabel = busy === "redraw" ? t.home.drawing : run.image ? t.home.redraw : t.home.draw;
   return (
     <>
       <div className="card-actions" role="toolbar" aria-label={t.run.actions}>
@@ -77,34 +65,34 @@ function CardActions({
             aria-haspopup="dialog"
             onClick={(e) => {
               opener.current = e.currentTarget;
-              setError(null);
+              setRefreshError(null);
               setAsking(true);
             }}
           >
             <RefreshIcon />
           </button>
         )}
-        {admin && (
+        {drawable && (
           <button
             type="button"
             className="icon-button"
-            aria-label={drawLabel}
-            title={drawLabel}
+            aria-label={drawing.label}
+            title={drawing.label}
             aria-describedby={`card-${run.id}`}
-            aria-busy={busy === "redraw"}
-            disabled={busy === "redraw"}
-            onClick={redraw}
+            aria-busy={drawing.busy}
+            disabled={drawing.busy}
+            onClick={drawing.redraw}
           >
             <ImageIcon />
           </button>
         )}
       </div>
       <p className="sr-only" role="status">
-        {said}
+        {drawing.said}
       </p>
-      {error && !asking && (
+      {drawing.error && (
         <p className="error card-error" role="alert">
-          {error}
+          {drawing.error}
         </p>
       )}
       {asking && (
@@ -114,8 +102,8 @@ function CardActions({
           body={t.run.refreshBody(admin)}
           confirm={t.run.refreshConfirm}
           confirming={t.run.refreshing}
-          busy={busy === "refresh"}
-          error={error}
+          busy={refreshing}
+          error={refreshError}
           onConfirm={refresh}
           onClose={close}
         />

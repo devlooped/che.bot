@@ -124,6 +124,29 @@ test("on its card, an admin draws the picture again and the owner asks the quest
   await expect(page.getByRole("heading", { level: 1, name: asked })).toBeVisible();
 });
 
+test("on the page of the answer, its owner draws the picture again and may ask it again; a reader shares it", async ({
+  page,
+  browser,
+}) => {
+  const asked = uniqueQuestion();
+  const runId = await finishedRun(page.request, asked);
+
+  const stranger = await browser.newPage();
+  await stranger.goto(`/r/${runId}`);
+  const theirs = stranger.getByRole("toolbar", { name: t.run.actions });
+  await expect(theirs.getByRole("button", { name: t.help.open })).toBeVisible();
+  await expect(theirs.getByRole("button", { name: t.home.redraw })).toHaveCount(0);
+  await expect(theirs.getByRole("button", { name: t.run.refresh })).toHaveCount(0);
+  await stranger.close();
+
+  await page.goto(`/r/${runId}`);
+  const bar = page.getByRole("toolbar", { name: t.run.actions });
+  await expect(bar.getByRole("button", { name: t.run.refresh })).toBeVisible();
+  await bar.getByRole("button", { name: t.home.redraw }).click();
+  await expect(page.getByRole("status").filter({ hasText: t.home.drawn })).toBeVisible();
+  await expect(bar.getByRole("button", { name: t.home.redraw })).toBeEnabled();
+});
+
 test("Mis preguntas asks a signed-out reader to sign in, and is not in the menu", async ({
   page,
 }) => {

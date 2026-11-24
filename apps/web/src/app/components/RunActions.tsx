@@ -6,14 +6,16 @@ import { runPath } from "../routes.tsx";
 import { errorText } from "../view/errors.ts";
 import { ConfirmSheet } from "./ConfirmSheet.tsx";
 import { Sheet } from "./Discussion.tsx";
-import { HelpIcon, RefreshIcon, ShareIcon, StopIcon, TrashIcon } from "./Icons.tsx";
+import { HelpIcon, ImageIcon, RefreshIcon, ShareIcon, StopIcon, TrashIcon } from "./Icons.tsx";
 import { ShareLink } from "./ShareLink.tsx";
+import { useRedraw } from "./useRedraw.ts";
 
 /** How the page works: the buttons of the bar, the seats, the margin marks, the sections. */
 function HelpSheet({ onClose }: { onClose: () => void }) {
   const items = [
     { icon: <ShareIcon />, text: t.help.share },
     { icon: <RefreshIcon />, text: t.help.refresh },
+    { icon: <ImageIcon />, text: t.help.image },
     { icon: <TrashIcon />, text: t.help.remove },
     { icon: <StopIcon />, text: t.help.cancel },
     { icon: null, text: t.help.seats },
@@ -39,7 +41,8 @@ type Open = "help" | "refresh" | "remove" | "cancel" | null;
 /**
  * The bar under the question: share it, and the help of the page, for everyone; for its owner,
  * cancel it while it is in progress (it is deleted for good), else ask it again and delete it: they
- * alone see a deleted question, and restore it here.
+ * alone see a deleted question, and restore it here. Its owner or an admin draws its picture again
+ * once it was asked.
  */
 export function RunActions({
   runId,
@@ -50,6 +53,8 @@ export function RunActions({
   inProgress,
   answered,
   free,
+  drawable,
+  hasImage,
   onChange,
 }: {
   runId: string;
@@ -63,6 +68,10 @@ export function RunActions({
   answered: boolean;
   /** The owner runs free (an admin): asking again costs nothing. */
   free: boolean;
+  /** Its owner or an admin, once it was asked: they may draw its picture again. */
+  drawable: boolean;
+  /** It has a picture: the button draws it again rather than for the first time. */
+  hasImage: boolean;
   /** The summary changed (deleted, restored): read it again. */
   onChange: () => void;
 }) {
@@ -71,6 +80,7 @@ export function RunActions({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const opener = useRef<HTMLButtonElement | null>(null);
+  const drawing = useRedraw(runId, hasImage, onChange);
 
   function show(which: Open, button: HTMLButtonElement) {
     opener.current = button;
@@ -137,6 +147,19 @@ export function RunActions({
             <RefreshIcon />
           </button>
         )}
+        {drawable && !deleted && (
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={drawing.label}
+            title={drawing.label}
+            aria-busy={drawing.busy}
+            disabled={drawing.busy}
+            onClick={drawing.redraw}
+          >
+            <ImageIcon />
+          </button>
+        )}
         {mine && !deleted && inProgress && (
           <button
             type="button"
@@ -170,6 +193,14 @@ export function RunActions({
           <HelpIcon />
         </button>
       </div>
+      <p className="fine" role="status">
+        {drawing.said}
+      </p>
+      {drawing.error && (
+        <p className="error" role="alert">
+          {drawing.error}
+        </p>
+      )}
       {deleted && (
         <div className="run-deleted" data-testid="run-deleted">
           <span className="run-deleted-badge">{t.run.deleted}</span>

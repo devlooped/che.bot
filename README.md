@@ -129,8 +129,9 @@ and the model of the `image` role draws it (Grok Imagine by default, `spacexai/g
 `/admin` changes it like any other role). Two tries at most, one per tick. The run keeps the picture
 in its object, in chunks of 1 MB (a value of the storage holds 2 MB), and its version in the `image`
 column of the list (`migrations/0004_run_image.sql`); its cost goes to the run's spend. A run asked
-before the pictures has none until an admin draws it from its card on the home page, where an
-admin also draws any picture again.
+before the pictures has none until it is drawn: its owner draws theirs again, from its card on the
+home page or the bar of its page, once it was asked and under the guardrails of asking (the rate
+limit and the daily cap); an admin draws any.
 
 A run is a UUID inside: its object, its payment job, its row in the list. Once it is paid and
 starts, the helper model (Claude Haiku at medium effort by default) sums the question up in at
@@ -168,7 +169,7 @@ hook back on the origin of the page, which it cannot reach on localhost).
 | `GET /api/runs/:id`, `/events?after=`, `/ws?after=`, `/snapshots/:v`            | anyone with the link (`mine` in the summary: the caller owns it); a deleted run, its owner only (`410` for anyone else) |
 | `GET /api/runs/:id/charts/:chart/:v.svg`                                        | anyone with the link: the render of a chart (`c1`) at version `v`                                                       |
 | `GET /api/runs/:id/image?v=`                                                    | anyone with the link: the picture of the question (immutable with its version `v`)                                      |
-| `POST /api/runs/:id/image` → `{image}`                                          | `Admin`: draws the picture again with today's models, also for a run asked before the pictures                          |
+| `POST /api/runs/:id/image` → `{image}`                                          | the owner, once it was asked (`409` before), or an `Admin`: draws the picture again with today's models                 |
 | `GET /api/me/runs`                                                              | signed in                                                                                                               |
 | `GET`, `PUT /api/admin/models`, `/api/admin/prices`                             | `Admin`                                                                                                                 |
 | `POST /api/pay/hook`                                                            | the jobs service, with the run's own token as Bearer                                                                    |
