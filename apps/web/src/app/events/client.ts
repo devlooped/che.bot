@@ -1,4 +1,12 @@
-import { emptyView, type LoggedEvent, type RunView, replay } from "@chebot/protocol";
+import {
+  emptyView,
+  isProgressMessage,
+  type LoggedEvent,
+  type ModelId,
+  type ProgressMessage,
+  type RunView,
+  replay,
+} from "@chebot/protocol";
 
 // The event client of a run page (step 27). It builds the view of the run with the same reducer
 // the server uses (`replay` of @chebot/protocol), from the event log alone:
@@ -10,6 +18,8 @@ import { emptyView, type LoggedEvent, type RunView, replay } from "@chebot/proto
 // - A dropped socket reconnects with `after=<last seq>`; after a few failures in a row the client
 //   reads GET /events every few seconds instead. Every event is applied once, in `seq` order.
 // - A run that ended (completed, expired) is read over HTTP only.
+// - Beside the events, the socket carries what each seat is thinking while its call goes
+//   (`seat.progress`, never stored): kept apart from the view, and dropped with the socket.
 
 /** What the client hears from a socket. */
 export interface SocketHandlers {
@@ -53,7 +63,11 @@ export interface StreamState {
   connection: Connection;
   /** The seqs applied by the last update: the live ones the page may highlight. */
   fresh: number[];
+  /** The paragraph each seat of the panel is writing now, while its call goes. */
+  progress: Progress;
 }
+
+export type Progress = Readonly<Partial<Record<ModelId, string>>>;
 
 export interface StreamOptions {
   transport: Transport;
@@ -89,6 +103,7 @@ export class RunStream {
   private retryTimer: unknown = null;
   private failures = 0;
   private connection: Connection = "connecting";
+  private progress: Progress = {};
   private stopped = false;
   private readonly clock: Clock;
   private readonly gapMs: number;
@@ -122,6 +137,7 @@ export class RunStream {
     this.clearTimer("playTimer");
     const socket = this.socket;
     this.socket = null;
+    this.progress = {};
     socket?.close();
   }
 
@@ -148,15 +164,19 @@ export class RunStream {
         },
         message: (data) => {
           if (!current() || typeof data !== "string") return;
+          let message: unknown;
           try {
-            this.receive([JSON.parse(data) as LoggedEvent]);
+            message = JSON.parse(data);
           } catch {
-            // not an event
+            return; // not JSON
           }
+          if (isProgressMessage(message)) this.think(message);
+          else this.receive([message as LoggedEvent]);
         },
         close: () => {
           if (!current()) return;
           this.socket = null;
+          this.forget();
           if (this.stopped) return;
           if (ended(this.view)) return this.setConnection("closed");
           if (!opened) this.socketFailed();
@@ -270,7 +290,26 @@ export class RunStream {
   private apply(events: LoggedEvent[], fresh: number[]): void {
     this.view = replay(events, this.view);
     this.applied = events.at(-1)?.seq ?? this.applied;
+    if (this.view.status !== "running") this.progress = {};
     this.emit(fresh);
+  }
+
+  /** What a seat is thinking now; null: its call landed. Only while the run goes. */
+  private think(message: ProgressMessage): void {
+    const { [message.seat]: _, ...others } = this.progress;
+    if (message.text === null && !(message.seat in this.progress)) return;
+    this.progress =
+      message.text !== null && this.view.status === "running"
+        ? { ...others, [message.seat]: message.text }
+        : others;
+    this.emit([]);
+  }
+
+  /** The socket is gone: what it said of the seats is stale. */
+  private forget(): void {
+    if (Object.keys(this.progress).length === 0) return;
+    this.progress = {};
+    this.emit([]);
   }
 
   private setConnection(connection: Connection): void {
@@ -285,6 +324,7 @@ export class RunStream {
       seq: this.applied,
       connection: this.connection,
       fresh,
+      progress: this.progress,
     });
   }
 

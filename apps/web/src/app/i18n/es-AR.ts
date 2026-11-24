@@ -256,6 +256,10 @@ export const esAR = {
     polling: "La conexión está lenta: actualizamos cada pocos segundos.",
   },
 
+  progress: {
+    title: "Lo que van pensando",
+  },
+
   moments: {
     title: "Lo que va pasando",
     titleDone: "Cómo se armó la respuesta",

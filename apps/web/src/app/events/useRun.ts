@@ -15,7 +15,13 @@ export interface RunState {
 /** Events are public: the stream does not wait for the sign-in state. */
 const publicApi = createApi();
 
-const initial: StreamState = { view: emptyView(), seq: 0, connection: "connecting", fresh: [] };
+const initial: StreamState = {
+  view: emptyView(),
+  seq: 0,
+  connection: "connecting",
+  fresh: [],
+  progress: {},
+};
 
 /** A reader who asked for reduced motion gets each batch at once, not played event by event. */
 function prefersReducedMotion(): boolean {

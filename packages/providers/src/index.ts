@@ -7,3 +7,4 @@ export * from "./images.ts";
 export * from "./provider.ts";
 export * from "./resolve.ts";
 export * from "./roles.ts";
+export * from "./stream.ts";

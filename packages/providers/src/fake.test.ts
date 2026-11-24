@@ -102,3 +102,24 @@ test("records every call, so a test can assert each key was requested exactly on
   expect(fake.repeated()).toEqual(["a"]);
   expect(fake.counts().get("a")).toBe(2);
 });
+
+test("streams the thoughts of an outcome to onProgress across its delay, a paragraph after a blank line", async () => {
+  const said: string[] = [];
+  const fake = new FakeProvider({
+    respond: () => ({
+      output: { answer: "a" },
+      delayMs: 20,
+      thoughts: ["Busco la cifra.", "La tengo."],
+    }),
+  });
+  const result = await fake.generate({
+    ...request("draft:0:grok"),
+    onProgress: (text) => said.push(text),
+  });
+  expect(result.output).toEqual({ answer: "a" });
+  expect(said).toEqual(["Busco", " la", " cifra.", "\n\nLa", " tengo."]);
+  // without a listener, the thoughts are only a delay
+  await expect(fake.generate(request("draft:1:grok"))).resolves.toMatchObject({
+    output: { answer: "a" },
+  });
+});

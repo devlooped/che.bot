@@ -44,6 +44,10 @@ class FakeSocket implements SocketLike {
   send(events: LoggedEvent[]) {
     for (const e of events) this.handlers.message(JSON.stringify(e));
   }
+  /** A message that is not an event. */
+  say(data: string) {
+    this.handlers.message(data);
+  }
   drop() {
     this.handlers.close();
   }
@@ -238,5 +242,71 @@ describe("the event client", () => {
     vi.advanceTimersByTime(5_000);
     expect(texts()).toEqual(["m1"]);
     expect(srv.sockets[0]?.closed).toBe(true);
+  });
+});
+
+describe("what the seats are thinking", () => {
+  const started: LoggedEvent = {
+    key: "run.started",
+    batch: 1,
+    type: "run.started",
+    runId: "r1",
+    question: "¿Cuánta agua?",
+    mode: "thorough",
+    models: {},
+    budgetUsd: 2,
+    deadlineAt: 0,
+    seq: 1,
+    at: 0,
+  };
+  const said = (seat: string, text: string | null) =>
+    JSON.stringify({ type: "seat.progress", seat, text });
+
+  /** A run that goes, followed over an open socket. */
+  async function running() {
+    const srv = server([started]);
+    const st = stream(srv.transport);
+    await st.s.start();
+    const socket = srv.sockets[0];
+    if (!socket) throw new Error("no socket");
+    socket.open();
+    return { ...st, srv, socket, message: (data: string) => socket.say(data) };
+  }
+
+  it("keeps each seat's paragraph apart from the events, and drops it when its call lands", async () => {
+    const { message, last } = await running();
+    message(said("claude", "Separo la cifra de la afirmación."));
+    message(said("grok", "Busco la cifra."));
+    expect(last()?.progress).toEqual({
+      claude: "Separo la cifra de la afirmación.",
+      grok: "Busco la cifra.",
+    });
+    expect(last()?.seq).toBe(1);
+    message(said("claude", null));
+    expect(last()?.progress).toEqual({ grok: "Busco la cifra." });
+  });
+
+  it("ignores a seat outside the panel and a run that does not go", async () => {
+    const srv = server();
+    const { s, last } = stream(srv.transport);
+    await s.start();
+    srv.sockets[0]?.open();
+    srv.sockets[0]?.say(said("grok", "Antes de empezar."));
+    expect(last()?.progress).toEqual({});
+    const { message, last: lastRunning } = await running();
+    message(said("utility", "Junto las respuestas."));
+    expect(lastRunning()?.progress).toEqual({});
+  });
+
+  it("forgets every paragraph when the socket drops, and when the run ends", async () => {
+    const dropped = await running();
+    dropped.message(said("openai", "Comparo las fuentes."));
+    dropped.socket.drop();
+    expect(dropped.last()?.progress).toEqual({});
+
+    const ending = await running();
+    ending.message(said("gemini", "Reviso las propuestas."));
+    ending.socket.send([completed(2)]);
+    expect(ending.last()?.progress).toEqual({});
   });
 });

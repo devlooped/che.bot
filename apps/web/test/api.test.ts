@@ -1,6 +1,7 @@
 import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import type { LoggedEvent } from "@chebot/protocol";
+import { respond } from "@chebot/driver/testing";
+import { isProgressMessage, type LoggedEvent, type ProgressMessage } from "@chebot/protocol";
 import { describe, expect, test, vi } from "vitest";
 import { type RunObject, runStub } from "../src/worker/run-object.ts";
 import { RunStore } from "../src/worker/run-store.ts";
@@ -345,11 +346,14 @@ async function connect(id: string, after: number) {
   const ws = response.webSocket;
   if (!ws) throw new Error("no WebSocket");
   const received: LoggedEvent[] = [];
+  const progress: ProgressMessage[] = [];
   ws.addEventListener("message", (message: MessageEvent) => {
-    received.push(JSON.parse(String(message.data)) as LoggedEvent);
+    const data: unknown = JSON.parse(String(message.data));
+    if (isProgressMessage(data)) progress.push(data);
+    else received.push(data as LoggedEvent);
   });
   ws.accept();
-  return { ws, received };
+  return { ws, received, progress };
 }
 
 describe("the event stream", () => {
@@ -387,6 +391,30 @@ describe("the event stream", () => {
     expect(all.map((e) => e.seq)).toEqual(Array.from({ length: sent }, (_, i) => i + 1));
     expect(all).toEqual(await eventsOf(stub));
     second.ws.close(1000, "done");
+  });
+
+  test("while a call goes, the socket carries what its seat thinks, never stored, and then hides it", async () => {
+    fakes({
+      calls: {
+        "draft:0:grok": (req) => ({
+          ...respond(req),
+          delayMs: 900,
+          thoughts: ["Busco la capital.", "Canberra, no Sídney."],
+        }),
+      },
+    });
+    const { id, stub } = await paidRun();
+    const browser = await connect(id, 0);
+    await vi.waitFor(() => expect(browser.received).toHaveLength(4));
+    expect(await runDurableObjectAlarm(stub)).toBe(true); // the drafts
+    await vi.waitFor(() => expect(browser.progress.at(-1)?.text).toBeNull());
+    const said = browser.progress.filter((m) => m.text !== null);
+    expect(said.length).toBeGreaterThan(0);
+    expect(new Set(browser.progress.map((m) => m.seat))).toEqual(new Set(["grok"]));
+    // a paragraph at a time, the last of what it said
+    expect(said.every((m) => !m.text?.includes("\n"))).toBe(true);
+    expect(browser.received).toEqual(await eventsOf(stub));
+    browser.ws.close(1000, "done");
   });
 
   test("the stream of an unknown run answers 404; a plain request answers 426", async () => {

@@ -24,6 +24,12 @@ export interface GenerateRequest<T> {
   search?: { maxResults: number };
   /** The per-call timeout: when it aborts, the call fails with kind "timeout". */
   signal: AbortSignal;
+  /**
+   * What the model thinks and writes as prose while it answers (never the structured output or a
+   * tool call), as it comes; a new part starts with a blank line. For display only: the result is
+   * the same with or without it.
+   */
+  onProgress?: (text: string) => void;
 }
 
 export interface Usage {

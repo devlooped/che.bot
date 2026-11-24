@@ -11,6 +11,8 @@ import {
  * What a scripted call does. Every outcome may wait `delayMs` first; the wait honors the
  * request's signal, so a delay longer than the call timeout ends as a timeout.
  * - output: the canned output, run through the request's schema (an invalid one fails as "invalid").
+ *   Its `thoughts` go to the request's `onProgress`, one paragraph after another across the delay,
+ *   word by word, as a model's reasoning streams.
  * - timeout: never answers; fails as "timeout" when the signal aborts.
  * - refusal / error: fails with that kind.
  */
@@ -22,6 +24,7 @@ export type FakeOutcome =
       usage?: Usage;
       costUsd?: number;
       delayMs?: number;
+      thoughts?: string[];
     }
   | { kind: "timeout"; costUsd?: number }
   | { kind: "refusal"; costUsd?: number; delayMs?: number }
@@ -107,7 +110,9 @@ export class FakeProvider implements ModelProvider {
       await waitForAbort(req.signal);
       return fail("timeout", `${req.callKey} timed out.`, costUsd);
     }
-    if (!(await delay(outcome.delayMs ?? 0, req.signal)))
+    const thoughts =
+      outcome.kind === undefined || outcome.kind === "output" ? outcome.thoughts : [];
+    if (!(await think(thoughts ?? [], outcome.delayMs ?? 0, req)))
       return fail("timeout", `${req.callKey} timed out.`, costUsd);
     if (outcome.kind === "refusal") return fail("refusal", `${req.callKey} was refused.`, costUsd);
     if (outcome.kind === "error")
@@ -131,6 +136,32 @@ export class FakeProvider implements ModelProvider {
       via: "output",
     };
   }
+}
+
+/**
+ * Waits `ms`, telling `onProgress` the words of the thoughts evenly across the wait (each
+ * paragraph after a blank line). False as soon as the signal aborts.
+ */
+async function think(
+  thoughts: readonly string[],
+  ms: number,
+  req: Pick<GenerateRequest<unknown>, "onProgress" | "signal">,
+): Promise<boolean> {
+  const words = req.onProgress
+    ? thoughts.flatMap((paragraph, p) =>
+        paragraph
+          .split(/\s+/)
+          .filter(Boolean)
+          .map((word, w) => (w === 0 ? (p === 0 ? word : `\n\n${word}`) : ` ${word}`)),
+      )
+    : [];
+  if (words.length === 0) return delay(ms, req.signal);
+  const gap = ms / (words.length + 1);
+  for (const word of words) {
+    if (!(await delay(gap, req.signal))) return false;
+    req.onProgress?.(word);
+  }
+  return delay(gap, req.signal);
 }
 
 function waitForAbort(signal: AbortSignal): Promise<void> {

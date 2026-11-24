@@ -8,6 +8,7 @@ import { Checkout } from "../components/Checkout.tsx";
 import { Failure } from "../components/Failure.tsx";
 import { History } from "../components/History.tsx";
 import { Moments } from "../components/Moments.tsx";
+import { SeatsProgress } from "../components/Progress.tsx";
 import { RunActions } from "../components/RunActions.tsx";
 import { Panel, Sources } from "../components/RunDetails.tsx";
 import { Seats, useSettled } from "../components/Seats.tsx";
@@ -95,7 +96,7 @@ function RunView({ runId }: { runId: string }) {
   /** Asking again or rerunning: the button waits for the API. */
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const { view, connection } = stream;
+  const { view, connection, progress } = stream;
   // Done, the seats step back under the bar of the question, and the page is one centered column.
   const settled = useSettled(view);
   // The text of the answer, with its charts in their places among the paragraphs.
@@ -243,6 +244,8 @@ function RunView({ runId }: { runId: string }) {
                 {connection === "reconnecting" ? t.connection.reconnecting : t.connection.polling}
               </p>
             )}
+            {/* What each seat is thinking, while its call goes: gone once its answer landed. */}
+            {view.status === "running" && <SeatsProgress progress={progress} />}
             {/* While the run goes, what happens shows beside it; once done, it moves into the main column. */}
             {started && !final && <Moments view={view} notes={notes} />}
           </div>

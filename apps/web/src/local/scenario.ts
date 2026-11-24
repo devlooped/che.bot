@@ -339,6 +339,46 @@ const DELAY: Record<string, number | Record<ModelId, number>> = {
   moments: 300,
 };
 
+/** What each seat thinks while it answers, by the kind of call: it streams across the delay. */
+const THOUGHTS: Record<string, Record<ModelId, string[]>> = {
+  draft: {
+    grok: [
+      "Busco la cifra que más circula sobre el agua por kilo de carne vacuna.",
+      "Water Footprint Network da unos 15.400 litros como promedio mundial; reviso cuánto de eso es agua de lluvia.",
+    ],
+    claude: [
+      "La pregunta mezcla una cifra con una afirmación: conviene separar las dos.",
+      "El promedio mundial ronda los 15.400 litros, pero casi todo es agua de lluvia y no de riego, y eso cambia la lectura.",
+    ],
+    openai: [
+      "Primero la fuente original de la cifra y cómo se calculó.",
+      "Comparo el promedio mundial con los sistemas pastoriles, que usan mucha menos agua de riego.",
+    ],
+    gemini: [
+      "Reviso estudios recientes sobre la huella hídrica de la carne.",
+      "Las estimaciones cambian mucho según cómo se cría el ganado; anoto el rango antes de dar un número.",
+    ],
+  },
+  round: {
+    grok: [
+      "Leo el texto común párrafo por párrafo.",
+      "El párrafo que dice que la cifra exagera no se sostiene con las fuentes; propongo cambiarlo.",
+    ],
+    claude: [
+      "Me fijo si el texto distingue el agua de lluvia del agua de riego.",
+      "Al segundo párrafo le falta esa aclaración; sugiero una corrección.",
+    ],
+    openai: [
+      "Comparo cada propuesta con las fuentes que cita.",
+      "La versión de Grok me parece más justa con los datos.",
+    ],
+    gemini: [
+      "Reviso las propuestas abiertas una por una.",
+      "La del dato sobre la Argentina no tiene una fuente clara; voto en contra.",
+    ],
+  },
+};
+
 function delayOf(kind: string, seat: ModelId | undefined): number {
   const d = DELAY[kind] ?? 300;
   return typeof d === "number" ? d : seat ? d[seat] : 300;
@@ -372,12 +412,14 @@ export function respond(req: GenerateRequest<unknown>): FakeOutcome {
   const [kind = "", n, seatRaw] = req.callKey.split(":");
   const seat = seatRaw as ModelId | undefined;
   const delayMs = delayOf(kind, seat);
+  const thoughts = seat ? THOUGHTS[kind]?.[seat] : undefined;
   const out = (output: unknown, extra: { sources?: FoundSource[]; costUsd?: number } = {}) =>
     ({
       output,
       usage: { inputTokens: 1200, outputTokens: 400 },
       costUsd: extra.costUsd ?? (seat ? 0.02 : 0.001),
       delayMs,
+      ...(thoughts ? { thoughts } : {}),
       ...(extra.sources ? { sources: extra.sources } : {}),
     }) satisfies FakeOutcome;
 

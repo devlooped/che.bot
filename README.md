@@ -114,6 +114,16 @@ public; newest first, 24 at a time), `/r/:id` follows a run and replays how its 
 the user's questions (copy a link, delete one, restore a deleted one), and `/admin` sets the model
 of each role and the two prices (admins only; the menu of the account hides it from others).
 
+While a run goes, its page shows what each of the four is thinking under the seats ("Lo que van
+pensando"): a paragraph per seat whose call is in flight, ruled on its left in the seat's color,
+gone once its answer lands. The calls of the panel stream (`onProgress` of the providers:
+`src/stream.ts` puts the stream back together into the one result `generateText` expects, and asks
+OpenAI and Gemini for the summaries of their reasoning); only the reasoning and the prose reach
+it, never the structured output or a tool call. `RunObject` sends each seat's last paragraph over
+the socket at most every 500 ms as a `seat.progress` message (`src/worker/progress.ts`), never
+stored: a page that opens late sees the next one. In the local mode the scripted drafts and rounds
+think aloud across their delay.
+
 On the page of a run, its owner cancels it while it is in progress (quoted, waiting for its
 payment or running): after a confirmation it stops and is deleted for good, its payment job
 cancelled or ended. Once it ended, its owner asks the question again (there, or from the ↻ on its

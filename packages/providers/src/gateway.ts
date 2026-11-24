@@ -12,6 +12,7 @@ import {
   type ToolSet,
   TypeValidationError,
   tool,
+  wrapLanguageModel,
 } from "ai";
 import {
   type FoundSource,
@@ -23,6 +24,7 @@ import {
   type ProviderErrorKind,
   type Usage,
 } from "./provider.ts";
+import { progressMiddleware } from "./stream.ts";
 
 export interface GatewayOptions {
   /** Defaults to AI_GATEWAY_API_KEY of process.env, when there is one (a Worker passes its secret). */
@@ -66,6 +68,23 @@ export function effortOptions(model: ModelRef): ProviderOptions {
         : provider === "openai"
           ? { openai: { reasoningEffort: effort } }
           : undefined;
+}
+
+/**
+ * The provider options of a call whose progress is shown: the effort, and the summaries of the
+ * reasoning of the providers that only send them when asked (OpenAI, Gemini). A model without an
+ * effort does not reason, and is asked for nothing more.
+ */
+export function progressOptions(model: ModelRef): ProviderOptions {
+  const options = effortOptions(model);
+  if (!options) return options;
+  if (options.openai) return { openai: { ...options.openai, reasoningSummary: "auto" } };
+  const google = options.google as { thinkingConfig?: Record<string, unknown> } | undefined;
+  if (google)
+    return {
+      google: { ...google, thinkingConfig: { ...google.thinkingConfig, includeThoughts: true } },
+    };
+  return options;
 }
 
 /**
@@ -127,8 +146,17 @@ export function createGatewayProvider(options: GatewayOptions = {}): ModelProvid
     async generate<T>(req: GenerateRequest<T>): Promise<GenerateResult<T>> {
       const started = Date.now();
       const meter = new CallMeter();
-      const model = languageModel(req.model.id);
-      const providerOptions = effortOptions(req.model);
+      // A call whose progress is shown streams; the stream comes back as one result (stream.ts).
+      const plain = languageModel(req.model.id);
+      const model = req.onProgress
+        ? wrapLanguageModel({
+            model: typeof plain === "string" ? gateway(plain) : plain,
+            middleware: progressMiddleware(req.onProgress),
+          })
+        : plain;
+      const providerOptions = req.onProgress
+        ? progressOptions(req.model)
+        : effortOptions(req.model);
       const tools: ToolSet | undefined = req.search
         ? {
             web_search: gateway.tools.parallelSearch({

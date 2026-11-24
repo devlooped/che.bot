@@ -14,6 +14,7 @@ import {
   linkOf,
   nextStep,
   type OutputOf,
+  type ProgressMessage,
   paymentConfirmedEvent,
   paymentRequestedEvent,
   type QuestionClass,
@@ -42,6 +43,7 @@ import { type ImageResult, type ModelRef, ProviderError } from "@chebot/provider
 import { deps } from "./deps.ts";
 import type { Env } from "./env.ts";
 import { type JobSnapshot, JobsError } from "./jobs.ts";
+import { SeatProgress } from "./progress.ts";
 import {
   attemptPrefix,
   type CallCost,
@@ -591,6 +593,7 @@ export class RunObject extends DurableObject<Env> {
   /**
    * One step: the stage and "thinking" events at once, the calls through the ledger (a finished
    * call is reused, see `runCalls`), then the reduced state and its events in one transaction.
+   * While the calls go, the browsers get what each seat is thinking (SeatProgress), not stored.
    */
   private async tick(run: RunRecord, state: RunState): Promise<void> {
     const prefix = attemptPrefix(run.attempt);
@@ -600,13 +603,18 @@ export class RunObject extends DurableObject<Env> {
     this.broadcast();
     // The helper names the question and its picture is drawn beside the first steps, so the run
     // does not wait for them.
+    const progress = new SeatProgress((message) => this.send(message));
     const [entries] = await Promise.all([
       runCalls(state, step, {
         provider: deps.provider(this.env),
         renderer: deps.renderer(this.env),
         ledger: this.store.ledger(prefix),
         now: Date.now,
-      }),
+        onProgress: (call, text) => progress.add(call, text),
+        onCall: (call, phase) => {
+          if (phase === "end") progress.end(call);
+        },
+      }).finally(() => progress.close()),
       this.nameRun(run),
       this.illustrate(run),
     ]);
@@ -1156,6 +1164,18 @@ export class RunObject extends DurableObject<Env> {
     if (!last) return;
     for (const event of events) ws.send(JSON.stringify(event));
     ws.serializeAttachment({ sent: last.seq } satisfies Attachment);
+  }
+
+  /** Sends every browser a message that is not an event (SeatProgress); a closed socket misses it. */
+  private send(message: ProgressMessage): void {
+    const data = JSON.stringify(message);
+    for (const ws of this.ctx.getWebSockets()) {
+      try {
+        ws.send(data);
+      } catch {
+        // closing: the next message or the catch-up after a reconnect makes up for it
+      }
+    }
   }
 
   private broadcast(): void {

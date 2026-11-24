@@ -1290,6 +1290,36 @@ a.button {
   color: var(--notice);
 }
 
+/* Run: what each seat is thinking, while its call goes ---------------------------------------- */
+
+.progress-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.progress-note {
+  padding-left: 0.7rem;
+  border-left: 2px solid var(--ink-model);
+  animation: fade-in 0.3s ease-out;
+}
+
+.progress-name {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.progress-text {
+  margin-top: 0.2rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
 /* Run: moments --------------------------------------------------------------------------------- */
 
 .side-title {
@@ -2752,6 +2782,12 @@ a.button {
   from {
     transform: translateY(24px);
     opacity: 0.6;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
   }
 }
 

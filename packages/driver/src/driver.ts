@@ -7,6 +7,7 @@ import {
   type CallsStep,
   type CreateRunInput,
   createRun,
+  isPanel,
   type LoggedEvent,
   MODELS,
   type ModelSnapshot,
@@ -115,6 +116,11 @@ export interface CallOptions {
   now: () => number;
   /** Each call as it is made (or read from the ledger) and as it lands. */
   onCall?: (call: Call, phase: "start" | "end", entry?: LedgerEntry & { cached: boolean }) => void;
+  /**
+   * What the model of a call of the panel thinks and writes as it answers (`onProgress` of the
+   * provider); the calls of the utility model are not followed.
+   */
+  onProgress?: (call: Call, text: string) => void;
 }
 
 export interface DriveOptions extends Omit<CallOptions, "ledger" | "now"> {
@@ -295,6 +301,9 @@ async function generateOnce(
     maxOutputTokens: call.maxOutputTokens,
     ...(call.search ? { search: call.search } : {}),
     signal: AbortSignal.timeout(call.timeoutMs),
+    ...(options.onProgress && isPanel(call.seat)
+      ? { onProgress: (text: string) => options.onProgress?.(call, text) }
+      : {}),
   });
   return {
     result: {

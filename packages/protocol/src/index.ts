@@ -5,6 +5,7 @@ export * from "./config.ts";
 export * from "./events.ts";
 export * from "./model.ts";
 export * from "./moments.ts";
+export * from "./progress.ts";
 export * from "./prompts/index.ts";
 export * from "./reducer.ts";
 export * from "./replay.ts";
