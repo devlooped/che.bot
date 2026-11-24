@@ -136,7 +136,7 @@ function RunView({ runId }: { runId: string }) {
   const line = stageLine(view, summary?.status === "awaiting_payment");
   const live = connection === "live" || connection === "polling";
   const final = view.status === "completed";
-  // The card of the question, as on the home page: its picture, and its verdict once it is answered.
+  // The verdict of the card of the question, once it is answered.
   const verdict = final ? verdictOf(view.drafts) : null;
   const image = summary?.id === runId ? summary.image : null;
   // The stream says first when a run ends; the summary, whether it was quoted before any event.
@@ -191,19 +191,6 @@ function RunView({ runId }: { runId: string }) {
   return (
     <main className={settled ? "page run run-settled" : "page run"} data-status={view.status}>
       <header className="run-head">
-        {(image || verdict) && (
-          <figure className="run-card" data-testid="run-card">
-            <span className="card-picture">
-              {image ? (
-                <img src={imagePath(runId, image)} alt="" width={512} height={512} />
-              ) : (
-                <span className="card-placeholder" aria-hidden="true" />
-              )}
-              {verdict && <VerdictOverlay verdict={verdict} />}
-            </span>
-            {verdict && <figcaption className="sr-only">{verdictText(verdict)}</figcaption>}
-          </figure>
-        )}
         {question ? (
           <h1 className="question">{question}</h1>
         ) : (
@@ -232,6 +219,20 @@ function RunView({ runId }: { runId: string }) {
         </div>
         {(summary?.attempt ?? 1) > 1 && view.status !== "failed" && (
           <p className="fine">{t.failure.secondAttempt}</p>
+        )}
+        {/* The card of the question, as on the home page: under its bar, above the seats. */}
+        {(image || verdict) && (
+          <figure className="run-card" data-testid="run-card">
+            <span className="card-picture">
+              {image ? (
+                <img src={imagePath(runId, image)} alt="" width={512} height={512} />
+              ) : (
+                <span className="card-placeholder" aria-hidden="true" />
+              )}
+              {verdict && <VerdictOverlay verdict={verdict} />}
+            </span>
+            {verdict && <figcaption className="sr-only">{verdictText(verdict)}</figcaption>}
+          </figure>
         )}
         {settled && <Seats view={view} line={line} compact />}
       </header>

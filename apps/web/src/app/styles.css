@@ -1096,10 +1096,11 @@ a.button {
 }
 
 .run-main {
+  --main-gap: 2.25rem;
   display: grid;
   /* One column that never grows past the track: a long word or link below wraps instead of running under the side column. */
   grid-template-columns: minmax(0, 1fr);
-  gap: 2.25rem;
+  gap: var(--main-gap);
   align-content: start;
   min-width: 0;
 }
@@ -1421,8 +1422,9 @@ a.button {
   grid-template-columns: var(--gutter) minmax(0, 1fr);
 }
 
+/* A marked paragraph's gutter is its mark: a click anywhere in it opens the discussion. */
 .gutter {
-  padding-right: 0.3rem;
+  display: grid;
 }
 
 .para-marked .gutter {
@@ -1470,9 +1472,9 @@ a.button {
   display: grid;
   justify-items: center;
   gap: 0.2rem;
+  align-content: start;
   width: 100%;
-  padding: 0.3rem 0;
-  margin-top: calc(var(--para-size) * (var(--para-leading) / 2 + 0.435) - 12px - 0.3rem);
+  padding: calc(var(--para-size) * (var(--para-leading) / 2 + 0.435) - 12px) 0 0.3rem;
   border: 0;
   border-radius: 5px;
   background: transparent;
@@ -1937,9 +1939,14 @@ a.button {
 
 /* Run: the sections after the answer, which the reader opens and closes ------------------------ */
 
+/* The same space above and below the title of a section, between its rule and the next one. */
 .fold {
-  padding-top: 1rem;
+  padding-block: 0.5rem;
   border-top: 1px solid var(--rule);
+}
+
+.run-main > .fold + .fold {
+  margin-top: calc(-1 * var(--main-gap));
 }
 
 .fold-summary {
@@ -1947,7 +1954,6 @@ a.button {
   align-items: center;
   gap: 0.55rem;
   min-height: 2.75rem; /* a target a finger can take */
-  margin-top: -0.5rem;
   cursor: pointer;
   list-style: none;
 }
