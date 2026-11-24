@@ -38,8 +38,8 @@
   --sans:
     "Instrument Sans Variable", "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  /* The margin of the marks: their column (12px) and the same small space on each side. */
-  --gutter: calc(12px + 0.6rem);
+  /* The margin of the marks: their column (12px), the same small space (0.3rem) on each side, and the 2px rule. */
+  --gutter: calc(12px + 0.6rem + 2px);
   --page-pad: 1.15rem;
 
   color-scheme: light;
@@ -83,7 +83,7 @@
 @media (min-width: 900px) {
   :root {
     /* two columns of marks (12px, 5px apart) */
-    --gutter: calc(29px + 0.6rem);
+    --gutter: calc(29px + 0.6rem + 2px);
     --page-pad: 2.5rem;
     font-size: 112.5%; /* 18px */
   }
@@ -1245,7 +1245,7 @@ a.button {
 }
 
 .gutter {
-  padding: 0 0.1rem;
+  padding: 0 0.3rem;
 }
 
 .para-marked .gutter {
@@ -1291,7 +1291,7 @@ a.button {
   justify-items: center;
   gap: 0.2rem;
   width: 100%;
-  padding: 0.3rem 0.2rem;
+  padding: 0.3rem 0;
   margin-top: 0.15rem;
   border: 0;
   border-radius: 5px;
