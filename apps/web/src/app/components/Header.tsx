@@ -95,8 +95,8 @@ function AccountMenu({ user, onSignOut }: { user: AuthUser; onSignOut: () => voi
 }
 
 /**
- * The header of every page, in one row: the round home button, the name in the middle, then the
- * round buttons of the theme, to ask (to sign in first, for someone signed out) and of the
+ * The header of every page, in one row: the round buttons of home and the theme, the name in the
+ * middle, then the round buttons to ask (to sign in first, for someone signed out) and of the
  * account; a double rule under it.
  */
 export function Header() {
@@ -108,13 +108,13 @@ export function Header() {
           <Link to="/" className="round-button" aria-label={t.nav.home} title={t.nav.home}>
             <HomeIcon />
           </Link>
+          <ThemeSwitch />
           {local && <span className="local-tag">{t.local.badge}</span>}
         </div>
         <Link to="/" className="wordmark">
           {t.appName}
         </Link>
         <div className="header-end">
-          <ThemeSwitch />
           <Link
             to="/new"
             className="round-button"
