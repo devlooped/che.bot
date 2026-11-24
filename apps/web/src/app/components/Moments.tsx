@@ -61,10 +61,7 @@ export function Moments({ view, notes }: { view: RunView; notes: readonly string
       </Fold>
     );
   return (
-    <section className="moments" aria-labelledby="moments-title">
-      <h2 id="moments-title" className="side-title">
-        {t.moments.title}
-      </h2>
+    <section className="moments">
       {feed}
     </section>
   );

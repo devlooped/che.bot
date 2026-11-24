@@ -257,11 +257,10 @@ export const esAR = {
   },
 
   progress: {
-    title: "Lo que van pensando",
+    title: "Progreso",
   },
 
   moments: {
-    title: "Lo que va pasando",
     titleDone: "Cómo se armó la respuesta",
     empty: "Todavía no pasó nada.",
     showAll: (n: number) => `Ver ${n} más`,
