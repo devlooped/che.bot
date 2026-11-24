@@ -24,6 +24,7 @@ test("a claim keeps a source its search found when the URL differs only by www. 
           },
         ],
         charts: [],
+        verdict: { kind: "fact", rating: "none" },
       },
       {
         sources: [

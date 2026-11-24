@@ -63,6 +63,14 @@ export const draftSchema = z.object({
     .describe(
       "Up to 3 charts, one per measure, when figures compared across time, places or categories make the answer clearer; [] otherwise.",
     ),
+  verdict: z.object({
+    kind: z
+      .enum(["claim", "question", "fact"])
+      .describe("What the question asks: to check a claim, a yes or a no, or a fact."),
+    rating: z
+      .enum(["true", "false", "depends", "unknown", "none"])
+      .describe("Your answer in one word; none for a fact."),
+  }),
 });
 
 export const mergeSchema = z.object({
@@ -148,6 +156,11 @@ export const slugSchema = z.object({ words: z.array(z.string()) });
 /** The helper's prompt for the picture of a question (see illustrationPrompt). */
 export const illustrationSchema = z.object({
   prompt: z.string().min(10).max(2_000).describe("The prompt of the illustration, in English."),
+});
+
+/** The helper's one-sentence summary of a completed answer (see tldrPrompt). */
+export const tldrSchema = z.object({
+  text: z.string().describe("One sentence, at most 25 words."),
 });
 
 export const momentsSchema = z.object({

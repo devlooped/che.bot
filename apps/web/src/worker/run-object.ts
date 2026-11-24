@@ -27,10 +27,16 @@ import {
   SLUG_WORDS,
   type Snapshot,
   type Stage,
+  selectAnswer,
   shortOf,
   slugOf,
   slugPrompt,
   slugSchema,
+  summarizedEvent,
+  tldrOf,
+  tldrPrompt,
+  tldrSchema,
+  verdictOf,
 } from "@chebot/protocol";
 import { type ImageResult, type ModelRef, ProviderError } from "@chebot/providers";
 import { deps } from "./deps.ts";
@@ -53,6 +59,8 @@ import {
   retireReplaced,
   setRunImage,
   setRunStatus,
+  setRunTldr,
+  setRunVerdict,
 } from "./settings.ts";
 import { type RunSpend, type SpendCall, spendOf, stageOfKey } from "./spend.ts";
 import { spendMeter } from "./spend-meter.ts";
@@ -90,6 +98,9 @@ export const HELPER_TIMEOUT_MS = 30_000;
  * that second has the same words.
  */
 export const LINK_SECONDS = 3;
+
+/** The helper's tries at the TL;DR of a completed run, at most: one when it completes, then one per alarm. */
+export const TLDR_TRIES = 3;
 
 /** The tries at the picture of a run, at most: one per tick until it has one. */
 export const IMAGE_TRIES = 2;
@@ -559,7 +570,10 @@ export class RunObject extends DurableObject<Env> {
     const run = this.store.run();
     if (!run) return;
     if (run.status === "awaiting_payment") return this.paymentTick(run);
-    if (run.status === "completed" || run.status === "failed") return this.close();
+    if (run.status === "completed" || run.status === "failed") {
+      await this.sumUp();
+      return this.close();
+    }
     if (run.status !== "running" || !run.state) return;
     const retries = info?.retryCount ?? 0;
     if (retries >= ALARM_ATTEMPTS) return this.fail(run, run.state);
@@ -783,7 +797,80 @@ export class RunObject extends DurableObject<Env> {
   private async ended(status: RunStatus): Promise<void> {
     this.store.updateRun({ retries: 0 });
     await this.index(status);
+    if (status === "completed") {
+      await this.listVerdict();
+      await this.sumUp();
+    }
     await this.close();
+  }
+
+  /** Records the verdict of the drafts in the list of runs, for the cards. Never throws. */
+  private async listVerdict(): Promise<void> {
+    const run = this.store.run();
+    const verdict = run?.state ? verdictOf(run.state.drafts) : null;
+    if (!run || !verdict) return;
+    await setRunVerdict(this.env.DB, run.id, verdict).catch((error: unknown) => {
+      console.error(`The verdict of run ${run.id} could not be listed in D1.`, error);
+    });
+  }
+
+  /**
+   * Sums the answer of a completed run up in one sentence, its TL;DR, for its card and its page:
+   * the helper writes it when the run completes and, after a failure, once per alarm, at most
+   * TLDR_TRIES. It reaches the page as `answer.summarized` and the cards through the list of runs;
+   * its cost goes to the run's spend and the SpendMeter. A run whose models predate the helper gets
+   * none. Never throws.
+   */
+  private async sumUp(): Promise<void> {
+    const run = this.store.run();
+    const model = run?.models?.helper;
+    const answer = run?.state ? selectAnswer(run.state) : null;
+    if (run?.status !== "completed" || run.tldr !== null) return;
+    if (run.tldrTries >= TLDR_TRIES || !model || !answer) return;
+    const tries = run.tldrTries + 1;
+    this.store.updateRun({ tldr_tries: tries });
+    let tldr: string | null = null;
+    let cost: CallCost;
+    try {
+      const result = await deps.provider(this.env).generate({
+        callKey: `tldr:${tries}`,
+        model,
+        ...tldrPrompt({ question: run.question, answer: answer.text }),
+        schema: tldrSchema,
+        maxOutputTokens: 2_000,
+        signal: AbortSignal.timeout(HELPER_TIMEOUT_MS),
+      });
+      tldr = tldrOf(result.output.text);
+      cost = { model: model.id, costUsd: result.costUsd, ...result.usage };
+    } catch (error) {
+      console.warn(`The helper could not sum up run ${run.id} (try ${tries}).`, error);
+      cost = failedCost(model, error);
+    }
+    if (cost.costUsd > 0)
+      await spendMeter(this.env)
+        .settle(`${run.id}:tldr:${tries}`, cost.costUsd)
+        .catch((error: unknown) => {
+          console.warn(`The cost of the TL;DR of run ${run.id} could not be recorded.`, error);
+        });
+    // The run may have been deleted while the helper answered.
+    const kept = this.ctx.storage.transactionSync(() => {
+      const current = this.store.run();
+      if (!current) return false;
+      this.store.updateRun({
+        tldr,
+        tldr_calls: JSON.stringify([...current.tldrCalls, cost] satisfies CallCost[]),
+      });
+      if (tldr)
+        this.store.append([summarizedEvent(tldr)], Date.now(), attemptPrefix(current.attempt));
+      return tldr !== null;
+    });
+    if (kept && tldr) {
+      this.broadcast();
+      await setRunTldr(this.env.DB, run.id, tldr).catch((error: unknown) => {
+        console.error(`The TL;DR of run ${run.id} could not be listed in D1.`, error);
+      });
+    } else if (this.store.run() && tries < TLDR_TRIES)
+      await this.ctx.storage.setAlarm(Date.now() + backoffMs(tries));
   }
 
   /**
@@ -889,6 +976,8 @@ export class RunObject extends DurableObject<Env> {
       calls.push({ agent: "helper", stage: "link", running: false, ...call });
     for (const call of run.imageCalls)
       calls.push({ agent: call.stage === "image" ? "image" : "helper", running: false, ...call });
+    for (const call of run.tldrCalls)
+      calls.push({ agent: "helper", stage: "tldr", running: false, ...call });
     const inFlight = new Map<string, SpendCall>();
     if (run.status === "running" && run.state) {
       const step = nextStep(run.state, Date.now());

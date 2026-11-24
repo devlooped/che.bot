@@ -9,6 +9,7 @@ import type {
 import type {
   AbstainReason,
   Claim,
+  DraftVerdict,
   Flags,
   Mode,
   ModelId,
@@ -72,6 +73,8 @@ export type RunEvent = { key: string; batch: number } & (
       sources: Source[];
       /** The ids of earlier sources this model found too (absent when none). */
       alsoFound?: string[];
+      /** What the draft says the question is, and its rating (absent before the verdicts). */
+      verdict?: DraftVerdict;
     }
   | {
       type: "document.seeded";
@@ -151,6 +154,8 @@ export type RunEvent = { key: string; batch: number } & (
   | { type: "moment"; text: string; origin: "model" | "template" }
   | { type: "run.completed"; version: number; flags: Flags; spentUsd: number }
   | { type: "run.failed"; reason: FailureReason; spentUsd: number }
+  /** After the run completed, beside the protocol: the helper's one-sentence summary of the answer. */
+  | { type: "answer.summarized"; text: string }
 );
 
 export type EventType = RunEvent["type"];
@@ -202,4 +207,10 @@ export function paymentConfirmedEvent(input: { amount: number; currency: string 
 
 export function expiredEvent(): RunEvent {
   return { key: "run.expired", batch: 0, type: "run.expired" };
+}
+
+// After the run (batch 0, like the events before it): the server appends it once the helper wrote it.
+
+export function summarizedEvent(text: string): RunEvent {
+  return { key: "answer.summarized", batch: 0, type: "answer.summarized", text };
 }

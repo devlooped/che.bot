@@ -317,6 +317,7 @@ export function respondChart(
           answer: CLAIMS.join("\n\n"),
           claims: CLAIMS.map((text) => ({ text, confidence: "high", sources: [] })),
           charts: CHARTS[seat],
+          verdict: { kind: "fact", rating: "none" },
         },
         { sources: FOUND[seat], costUsd: 0.05 },
       );

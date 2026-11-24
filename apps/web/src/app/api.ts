@@ -1,4 +1,10 @@
-import type { FailureReason, LoggedEvent, QuestionClass, Stage } from "@chebot/protocol";
+import type {
+  FailureReason,
+  LoggedEvent,
+  QuestionClass,
+  RunVerdict,
+  Stage,
+} from "@chebot/protocol";
 import type { AuthUser } from "./auth/types.ts";
 
 // The HTTP API of the Worker (src/worker/api.ts), as the browser calls it, on the origin of the
@@ -92,6 +98,10 @@ export interface PublicRun {
   link: string | null;
   /** The version of its picture; null before it has one. */
   image: string | null;
+  /** What the question asks and each model's rating, once it completed; null before. */
+  verdict: RunVerdict | null;
+  /** The answer in one sentence, once the helper wrote it; null before. */
+  tldr: string | null;
   /** The signed-in user asked it: the card offers to ask it again. */
   mine: boolean;
 }

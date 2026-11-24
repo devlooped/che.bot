@@ -17,15 +17,18 @@ import {
   resolveRunModels,
   setReplaces,
   setRunDeleted,
+  shareOf,
   visibilityOf,
 } from "./settings.ts";
+import { withPreview } from "./share.ts";
 import { spendMeter } from "./spend-meter.ts";
 
 // The HTTP API, the sign-in routes of auth0.ts under /auth/, and the pages of runs under /r/. Who
 // may call each route:
 //
-//   GET    /r/:ref                    anyone: the page of a run (the app); a UUID or a short link
-//                                    redirects for good to the run's link once it has one
+//   GET    /r/:ref                    anyone: the page of a run (the app, with the preview of its
+//                                    link); a UUID or a short link redirects for good to the run's
+//                                    link once it has one
 //   GET    /api/links/:ref            anyone: the UUID and the link of a run, by its link
 //   GET    /api/me                    anyone: the signed-in user, or null
 //   GET    /api/runs?after=:id        anyone: the questions asked, newest first (the home page);
@@ -86,26 +89,48 @@ async function resolveLink(env: Env, ref: string): Promise<{ id: string; link: s
 /**
  * GET /r/:ref: the app's page. A run named by its UUID or by a link that is not its own (the short
  * part alone, or other words) redirects for good to its link; any other path is the app, which
- * says when there is no such run. A failure of D1 serves the app, which resolves the run itself.
+ * says when there is no such run, with the preview of the run for the sites it is shared on
+ * (share.ts). A failure of D1 serves the app, which resolves the run itself.
  */
 async function runPage(request: Request, env: Env, ref: string): Promise<Response> {
   let to: string | null = null;
+  let id: string | null = null;
   try {
     const parsed = parseRunRef(ref);
-    if (parsed?.kind === "uuid") to = await linkOfRun(env.DB, parsed.id);
-    else if (parsed?.kind === "link") {
+    if (parsed?.kind === "uuid") {
+      id = parsed.id;
+      to = await linkOfRun(env.DB, parsed.id);
+    } else if (parsed?.kind === "link") {
       const found = await resolveLink(env, ref);
       if (found && found.link !== ref) to = found.link;
+      else id = found?.id ?? null;
     }
   } catch (e) {
     console.error("The link of a run page could not be read.", e);
   }
-  if (!to) return env.ASSETS.fetch(request);
+  if (!to) return previewPage(request, env, id);
   const url = new URL(request.url);
   return new Response(null, {
     status: 301,
     headers: { location: `/r/${to}${url.search}` },
   });
+}
+
+/**
+ * The app's page of the run `id`, with its preview in the head; without one when there is no such
+ * run, its owner deleted it, or D1 fails.
+ */
+async function previewPage(request: Request, env: Env, id: string | null): Promise<Response> {
+  const page = await env.ASSETS.fetch(request);
+  if (!id || request.method !== "GET" || !page.ok) return page;
+  if (!page.headers.get("content-type")?.includes("text/html")) return page;
+  try {
+    const share = await shareOf(env.DB, id);
+    if (share && !share.deleted) return withPreview(page, share, new URL(request.url).origin);
+  } catch (e) {
+    console.error("The preview of a run page could not be read.", e);
+  }
+  return page;
 }
 
 /** A path segment decoded, or "" when it is not valid percent-encoding. */

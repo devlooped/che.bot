@@ -9,6 +9,7 @@ import { errorText } from "../view/errors.ts";
 import { ConfirmSheet } from "./ConfirmSheet.tsx";
 import { ImageIcon, RefreshIcon } from "./Icons.tsx";
 import { useRedraw } from "./useRedraw.ts";
+import { VerdictOverlay, verdictText } from "./Verdict.tsx";
 
 /**
  * The buttons over the picture of a card: its owner asks the question again once it ended (the new
@@ -112,7 +113,10 @@ function CardActions({
   );
 }
 
-/** A question asked: its picture, its text and when it was asked; its status while it is not done. */
+/**
+ * A question asked: its picture with its verdict over it, its text, its TL;DR and when it was
+ * asked; its status while it is not done.
+ */
 function Card({
   run,
   admin,
@@ -122,6 +126,7 @@ function Card({
   admin: boolean;
   onDrawn: (image: string) => void;
 }) {
+  const verdict = run.status === "completed" ? run.verdict : null;
   return (
     <li className="card" data-testid="question-card">
       <Link to={runPath(run.id, run.link)} className="card-link">
@@ -137,6 +142,7 @@ function Card({
           ) : (
             <span className="card-placeholder" aria-hidden="true" />
           )}
+          {verdict && <VerdictOverlay verdict={verdict} />}
           {run.status !== "completed" && (
             <span className={`card-stamp status-${run.status}`}>
               {run.status === "running" && <span className="pulse" aria-hidden="true" />}
@@ -147,6 +153,8 @@ function Card({
         <span className="card-question" id={`card-${run.id}`}>
           {run.question}
         </span>
+        {verdict && <span className="sr-only">{verdictText(verdict)}</span>}
+        {run.tldr && <span className="card-tldr">{run.tldr}</span>}
       </Link>
       <p className="card-meta">
         <time dateTime={run.createdAt}>{t.home.asked(t.day(run.createdAt))}</time>

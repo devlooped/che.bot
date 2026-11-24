@@ -149,6 +149,7 @@ export function respond(req: GenerateRequest<unknown>): FakeOutcome {
           answer: DRAFTS[seat].map((c) => c.text).join("\n\n"),
           claims: DRAFTS[seat].map((c) => ({ ...c, confidence: "high" })),
           charts: [],
+          verdict: { kind: "fact", rating: "none" },
         },
         { sources: FOUND[seat], costUsd: 0.05 },
       );
@@ -200,6 +201,11 @@ export function respond(req: GenerateRequest<unknown>): FakeOutcome {
     // The helper's prompt for the picture of a run.
     case "illustration":
       return out({ prompt: "A quiet map of Australia with the city of Canberra marked by a pin." });
+    // The helper's TL;DR of a completed run.
+    case "tldr":
+      return out({
+        text: "La capital de Australia es Canberra, donde viven unas 470.000 personas.",
+      });
     default:
       return { kind: "error", message: `unscripted ${req.callKey}` };
   }

@@ -318,14 +318,16 @@ describe("the spend of a run", () => {
     const done = await spendOf(id, admin);
     const ended = (await eventsOf(stub)).find((e) => e.type === "run.completed");
     if (ended?.type !== "run.completed") throw new Error("the run did not complete");
-    // Beside the run's own spend: the classification, the helper's link and the prompt of the
-    // picture, US$0.001 a call, and the picture, US$0.04. The link may take another try when a
-    // test of the same second has its words.
+    // Beside the run's own spend: the classification, the helper's link, the prompt of the picture
+    // and the TL;DR, US$0.001 a call, and the picture, US$0.04. The link may take another try when
+    // a test of the same second has its words.
     const calls = (stage: string) => done.rows.stage.find((r) => r.label === stage)?.calls ?? 0;
     expect(calls("classify")).toBe(1);
     expect(calls("image")).toBe(1);
+    expect(calls("tldr")).toBe(1);
     const beside =
-      0.001 * (calls("classify") + calls("link") + calls("illustration")) + 0.04 * calls("image");
+      0.001 * (calls("classify") + calls("link") + calls("illustration") + calls("tldr")) +
+      0.04 * calls("image");
     expect(done.totalUsd).toBeCloseTo(ended.spentUsd + beside, 9);
     for (const rows of Object.values(done.rows))
       expect(rows.reduce((sum, r) => sum + r.costUsd, 0)).toBeCloseTo(done.totalUsd, 9);

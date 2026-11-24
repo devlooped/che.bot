@@ -59,6 +59,8 @@ export interface RunView {
   disputes: Record<string, Dispute>;
   renders: ChartRender[];
   droppedPatches: DroppedPatch[];
+  /** The helper's one-sentence summary of the answer, once the run completed and it wrote one. */
+  tldr: string | null;
 }
 
 /**
@@ -113,6 +115,7 @@ export function emptyView(): RunView {
     disputes: {},
     renders: [],
     droppedPatches: [],
+    tldr: null,
   };
 }
 
@@ -188,7 +191,12 @@ function applyEvent(view: RunView, e: RunEvent) {
       }
       break;
     case "draft.completed":
-      view.drafts.push({ model: e.model, answer: e.answer, claims: e.claims.map((c) => c.id) });
+      view.drafts.push({
+        model: e.model,
+        answer: e.answer,
+        claims: e.claims.map((c) => c.id),
+        ...(e.verdict && { verdict: clone(e.verdict) }),
+      });
       for (const c of e.claims) view.claims[c.id] = c;
       view.briefs.push(...clone(e.charts ?? []));
       view.sources.push(...e.sources);
@@ -284,6 +292,9 @@ function applyEvent(view: RunView, e: RunEvent) {
     case "run.failed":
       view.status = "failed";
       view.spentUsd = e.spentUsd;
+      break;
+    case "answer.summarized":
+      view.tldr = e.text;
       break;
     case "chart.declined":
       view.declined.push({

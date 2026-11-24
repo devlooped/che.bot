@@ -58,7 +58,10 @@ const SCHEMA = [
      image TEXT,
      image_type TEXT,
      image_tries INTEGER NOT NULL DEFAULT 0,
-     image_calls TEXT
+     image_calls TEXT,
+     tldr TEXT,
+     tldr_tries INTEGER NOT NULL DEFAULT 0,
+     tldr_calls TEXT
    )`,
   `CREATE TABLE IF NOT EXISTS events (
      seq INTEGER PRIMARY KEY,
@@ -98,6 +101,9 @@ const ADDED_COLUMNS: readonly [string, string][] = [
   ["image_type", "TEXT"],
   ["image_tries", "INTEGER NOT NULL DEFAULT 0"],
   ["image_calls", "TEXT"],
+  ["tldr", "TEXT"],
+  ["tldr_tries", "INTEGER NOT NULL DEFAULT 0"],
+  ["tldr_calls", "TEXT"],
 ];
 
 /** A model call made beside the protocol (the classification, the link): what it cost. */
@@ -188,6 +194,12 @@ export interface RunRecord {
   imageTries: number;
   /** The calls for the picture so far, every try. */
   imageCalls: ImageCall[];
+  /** The helper's one-sentence summary of the answer, once the run completed; null before. */
+  tldr: string | null;
+  /** How many times the helper was asked for it (TLDR_TRIES at most). */
+  tldrTries: number;
+  /** The helper's calls for it so far, every try. */
+  tldrCalls: CallCost[];
 }
 
 interface RunRow extends Record<string, SqlStorageValue> {
@@ -223,6 +235,9 @@ interface RunRow extends Record<string, SqlStorageValue> {
   image_type: string | null;
   image_tries: number;
   image_calls: string | null;
+  tldr: string | null;
+  tldr_tries: number;
+  tldr_calls: string | null;
 }
 
 /** The columns of the run row that `updateRun` may set. */
@@ -316,6 +331,9 @@ export class RunStore {
       image: row.image,
       imageTries: row.image_tries,
       imageCalls: row.image_calls ? (JSON.parse(row.image_calls) as ImageCall[]) : [],
+      tldr: row.tldr,
+      tldrTries: row.tldr_tries,
+      tldrCalls: row.tldr_calls ? (JSON.parse(row.tldr_calls) as CallCost[]) : [],
     };
   }
 

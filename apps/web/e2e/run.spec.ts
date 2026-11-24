@@ -105,6 +105,34 @@ test("a shared link opens signed out; the UUID and the short link lead to the ru
   await expect(page.getByTestId("quote")).toHaveCount(0);
 });
 
+test("the card of an answered question: its picture, its verdict and its TL;DR, on its page, the home page and the preview of its link", async ({
+  page,
+  request,
+}) => {
+  const runId = await finishedRun(request);
+  await page.goto(`/r/${runId}`);
+  await expect(page.getByTestId("stage-line")).toHaveText(DONE);
+  // The scripted drafts take the question for a claim: Engañoso, Grok and Gemini apart.
+  const card = page.getByTestId("run-card");
+  await expect(card.locator("img")).toBeVisible();
+  await expect(card.locator(".card-verdict-label")).toHaveText(t.verdict.ratings.claim.depends);
+  await expect(card.locator(".card-verdict-kind")).toHaveText(t.verdict.kinds.claim);
+  await expect(card.locator(".card-verdict-row")).toHaveCount(3);
+  await expect(card.locator(".card-verdict-model")).toHaveCount(4);
+  await expect(page.getByTestId("tldr")).toContainText("15.400 litros");
+
+  const html = await (await request.get(new URL(page.url()).pathname)).text();
+  expect(html).toContain('<meta property="og:image"');
+  expect(html).toContain(`${SCENARIO_QUESTION} ⚠️`);
+
+  await page.goto("/");
+  const listed = page
+    .getByTestId("question-card")
+    .filter({ has: page.locator(`[id="card-${runId}"]`) });
+  await expect(listed.locator(".card-verdict-label")).toHaveText(t.verdict.ratings.claim.depends);
+  await expect(listed.locator(".card-tldr")).toContainText("15.400 litros");
+});
+
 test("an admin runs without paying", async ({ page }) => {
   await signIn(page, newUser(["Admin"]));
   await ask(page);

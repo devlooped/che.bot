@@ -1,5 +1,6 @@
-import { parseRunRef } from "@chebot/protocol";
+import { parseRunRef, verdictOf } from "@chebot/protocol";
 import { useEffect, useMemo, useState } from "react";
+import { imagePath } from "../api.ts";
 import { useSession } from "../auth/context.tsx";
 import { isAdmin } from "../auth/types.ts";
 import { AnswerDocument } from "../components/AnswerDocument.tsx";
@@ -11,6 +12,7 @@ import { RunActions } from "../components/RunActions.tsx";
 import { Panel, Sources } from "../components/RunDetails.tsx";
 import { Seats, useSettled } from "../components/Seats.tsx";
 import { Spend } from "../components/Spend.tsx";
+import { VerdictOverlay, verdictText } from "../components/Verdict.tsx";
 import { useRun } from "../events/useRun.ts";
 import { t } from "../i18n/index.ts";
 import { Link, navigate } from "../router/index.tsx";
@@ -97,16 +99,19 @@ function RunView({ runId }: { runId: string }) {
   const settled = useSettled(view);
   // The text of the answer, with its charts in their places among the paragraphs.
   const doc = useMemo(() => documentOf(view), [view]);
-  // The summary says why a run failed and whether it may run again: read it again when it ends.
+  // The summary says why a run failed and whether it may run again, and its picture may have come
+  // since: read it again when it ends.
   useEffect(() => {
-    if (view.status === "failed" || view.status === "expired") refresh();
+    if (view.status === "failed" || view.status === "expired" || view.status === "completed")
+      refresh();
   }, [view.status, refresh]);
-  // The helper names a paid question beside its first steps: read the link again at each stage.
-  const linkPending = summary?.link === null && view.status === "running";
+  // The helper names a paid question and its picture is drawn beside its first steps: read the
+  // summary again at each stage until it has both.
+  const pending = (summary?.link === null || summary?.image === null) && view.status === "running";
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new stage asks for a new read
   useEffect(() => {
-    if (linkPending) refresh();
-  }, [view.stage, linkPending, refresh]);
+    if (pending) refresh();
+  }, [view.stage, pending, refresh]);
   // The address bar shows the link to share: the run's link once it has one, its UUID before.
   const link = summary?.id === runId ? summary.link : null;
   const path = runPath(runId, link);
@@ -131,6 +136,9 @@ function RunView({ runId }: { runId: string }) {
   const line = stageLine(view, summary?.status === "awaiting_payment");
   const live = connection === "live" || connection === "polling";
   const final = view.status === "completed";
+  // The card of the question, as on the home page: its picture, and its verdict once it is answered.
+  const verdict = final ? verdictOf(view.drafts) : null;
+  const image = summary?.id === runId ? summary.image : null;
   // The stream says first when a run ends; the summary, whether it was quoted before any event.
   const ended =
     view.status === "completed" || view.status === "failed" || view.status === "expired";
@@ -183,10 +191,28 @@ function RunView({ runId }: { runId: string }) {
   return (
     <main className={settled ? "page run run-settled" : "page run"} data-status={view.status}>
       <header className="run-head">
+        {(image || verdict) && (
+          <figure className="run-card" data-testid="run-card">
+            <span className="card-picture">
+              {image ? (
+                <img src={imagePath(runId, image)} alt="" width={512} height={512} />
+              ) : (
+                <span className="card-placeholder" aria-hidden="true" />
+              )}
+              {verdict && <VerdictOverlay verdict={verdict} />}
+            </span>
+            {verdict && <figcaption className="sr-only">{verdictText(verdict)}</figcaption>}
+          </figure>
+        )}
         {question ? (
           <h1 className="question">{question}</h1>
         ) : (
           <p className="muted">{t.common.loading}</p>
+        )}
+        {final && view.tldr && (
+          <p className="run-tldr" data-testid="tldr">
+            <span className="tldr-label">{t.verdict.tldr}</span> {view.tldr}
+          </p>
         )}
         <div className="run-share">
           <RunActions

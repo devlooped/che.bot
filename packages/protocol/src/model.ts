@@ -64,10 +64,30 @@ export interface Claim {
   sources: string[]; // Source ids
 }
 
+/**
+ * What a question asks, for its card: to check a claim ("Verdadero", "Falso"...), a yes or a no
+ * ("Sí", "No"...), or a fact, a figure or an explanation ("Dato", with no vote).
+ */
+export type QuestionKind = "claim" | "question" | "fact";
+
+/**
+ * A model's answer in one word, the same four codes for a claim and a question: true (Verdadero,
+ * Sí), false (Falso, No), depends (Engañoso, Depende) and unknown (Insostenible, No sé).
+ */
+export type Rating = "true" | "false" | "depends" | "unknown";
+
+/** What a draft says the question is, and its rating; null for a fact. */
+export interface DraftVerdict {
+  kind: QuestionKind;
+  rating: Rating | null;
+}
+
 export interface Draft {
   model: ModelId;
   answer: string;
   claims: string[]; // Claim ids, in the draft's order
+  /** Absent on drafts written before the verdicts. */
+  verdict?: DraftVerdict;
 }
 
 export type SuggestionOp = "replace" | "insert_after" | "delete" | "patch"; // "patch" is for chart layers

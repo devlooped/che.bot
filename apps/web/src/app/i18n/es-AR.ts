@@ -127,6 +127,23 @@ export const esAR = {
     drawn: "La imagen nueva está lista.",
   },
 
+  verdict: {
+    /** What the question asks: the heading of the votes. */
+    kinds: { claim: "Afirmación", question: "Pregunta", fact: "Dato" },
+    /** Each rating, by what the question asks (the codes of the protocol, see Rating). */
+    ratings: {
+      claim: { true: "Verdadero", false: "Falso", depends: "Engañoso", unknown: "Insostenible" },
+      question: { true: "Sí", false: "No", depends: "Depende", unknown: "No sé" },
+    },
+    split: "Dividido",
+    /** A model that took the question for a fact: it gave no rating. */
+    none: "sin voto",
+    /** What a screen reader reads for the card: "Afirmación: Engañoso. Grok: Verdadero; ...". */
+    said: (heading: string, votes: readonly string[]) =>
+      votes.length ? `${heading}. ${votes.join("; ")}.` : `${heading}.`,
+    tldr: "TL;DR",
+  },
+
   quote: {
     classes: { simple: "simple", complex: "compleja" },
     yourQuestion: (cls: string) => `Tu pregunta es ${cls}.`,

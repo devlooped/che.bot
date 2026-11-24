@@ -157,6 +157,7 @@ export function respondWebChart(req: GenerateRequest<unknown>): FakeOutcome {
               rows: ROWS_WEB[seat],
             },
           ],
+          verdict: { kind: "fact", rating: "none" },
         },
         { sources: FOUND_WEB[seat], costUsd: 0.05 },
       );

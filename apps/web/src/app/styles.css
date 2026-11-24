@@ -34,6 +34,16 @@
   --fill-gemini: #9a6ae0;
   --ink-gemini: #6a3fb6;
 
+  /* The verdict of a card (grokeado's colors): its mark is white on the dark ones, ink on the light ones. */
+  --verdict-true: #2f7a4b;
+  --verdict-false: #b3361f;
+  --verdict-depends: #e98939;
+  --verdict-unknown: #e4c037;
+  --verdict-fact: #3c5ea8;
+  --verdict-split: #5b6670;
+  --verdict-glyph: #fff;
+  --verdict-glyph-light: #1b1915;
+
   --serif: "Literata Variable", "Literata", Georgia, "Times New Roman", serif;
   --sans:
     "Instrument Sans Variable", "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -76,6 +86,14 @@
   --ink-claude: #f8a65e;
   --ink-openai: #86c9f3;
   --ink-gemini: #bf9cf2;
+
+  --verdict-true: #69b986;
+  --verdict-false: #ed8068;
+  --verdict-depends: #f49a50;
+  --verdict-unknown: #ead15b;
+  --verdict-fact: #8fa9e6;
+  --verdict-split: #9ba7b1;
+  --verdict-glyph: #1b1915;
 
   color-scheme: dark;
 }
@@ -755,6 +773,19 @@ a.button {
   outline-offset: -3px;
 }
 
+/* The answer in one sentence, under the question. */
+.card-tldr {
+  display: -webkit-box;
+  overflow: hidden;
+  padding: 0.45rem 1rem 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--ink-soft);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
 .card-meta {
   padding: 0.5rem 1rem 0.9rem;
   font-size: 0.85rem;
@@ -777,12 +808,155 @@ a.button {
   }
 }
 
+/* The verdict over a picture: the label of the outcome at the top left, the votes at the bottom
+   right, as on the cards of grokeado. Sized by --verdict-size (the circle of a mark). */
+.card-verdict {
+  --verdict-size: 1.55rem;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.card-verdict-label,
+.card-verdict-votes {
+  position: absolute;
+  display: flex;
+  color: var(--ink);
+  background: var(--paper-raised);
+  border: 2px solid var(--ink);
+}
+
+.card-verdict-label {
+  top: 0.75rem;
+  left: 0.75rem;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.25rem 0.65rem 0.25rem 0.35rem;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.card-verdict-votes {
+  right: 0.75rem;
+  bottom: 0.75rem;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+  padding: 0.45rem 0.5rem;
+  box-shadow: 3px 3px 0 0 var(--ink);
+}
+
+.card-verdict-kind {
+  font-size: 0.85rem;
+  font-weight: 650;
+  line-height: 1.1;
+}
+
+.card-verdict-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.card-verdict-dot,
+.card-verdict-model {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: var(--verdict-size);
+  height: var(--verdict-size);
+  border-radius: 50%;
+}
+
+.card-verdict-dot {
+  font-weight: 700;
+  color: var(--verdict-glyph);
+  background: var(--rule-strong);
+}
+
+.card-verdict-dot svg,
+.card-verdict-model svg {
+  width: 62%;
+  height: 62%;
+}
+
+.card-verdict-dot[data-mark="true"] {
+  background: var(--verdict-true);
+}
+.card-verdict-dot[data-mark="false"] {
+  background: var(--verdict-false);
+}
+.card-verdict-dot[data-mark="depends"] {
+  color: var(--verdict-glyph-light);
+  background: var(--verdict-depends);
+}
+.card-verdict-dot[data-mark="unknown"] {
+  color: var(--verdict-glyph-light);
+  background: var(--verdict-unknown);
+}
+.card-verdict-dot[data-mark="fact"] {
+  background: var(--verdict-fact);
+}
+.card-verdict-dot[data-mark="split"] {
+  background: var(--verdict-split);
+}
+
+.glyph-down {
+  transform: rotate(180deg);
+}
+
+.card-verdict-model {
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+}
+
 /* Run: layout ---------------------------------------------------------------------------------- */
 
 .run-head {
   display: grid;
   gap: 0.9rem;
   padding: 0.5rem 0 1.25rem;
+}
+
+/* The card of the question at the top of its page: its picture and its verdict. */
+.run-card {
+  width: min(100%, 26rem);
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+}
+
+.run-card .card-picture {
+  border-bottom: 0;
+}
+
+.run-card .card-verdict {
+  --verdict-size: 2rem;
+}
+
+.run-card .card-verdict-label {
+  font-size: 1.15rem;
+}
+
+.run-card .card-verdict-kind {
+  font-size: 0.95rem;
+}
+
+.run-tldr {
+  max-width: 40rem;
+  font-size: 1.05rem;
+  color: var(--ink-soft);
+}
+
+.tldr-label {
+  margin-right: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--muted);
 }
 
 .question {

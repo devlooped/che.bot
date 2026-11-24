@@ -77,6 +77,7 @@ import {
 } from "./threads.ts";
 import { normalizeUrl } from "./urls.ts";
 import { clone, hash, normalizeText, seededShuffle } from "./util.ts";
+import { readVerdict } from "./verdict.ts";
 
 // The orchestrator: pure functions over a JSON run state. `nextStep` says which calls to make,
 // `reduce` folds their results into a new state and the events to append. The state holds no
@@ -1035,7 +1036,13 @@ function reduceDrafts(run: RunState, outputs: Map<string, Output>, events: RunEv
     for (const c of claims) run.claims[c.id] = c;
     const charts = readBriefs({ model, label, charts: draft.charts, found, urls });
     run.charts.briefs.push(...charts);
-    run.drafts.push({ model, answer: draft.answer.trim(), claims: claims.map((c) => c.id) });
+    const verdict = readVerdict(draft.verdict);
+    run.drafts.push({
+      model,
+      answer: draft.answer.trim(),
+      claims: claims.map((c) => c.id),
+      verdict,
+    });
     events.push({
       key: `draft.completed:${model}`,
       batch: run.batch,
@@ -1046,6 +1053,7 @@ function reduceDrafts(run: RunState, outputs: Map<string, Output>, events: RunEv
       charts: clone(charts),
       sources: added,
       ...(again.length > 0 && { alsoFound: again }),
+      verdict: clone(verdict),
     });
   }
   if (run.drafts.length === 0) return fail(run, "no_drafts", events);

@@ -144,7 +144,12 @@ describe("the alarm driver", () => {
     expect(view.status).toBe("completed");
     expect(view.snapshots).toEqual(cli.state.snapshots);
     expect(selectAnswer(view)).toEqual(selectAnswer(cli.state));
-    expect(keysAfterStart(log)).toEqual(keysAfterStart(cli.log));
+    // The same events, and after them the helper's TL;DR, which the CLI does not write.
+    expect(keysAfterStart(log)).toEqual([
+      ...keysAfterStart(cli.log),
+      "answer.summarized|answer.summarized",
+    ]);
+    expect(view.tldr).toEqual(expect.any(String));
     const stored = await inside(stub, (store) => store.run()?.state);
     expect(selectAnswer(stored ?? cli.state)).toEqual(selectAnswer(cli.state));
     const summary = await stub.summary();

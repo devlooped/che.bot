@@ -98,6 +98,8 @@ The states around the happy path are played the same way, to see and test them:
 | The budget reached before the discussion | Ask with `[presupuesto]`: the drafts spend nearly all of it                                                             |
 | An expired payment                       | "Simular que venció el QR" under the QR (`POST /api/local/expire/:id`)                                                  |
 | A model that does not answer             | Every run: Gemini misses the last round of votes                                                                        |
+| The verdict of a claim                   | Every run: Engañoso, with Grok (Verdadero) and Gemini (Insostenible) apart                                              |
+| A question of yes or no, a fact          | Ask with `[sí o no]` (Sí, three to one) or `[dato]` (the label Dato alone)                                              |
 | Charts among the paragraphs              | Ask `CHART_QUESTION`: inflation after the first paragraph, wages after the second                                       |
 | A chart: agreed rows                     | The inflation chart: January, February and April; every row of the wages                                                |
 | A point corrected by its source          | The inflation chart: March, drawn at 3,3 (two models) and settled at 3,7 by the statistics office                       |
@@ -132,6 +134,19 @@ column of the list (`migrations/0004_run_image.sql`); its cost goes to the run's
 before the pictures has none until it is drawn: its owner draws theirs again, from its card on the
 home page or the bar of its page, once it was asked and under the guardrails of asking (the rate
 limit and the daily cap); an admin draws any.
+
+Each draft also says what the question asks and answers it in one word (its `verdict`): a claim to
+check (Verdadero, Falso, Engañoso, Insostenible), a question of yes or no (Sí, No, Depende, No sé),
+or a fact (Dato, with no vote). The verdict of a run (`verdictOf` of the protocol) is the kind most
+drafts gave and the rating most models gave, Dividido on a tie. Once the run completes, it goes to
+the `verdict` column of the list (`migrations/0005_run_verdict.sql`), and the helper sums the answer
+up in one sentence, its TL;DR (the `tldr` column and the event `answer.summarized`; three tries at
+most, its cost in the run's spend). The card of a question, on the home page and at the top of its
+page, shows its picture with the verdict over it, as the cards of grokeado: the label of the outcome
+and, for a claim or a question, each model's rating beside its logo; the TL;DR goes under the
+question. The page of a run (`/r/:ref`) carries the preview of its link for the sites it is shared
+on: the Worker writes the Open Graph and Twitter tags into index.html (`src/worker/share.ts`): the
+question with the emoji of its verdict, the TL;DR and the picture.
 
 A run is a UUID inside: its object, its payment job, its row in the list. Once it is paid and
 starts, the helper model (Claude Haiku at medium effort by default) sums the question up in at

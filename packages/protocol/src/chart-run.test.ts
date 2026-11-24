@@ -412,6 +412,7 @@ describe("when the answer has charts", () => {
               answer: "Una respuesta.",
               claims: [{ text: "Una respuesta.", confidence: "high", sources: [] }],
               charts: charts(call.seat as ModelId),
+              verdict: { kind: "fact", rating: "none" },
             },
             { sources: FOUND[call.seat as ModelId] },
           )

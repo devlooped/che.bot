@@ -170,6 +170,7 @@ export const scripted: Responder = (call, state) => {
           answer: DRAFT_CLAIMS[m].map((c) => c.text).join("\n\n"),
           claims: DRAFT_CLAIMS[m].map((c) => ({ ...c, confidence: "high" })),
           charts: [],
+          verdict: { kind: "fact", rating: "none" },
         },
         { sources: FOUND[m], costUsd: 0.05 },
       );

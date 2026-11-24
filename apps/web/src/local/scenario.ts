@@ -18,12 +18,30 @@ import { respondChart } from "./chart-scenario.ts";
  *   per model, so that the free rerun of a paid run plays the full run.
  * - `fewDrafts`: Grok and Gemini do not answer the drafts: two answers, no discussion.
  * - `budget`: the drafts cost so much that the budget ends before the rounds.
+ * - `question`, `fact`: the drafts take the question for one of yes or no (Sí, three to one),
+ *   or for a fact (Dato, no votes); without them, for a claim (Engañoso, Grok and Gemini apart).
  */
 export const MARKERS = {
   fail: "[falla]",
   fewDrafts: "[pocas]",
   budget: "[presupuesto]",
+  question: "[sí o no]",
+  fact: "[dato]",
 } as const;
+
+/** What each draft says the question is, and its rating, by the markers of the question. */
+function verdictOf(prompt: string, seat: ModelId) {
+  if (prompt.includes(MARKERS.fact)) return { kind: "fact", rating: "none" };
+  if (prompt.includes(MARKERS.question))
+    return { kind: "question", rating: seat === "gemini" ? "depends" : "true" };
+  const ratings: Record<ModelId, string> = {
+    grok: "true",
+    claude: "depends",
+    openai: "depends",
+    gemini: "unknown",
+  };
+  return { kind: "claim", rating: ratings[seat] };
+}
 
 /** The models whose first draft already failed, per question (the `fail` marker): this isolate. */
 const failedOnce = new Set<string>();
@@ -357,6 +375,7 @@ export function respond(req: GenerateRequest<unknown>): FakeOutcome {
           answer: ANSWERS[seat],
           claims: CLAIMS[seat].map((c) => ({ ...c, confidence: "high" })),
           charts: [],
+          verdict: verdictOf(req.prompt, seat),
         },
         // With the budget marker, four drafts leave less than the worst case of a round.
         { sources: FOUND[seat], costUsd: marked(MARKERS.budget) ? 0.7 : 0.05 },
@@ -405,6 +424,10 @@ export function respond(req: GenerateRequest<unknown>): FakeOutcome {
     case "illustration":
       return out({
         prompt: `An editorial illustration about: ${req.prompt.replace(/^Question:\s*/, "")}`,
+      });
+    case "tldr":
+      return out({
+        text: "Unos 15.400 litros por kilo como promedio mundial, pero casi toda es agua de lluvia: el agua de riego es mucho menos.",
       });
   }
   return { kind: "error", message: `The local scenario has no answer for ${req.callKey}.` };

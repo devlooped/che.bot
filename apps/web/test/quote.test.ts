@@ -178,11 +178,13 @@ describe("the guardrails", () => {
   });
 });
 
-/** What a run spent, as its state counts it, and the helper's link and the picture beside it. */
+/** What a run spent, as its state counts it, and the helper's link, the picture and the TL;DR beside it. */
 const spentOf = (stub: DurableObjectStub<RunObject>) =>
   runInDurableObject(stub, (_: RunObject, state) => {
     const run = new RunStore(state.storage.sql).run();
-    const picture = run?.imageCalls.reduce((sum, call) => sum + call.costUsd, 0) ?? 0;
-    const link = run?.linkCalls.reduce((sum, call) => sum + call.costUsd, 0) ?? 0;
-    return (run?.state?.spentUsd ?? 0) + link + picture;
+    const sum = (calls: { costUsd: number }[] = []) =>
+      calls.reduce((total, call) => total + call.costUsd, 0);
+    return (
+      (run?.state?.spentUsd ?? 0) + sum(run?.linkCalls) + sum(run?.imageCalls) + sum(run?.tldrCalls)
+    );
   });

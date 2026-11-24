@@ -1,4 +1,4 @@
-import type { ModelSnapshot, QuestionClass } from "@chebot/protocol";
+import type { ModelSnapshot, QuestionClass, RunVerdict } from "@chebot/protocol";
 import { type ModelSetting, resolveModels } from "@chebot/providers";
 import { deps } from "./deps.ts";
 import type { Env } from "./env.ts";
@@ -149,7 +149,34 @@ export async function setRunImage(db: D1Database, id: string, version: string): 
   await db.prepare("UPDATE runs SET image = ? WHERE id = ?").bind(version, id).run();
 }
 
-/** A card of the home page: a question that was asked, and its picture. */
+/** Records the verdict of the run `id` (migration 0005), once it completed. */
+export async function setRunVerdict(
+  db: D1Database,
+  id: string,
+  verdict: RunVerdict,
+): Promise<void> {
+  await db
+    .prepare("UPDATE runs SET verdict = ? WHERE id = ?")
+    .bind(JSON.stringify(verdict), id)
+    .run();
+}
+
+/** Records the one-sentence summary of the answer of the run `id` (migration 0005). */
+export async function setRunTldr(db: D1Database, id: string, tldr: string): Promise<void> {
+  await db.prepare("UPDATE runs SET tldr = ? WHERE id = ?").bind(tldr, id).run();
+}
+
+/** A verdict as the list keeps it; null when there is none or it is not JSON. */
+function verdictOfRow(json: string | null): RunVerdict | null {
+  if (!json) return null;
+  try {
+    return JSON.parse(json) as RunVerdict;
+  } catch {
+    return null;
+  }
+}
+
+/** A card of the home page: a question that was asked, its picture, its verdict and its TL;DR. */
 export interface PublicRun {
   id: string;
   createdAt: string;
@@ -158,6 +185,10 @@ export interface PublicRun {
   link: string | null;
   /** The version of its picture; null before it has one. */
   image: string | null;
+  /** What the question asks and each model's rating, once it completed; null before. */
+  verdict: RunVerdict | null;
+  /** The answer in one sentence, once the helper wrote it; null before. */
+  tldr: string | null;
   /** The reader asked it: the card offers to ask it again. */
   mine: boolean;
 }
@@ -178,7 +209,7 @@ export async function listPublicRuns(
   const statuses = ASKED_STATUSES.map(() => "?").join(", ");
   const { results } = await db
     .prepare(
-      `SELECT id, created_at, question, status, link, image, owner = ? AS mine FROM runs
+      `SELECT id, created_at, question, status, link, image, verdict, tldr, owner = ? AS mine FROM runs
        WHERE deleted_at IS NULL AND status IN (${statuses})
          ${before ? "AND (created_at < ? OR (created_at = ? AND id > ?))" : ""}
        ORDER BY created_at DESC, id LIMIT ?`,
@@ -196,6 +227,8 @@ export async function listPublicRuns(
       status: string;
       link: string | null;
       image: string | null;
+      verdict: string | null;
+      tldr: string | null;
       /** 1, 0, or null when there is no reader. */
       mine: number | null;
     }>();
@@ -206,8 +239,52 @@ export async function listPublicRuns(
     status: row.status,
     link: row.link,
     image: row.image,
+    verdict: verdictOfRow(row.verdict),
+    tldr: row.tldr,
     mine: row.mine === 1,
   }));
+}
+
+/** What the preview of a shared link of a run shows (see share.ts); null when it is not listed. */
+export interface RunShare {
+  id: string;
+  question: string;
+  status: string;
+  link: string | null;
+  image: string | null;
+  verdict: RunVerdict | null;
+  tldr: string | null;
+  deleted: boolean;
+}
+
+export async function shareOf(db: D1Database, id: string): Promise<RunShare | null> {
+  const row = await db
+    .prepare(
+      "SELECT id, question, status, link, image, verdict, tldr, deleted_at FROM runs WHERE id = ?",
+    )
+    .bind(id)
+    .first<{
+      id: string;
+      question: string;
+      status: string;
+      link: string | null;
+      image: string | null;
+      verdict: string | null;
+      tldr: string | null;
+      deleted_at: string | null;
+    }>();
+  return row
+    ? {
+        id: row.id,
+        question: row.question,
+        status: row.status,
+        link: row.link,
+        image: row.image,
+        verdict: verdictOfRow(row.verdict),
+        tldr: row.tldr,
+        deleted: row.deleted_at !== null,
+      }
+    : null;
 }
 
 /** The date and id of a run of the list, for the page after it; null when it is not there. */
