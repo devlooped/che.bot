@@ -92,6 +92,8 @@ export interface PublicRun {
   id: string;
   /** ISO 8601. */
   createdAt: string;
+  /** When the answer was made (ISO 8601); null for runs completed before it was recorded. */
+  answeredAt: string | null;
   question: string;
   /** Running, completed or failed: the questions that were paid and started. */
   status: RunStatus;

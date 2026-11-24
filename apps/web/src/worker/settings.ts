@@ -149,15 +149,15 @@ export async function setRunImage(db: D1Database, id: string, version: string): 
   await db.prepare("UPDATE runs SET image = ? WHERE id = ?").bind(version, id).run();
 }
 
-/** Records the verdict of the run `id` (migration 0005), once it completed. */
+/** Records the verdict of the run `id` (migration 0005) and when it was answered (0006), once it completed. */
 export async function setRunVerdict(
   db: D1Database,
   id: string,
   verdict: RunVerdict,
 ): Promise<void> {
   await db
-    .prepare("UPDATE runs SET verdict = ? WHERE id = ?")
-    .bind(JSON.stringify(verdict), id)
+    .prepare("UPDATE runs SET verdict = ?, answered_at = ? WHERE id = ?")
+    .bind(JSON.stringify(verdict), new Date().toISOString(), id)
     .run();
 }
 
@@ -180,6 +180,8 @@ function verdictOfRow(json: string | null): RunVerdict | null {
 export interface PublicRun {
   id: string;
   createdAt: string;
+  /** When the answer was made (ISO 8601); null for runs completed before it was recorded. */
+  answeredAt: string | null;
   question: string;
   status: string;
   link: string | null;
@@ -209,7 +211,7 @@ export async function listPublicRuns(
   const statuses = ASKED_STATUSES.map(() => "?").join(", ");
   const { results } = await db
     .prepare(
-      `SELECT id, created_at, question, status, link, image, verdict, tldr, owner = ? AS mine FROM runs
+      `SELECT id, created_at, answered_at, question, status, link, image, verdict, tldr, owner = ? AS mine FROM runs
        WHERE deleted_at IS NULL AND status IN (${statuses})
          ${before ? "AND (created_at < ? OR (created_at = ? AND id > ?))" : ""}
        ORDER BY created_at DESC, id LIMIT ?`,
@@ -223,6 +225,7 @@ export async function listPublicRuns(
     .all<{
       id: string;
       created_at: string;
+      answered_at: string | null;
       question: string;
       status: string;
       link: string | null;
@@ -235,6 +238,7 @@ export async function listPublicRuns(
   return results.map((row) => ({
     id: row.id,
     createdAt: row.created_at,
+    answeredAt: row.answered_at,
     question: row.question,
     status: row.status,
     link: row.link,

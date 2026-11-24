@@ -48,6 +48,7 @@ export const esAR = {
   list,
   date: formatDate,
   day: formatDay,
+  isoDay: formatIsoDay,
   models: MODEL_NAMES,
   modelNames: names,
 
@@ -120,7 +121,6 @@ export const esAR = {
     failed: "No pudimos cargar las preguntas.",
     more: "Ver más preguntas",
     loadingMore: "Cargando más preguntas…",
-    asked: (date: string) => `Preguntada el ${date}`,
     draw: "Hacer la imagen",
     redraw: "Rehacer la imagen",
     drawing: "Dibujando la imagen…",
@@ -847,6 +847,12 @@ const dateFormat = new Intl.DateTimeFormat("es-AR", {
   hourCycle: "h23",
 });
 
+const isoDayFormat = new Intl.DateTimeFormat("sv-SE", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+
 const dayFormat = new Intl.DateTimeFormat("es-AR", {
   day: "numeric",
   month: "short",
@@ -856,6 +862,11 @@ const dayFormat = new Intl.DateTimeFormat("es-AR", {
 /** "16 nov 2026" (as Intl words it for es-AR). */
 function formatDay(iso: string | number): string {
   return dayFormat.format(new Date(iso));
+}
+
+/** "2026-11-16": sortable, the same in every language. */
+function formatIsoDay(iso: string | number): string {
+  return isoDayFormat.format(new Date(iso));
 }
 
 /** "16 de noviembre de 2026, 14:30" (as Intl words it for es-AR). */

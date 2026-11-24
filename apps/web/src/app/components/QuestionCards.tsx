@@ -116,7 +116,7 @@ function CardActions({
 
 /**
  * A question asked: its picture with its verdict over it, its text, the summary of its answer and
- * when it was asked; its status while it is not done.
+ * when it was answered; its status while it is not done.
  */
 function Card({
   run,
@@ -158,7 +158,10 @@ function Card({
         {run.tldr && <Summary text={run.tldr} verdict={run.verdict} />}
       </Link>
       <p className="card-meta">
-        <time dateTime={run.createdAt}>{t.home.asked(t.day(run.createdAt))}</time>
+        {/* The answer's date, not the question's: asking again moves it. */}
+        <time dateTime={run.answeredAt ?? run.createdAt}>
+          ✏️ {t.isoDay(run.answeredAt ?? run.createdAt)}
+        </time>
       </p>
       <CardActions run={run} admin={admin} onDrawn={onDrawn} />
     </li>

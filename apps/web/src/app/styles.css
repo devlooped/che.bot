@@ -818,8 +818,10 @@ a.button {
 
 .card-meta {
   padding: 0.5rem 1rem 0.9rem;
-  font-size: 0.85rem;
+  font-size: 0.72rem;
   color: var(--muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .card-error {
@@ -1577,17 +1579,17 @@ a.button {
   background: var(--paper-raised);
 }
 
-/* The marks of who holds a paragraph, top to bottom: one column on a phone, two on a wider screen. */
+/* The marks of who holds a paragraph: a single column on a phone, where the gutter is as wide as
+   one mark; on a wider screen two to a line, the first two on the first line, the rest below. */
 .support {
   display: inline-grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(4, auto);
+  grid-auto-flow: row;
   gap: 4px 5px;
 }
 
 @media (min-width: 900px) {
   .support {
-    grid-template-rows: repeat(2, auto);
+    grid-template-columns: repeat(2, auto);
   }
 }
 

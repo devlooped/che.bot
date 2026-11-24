@@ -86,7 +86,7 @@ test("the home page shows a question asked as a card with its picture, and a quo
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: t.home.title })).toBeVisible();
   const card = await cardOf(page, asked);
-  await expect(card).toContainText(t.home.asked(t.day(Date.now())));
+  await expect(card).toContainText(`✏️ ${t.isoDay(Date.now())}`);
   const picture = card.locator("img");
   await expect(picture).toBeVisible();
   expect(await picture.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
