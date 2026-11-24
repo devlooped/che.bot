@@ -1240,6 +1240,8 @@ a.button {
 }
 
 .para {
+  --para-size: 1.06rem;
+  --para-leading: 1.72;
   display: grid;
   grid-template-columns: var(--gutter) minmax(0, 1fr);
 }
@@ -1263,8 +1265,8 @@ a.button {
 
 .para-text {
   font-family: var(--serif);
-  font-size: 1.06rem;
-  line-height: 1.72;
+  font-size: var(--para-size);
+  line-height: var(--para-leading);
   max-width: 38rem;
   overflow-wrap: break-word;
 }
@@ -1286,13 +1288,16 @@ a.button {
   padding: 0 0.1em;
 }
 
+/* The first mark stands on the baseline of the paragraph's first line, as tall as a capital.
+   Literata's ascent is 1.18em and its descent 0.31em, so the baseline lies leading / 2 + 0.435em
+   below the top of the line; the mark (12px) and the button's top padding come off it. */
 .mark {
   display: grid;
   justify-items: center;
   gap: 0.2rem;
   width: 100%;
   padding: 0.3rem 0;
-  margin-top: 0.15rem;
+  margin-top: calc(var(--para-size) * (var(--para-leading) / 2 + 0.435) - 12px - 0.3rem);
   border: 0;
   border-radius: 5px;
   background: transparent;
