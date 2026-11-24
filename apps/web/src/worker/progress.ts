@@ -1,24 +1,17 @@
-import {
-  type Call,
-  isPanel,
-  type ModelId,
-  type ProgressMessage,
-  progressTail,
-} from "@chebot/protocol";
+import { type Call, isPanel, type ModelId, type ProgressMessage } from "@chebot/protocol";
 
-/** The browsers get the paragraph of each seat at most this often. */
+/** The browsers get more of what each seat says at most this often. */
 export const PROGRESS_MS = 500;
-/** What is kept of what a call said: enough for its last paragraph (progressTail). */
-const KEPT_CHARS = 4_000;
 
 /**
- * What the seats of the panel say during one step, for the browsers that follow the run: each
- * seat's last paragraph (progressTail) at most every PROGRESS_MS while its call goes, and null as
- * soon as it lands, or when the step ends. Nothing of it is stored.
+ * What the seats of the panel say during one step, for the browsers that follow the run: what
+ * each seat's call said since the last message, at most every PROGRESS_MS while it goes, and null
+ * as soon as it lands, or when the step ends. The page reads it at its own pace (reading.ts of the
+ * app). Nothing of it is stored.
  */
 export class SeatProgress {
-  /** What the call of each seat said so far, and what the browsers last got. */
-  private readonly seats = new Map<ModelId, { key: string; text: string; sent: string }>();
+  /** The call of each seat, what it said that the browsers did not get yet, and whether they got any. */
+  private readonly seats = new Map<ModelId, { key: string; pending: string; sent: boolean }>();
   private timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
@@ -30,12 +23,8 @@ export class SeatProgress {
   add(call: Call, text: string): void {
     if (!isPanel(call.seat)) return;
     const seat = this.seats.get(call.seat);
-    const said = (seat?.key === call.key ? seat.text : "") + text;
-    this.seats.set(call.seat, {
-      key: call.key,
-      text: said.length > KEPT_CHARS * 2 ? said.slice(-KEPT_CHARS) : said,
-      sent: seat?.sent ?? "",
-    });
+    if (seat?.key === call.key) seat.pending += text;
+    else this.seats.set(call.seat, { key: call.key, pending: text, sent: false });
     this.timer ??= setTimeout(() => this.flush(), this.ms);
   }
 
@@ -55,16 +44,16 @@ export class SeatProgress {
   private flush(): void {
     this.timer = null;
     for (const [seat, said] of this.seats) {
-      const text = progressTail(said.text);
-      if (!text || text === said.sent) continue;
-      said.sent = text;
-      this.send({ type: "seat.progress", seat, text });
+      if (!said.pending) continue;
+      this.send({ type: "seat.progress", seat, call: said.key, text: said.pending });
+      said.pending = "";
+      said.sent = true;
     }
   }
 
   private hide(seat: ModelId): void {
     const said = this.seats.get(seat);
     this.seats.delete(seat);
-    if (said?.sent) this.send({ type: "seat.progress", seat, text: null });
+    if (said?.sent) this.send({ type: "seat.progress", seat, call: said.key, text: null });
   }
 }

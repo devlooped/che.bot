@@ -1331,12 +1331,29 @@ a.button {
   line-height: 1.2;
 }
 
+/* A fixed height of whole lines (4 on a phone, 2 beside the answer), so the column never jumps:
+   the text starts at the top while it fits, then scrolls smoothly to its latest line (Progress.tsx),
+   and a new paragraph fades in. */
 .progress-text {
+  --lines: 4;
+  height: calc(var(--lines) * 1.45em);
   margin-top: 0.2rem;
+  overflow: hidden;
   font-size: 0.84rem;
   line-height: 1.45;
   color: var(--muted);
   overflow-wrap: anywhere;
+}
+
+.progress-paragraph {
+  display: block;
+  animation: fade-in 0.5s ease-out;
+}
+
+@media (min-width: 1000px) {
+  .progress-text {
+    --lines: 2;
+  }
 }
 
 /* Run: moments --------------------------------------------------------------------------------- */

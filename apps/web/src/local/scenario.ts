@@ -326,9 +326,12 @@ const ROUND3: Record<ModelId, unknown[]> = {
   gemini: [],
 };
 
-/** How long each kind of call takes, in ms: enough to watch the run, short enough for tests. */
+/**
+ * How long each kind of call takes, in ms: enough to watch the run (and to read some of what the
+ * drafts think, at a reader's pace), short enough for tests.
+ */
 const DELAY: Record<string, number | Record<ModelId, number>> = {
-  draft: { grok: 1800, claude: 2600, openai: 2200, gemini: 3200 },
+  draft: { grok: 4500, claude: 6000, openai: 5200, gemini: 5600 },
   merge: 1500,
   round: { grok: 1100, claude: 1500, openai: 1300, gemini: 1700 },
   dedupe: 400,

@@ -118,11 +118,18 @@ While a run goes, its page shows what each of the four is thinking under the sea
 pensando"): a paragraph per seat whose call is in flight, ruled on its left in the seat's color,
 gone once its answer lands. The calls of the panel stream (`onProgress` of the providers:
 `src/stream.ts` puts the stream back together into the one result `generateText` expects, and asks
-OpenAI and Gemini for the summaries of their reasoning); only the reasoning and the prose reach
-it, never the structured output or a tool call. `RunObject` sends each seat's last paragraph over
-the socket at most every 500 ms as a `seat.progress` message (`src/worker/progress.ts`), never
-stored: a page that opens late sees the next one. In the local mode the scripted drafts and rounds
-think aloud across their delay.
+OpenAI, Gemini and Claude for the summaries of their reasoning); what reaches it is the reasoning,
+then what the model writes: its prose, and the prose of the string values of its structured output
+(never a key, a label, a URL or a tool call). OpenAI sends no reasoning on a call that may search,
+so a draft of ChatGPT shows its answer as it writes it. `RunObject` sends what each seat's call
+said since the last time over the socket, at most every 500 ms, as a `seat.progress` message
+(`src/worker/progress.ts`), never stored: a page that opens late gets what comes after. The page
+reads it at a reader's pace, whatever the pace of the stream (`src/app/view/reading.ts`): each
+paragraph made plain (no URLs, JSON, code, Markdown or heading alone), a word at a time at about
+240 words a minute, in a box of a fixed height (2 lines beside the answer, 4 on a phone) that
+scrolls smoothly to its latest line; a paragraph read to its end stays 1.5 s, and when the stream
+runs two paragraphs or more ahead, the reader skips to the newest. In the local mode the scripted
+drafts and rounds think aloud across their delay.
 
 On the page of a run, its owner cancels it while it is in progress (quoted, waiting for its
 payment or running): after a confirmation it stops and is deleted for good, its payment job

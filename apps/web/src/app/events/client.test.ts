@@ -259,8 +259,8 @@ describe("what the seats are thinking", () => {
     seq: 1,
     at: 0,
   };
-  const said = (seat: string, text: string | null) =>
-    JSON.stringify({ type: "seat.progress", seat, text });
+  const said = (seat: string, text: string | null, call = `draft:0:${seat}`) =>
+    JSON.stringify({ type: "seat.progress", seat, call, text });
 
   /** A run that goes, followed over an open socket. */
   async function running() {
@@ -273,17 +273,21 @@ describe("what the seats are thinking", () => {
     return { ...st, srv, socket, message: (data: string) => socket.say(data) };
   }
 
-  it("keeps each seat's paragraph apart from the events, and drops it when its call lands", async () => {
+  it("keeps what each seat said in its call apart from the events, and drops it when the call lands", async () => {
     const { message, last } = await running();
-    message(said("claude", "Separo la cifra de la afirmación."));
+    message(said("claude", "Separo la cifra "));
     message(said("grok", "Busco la cifra."));
+    message(said("claude", "de la afirmación."));
     expect(last()?.progress).toEqual({
-      claude: "Separo la cifra de la afirmación.",
-      grok: "Busco la cifra.",
+      claude: { call: "draft:0:claude", text: "Separo la cifra de la afirmación." },
+      grok: { call: "draft:0:grok", text: "Busco la cifra." },
     });
     expect(last()?.seq).toBe(1);
     message(said("claude", null));
-    expect(last()?.progress).toEqual({ grok: "Busco la cifra." });
+    expect(last()?.progress).toEqual({ grok: { call: "draft:0:grok", text: "Busco la cifra." } });
+    // the next call of a seat starts anew
+    message(said("grok", "Leo el texto.", "round:1:grok"));
+    expect(last()?.progress).toEqual({ grok: { call: "round:1:grok", text: "Leo el texto." } });
   });
 
   it("ignores a seat outside the panel and a run that does not go", async () => {

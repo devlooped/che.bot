@@ -63,11 +63,11 @@ export interface StreamState {
   connection: Connection;
   /** The seqs applied by the last update: the live ones the page may highlight. */
   fresh: number[];
-  /** The paragraph each seat of the panel is writing now, while its call goes. */
+  /** What each seat of the panel said so far in the call it is making now. */
   progress: Progress;
 }
 
-export type Progress = Readonly<Partial<Record<ModelId, string>>>;
+export type Progress = Readonly<Partial<Record<ModelId, { call: string; text: string }>>>;
 
 export interface StreamOptions {
   transport: Transport;
@@ -294,13 +294,14 @@ export class RunStream {
     this.emit(fresh);
   }
 
-  /** What a seat is thinking now; null: its call landed. Only while the run goes. */
+  /** More of what a seat says in its call (a new call starts anew); null: it landed. Only while the run goes. */
   private think(message: ProgressMessage): void {
-    const { [message.seat]: _, ...others } = this.progress;
-    if (message.text === null && !(message.seat in this.progress)) return;
+    const { [message.seat]: said, ...others } = this.progress;
+    if (message.text === null && !said) return;
+    const text = said?.call === message.call ? said.text : "";
     this.progress =
       message.text !== null && this.view.status === "running"
-        ? { ...others, [message.seat]: message.text }
+        ? { ...others, [message.seat]: { call: message.call, text: text + message.text } }
         : others;
     this.emit([]);
   }

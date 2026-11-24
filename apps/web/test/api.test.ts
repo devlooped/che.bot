@@ -410,9 +410,12 @@ describe("the event stream", () => {
     await vi.waitFor(() => expect(browser.progress.at(-1)?.text).toBeNull());
     const said = browser.progress.filter((m) => m.text !== null);
     expect(said.length).toBeGreaterThan(0);
-    expect(new Set(browser.progress.map((m) => m.seat))).toEqual(new Set(["grok"]));
-    // a paragraph at a time, the last of what it said
-    expect(said.every((m) => !m.text?.includes("\n"))).toBe(true);
+    expect(new Set(browser.progress.map((m) => `${m.seat} ${m.call}`))).toEqual(
+      new Set(["grok draft:0:grok"]),
+    );
+    // what is new each time, in order: together, the start of what it said
+    const together = said.map((m) => m.text).join("");
+    expect("Busco la capital.\n\nCanberra, no Sídney.".startsWith(together)).toBe(true);
     expect(browser.received).toEqual(await eventsOf(stub));
     browser.ws.close(1000, "done");
   });
