@@ -1554,10 +1554,12 @@ a.button {
 
 /* The first mark stands on the baseline of the paragraph's first line, as tall as a capital.
    Literata's ascent is 1.18em and its descent 0.31em, so the baseline lies leading / 2 + 0.435em
-   below the top of the line; the mark (12px) and the button's top padding come off it. */
+   below the top of the line; the mark (12px) and the button's top padding come off it.
+   The marks hold the left of the button, at the edge of the page, in line with the seats' marks;
+   the button's width past them is the small space before the rule. */
 .mark {
   display: grid;
-  justify-items: center;
+  justify-items: start;
   gap: 0.2rem;
   align-content: start;
   width: 100%;
