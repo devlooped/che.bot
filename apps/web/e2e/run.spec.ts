@@ -48,6 +48,11 @@ test("a click on a margin mark opens its discussion, and the keyboard does too",
   await page.goto(`/r/${runId}`);
   await expect(page.getByTestId("stage-line")).toHaveText(DONE);
 
+  // The margin marks stand in line with the marks of the seats above the answer.
+  const left = async (selector: string) =>
+    (await page.locator(selector).first().boundingBox())?.x ?? Number.NaN;
+  expect(await left('[data-testid="mark"] svg')).toBeCloseTo(await left(".seat svg"), 0);
+
   // The paragraph that said the figure exaggerates: two proposals, a change of mind, accepted.
   const contested = page.getByTestId("paragraph").filter({ hasText: "Hay quienes sostienen" });
   await contested.getByTestId("mark").click();
