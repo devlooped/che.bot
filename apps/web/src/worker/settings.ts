@@ -158,6 +158,8 @@ export interface PublicRun {
   link: string | null;
   /** The version of its picture; null before it has one. */
   image: string | null;
+  /** The reader asked it: the card offers to ask it again. */
+  mine: boolean;
 }
 
 /** The statuses of a question that was asked: paid (or an admin's) and started. */
@@ -165,22 +167,24 @@ export const ASKED_STATUSES = ["running", "completed", "failed"] as const;
 
 /**
  * The questions that were asked, newest first, except the deleted ones: `limit` of them, before
- * the run `before` when it is given (the last of the page before).
+ * the run `before` when it is given (the last of the page before); `mine`, those of `reader`.
  */
 export async function listPublicRuns(
   db: D1Database,
   limit: number,
   before: { createdAt: string; id: string } | null,
+  reader: string | null,
 ): Promise<PublicRun[]> {
   const statuses = ASKED_STATUSES.map(() => "?").join(", ");
   const { results } = await db
     .prepare(
-      `SELECT id, created_at, question, status, link, image FROM runs
+      `SELECT id, created_at, question, status, link, image, owner = ? AS mine FROM runs
        WHERE deleted_at IS NULL AND status IN (${statuses})
          ${before ? "AND (created_at < ? OR (created_at = ? AND id > ?))" : ""}
        ORDER BY created_at DESC, id LIMIT ?`,
     )
     .bind(
+      reader,
       ...ASKED_STATUSES,
       ...(before ? [before.createdAt, before.createdAt, before.id] : []),
       limit,
@@ -192,6 +196,8 @@ export async function listPublicRuns(
       status: string;
       link: string | null;
       image: string | null;
+      /** 1, 0, or null when there is no reader. */
+      mine: number | null;
     }>();
   return results.map((row) => ({
     id: row.id,
@@ -200,6 +206,7 @@ export async function listPublicRuns(
     status: row.status,
     link: row.link,
     image: row.image,
+    mine: row.mine === 1,
   }));
 }
 

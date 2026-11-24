@@ -1,21 +1,50 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { imagePath, type PublicRun } from "../api.ts";
 import { useSession } from "../auth/context.tsx";
 import { isAdmin } from "../auth/types.ts";
 import { t } from "../i18n/index.ts";
-import { Link } from "../router/index.tsx";
+import { Link, navigate } from "../router/index.tsx";
 import { runPath } from "../routes.tsx";
 import { errorText } from "../view/errors.ts";
+import { ConfirmSheet } from "./ConfirmSheet.tsx";
+import { ImageIcon, RefreshIcon } from "./Icons.tsx";
 
-/** Admin: draws the picture of a run again, with today's image model. */
-function Redraw({ run, onDrawn }: { run: PublicRun; onDrawn: (image: string) => void }) {
+/**
+ * The buttons over the picture of a card: its owner asks the question again once it ended (the new
+ * run takes its place, as on its page); an admin draws its picture again, with today's image model.
+ */
+function CardActions({
+  run,
+  admin,
+  onDrawn,
+}: {
+  run: PublicRun;
+  admin: boolean;
+  onDrawn: (image: string) => void;
+}) {
   const { api } = useSession();
-  const [busy, setBusy] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState<"refresh" | "redraw" | null>(null);
   const [said, setSaid] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const opener = useRef<HTMLButtonElement | null>(null);
+  const refreshable = run.mine && (run.status === "completed" || run.status === "failed");
+  if (!refreshable && !admin) return null;
+
+  async function refresh() {
+    setBusy("refresh");
+    setError(null);
+    try {
+      const quote = await api.ask(run.question, run.id);
+      navigate(runPath(quote.runId));
+    } catch (e) {
+      setError(errorText(e));
+      setBusy(null);
+    }
+  }
 
   async function redraw() {
-    setBusy(true);
+    setBusy("redraw");
     setError(null);
     setSaid("");
     try {
@@ -24,30 +53,74 @@ function Redraw({ run, onDrawn }: { run: PublicRun; onDrawn: (image: string) => 
     } catch (e) {
       setError(errorText(e));
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
+  function close() {
+    setAsking(false);
+    setError(null);
+    opener.current?.focus();
+  }
+
+  const drawLabel = busy === "redraw" ? t.home.drawing : run.image ? t.home.redraw : t.home.draw;
   return (
-    <div className="card-admin">
-      <button
-        type="button"
-        className="button button-text"
-        disabled={busy}
-        aria-describedby={`card-${run.id}`}
-        onClick={redraw}
-      >
-        {busy ? t.home.drawing : run.image ? t.home.redraw : t.home.draw}
-      </button>
+    <>
+      <div className="card-actions" role="toolbar" aria-label={t.run.actions}>
+        {refreshable && (
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={t.run.refresh}
+            title={t.run.refresh}
+            aria-describedby={`card-${run.id}`}
+            aria-haspopup="dialog"
+            onClick={(e) => {
+              opener.current = e.currentTarget;
+              setError(null);
+              setAsking(true);
+            }}
+          >
+            <RefreshIcon />
+          </button>
+        )}
+        {admin && (
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={drawLabel}
+            title={drawLabel}
+            aria-describedby={`card-${run.id}`}
+            aria-busy={busy === "redraw"}
+            disabled={busy === "redraw"}
+            onClick={redraw}
+          >
+            <ImageIcon />
+          </button>
+        )}
+      </div>
       <p className="sr-only" role="status">
         {said}
       </p>
-      {error && (
-        <p className="error" role="alert">
+      {error && !asking && (
+        <p className="error card-error" role="alert">
           {error}
         </p>
       )}
-    </div>
+      {asking && (
+        <ConfirmSheet
+          title={t.run.refreshTitle}
+          question={run.question}
+          body={t.run.refreshBody(admin)}
+          confirm={t.run.refreshConfirm}
+          confirming={t.run.refreshing}
+          busy={busy === "refresh"}
+          error={error}
+          onConfirm={refresh}
+          onClose={close}
+        />
+      )}
+    </>
   );
 }
 
@@ -90,7 +163,7 @@ function Card({
       <p className="card-meta">
         <time dateTime={run.createdAt}>{t.home.asked(t.day(run.createdAt))}</time>
       </p>
-      {admin && <Redraw run={run} onDrawn={onDrawn} />}
+      <CardActions run={run} admin={admin} onDrawn={onDrawn} />
     </li>
   );
 }

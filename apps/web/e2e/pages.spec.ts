@@ -1,5 +1,18 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { finishedRun, fromApp, newUser, signIn, signInAs, t, uniqueQuestion } from "./helpers.ts";
+
+/** The card of `question` on the home page: other tests ask at the same time, so it may be on a later page. */
+async function cardOf(page: Page, question: string) {
+  const card = page.getByTestId("question-card").filter({ hasText: question });
+  await expect(page.getByTestId("question-card").first()).toBeVisible();
+  const more = page.getByRole("button", { name: t.home.more });
+  while ((await card.count()) === 0 && (await more.count()) > 0) {
+    await more.click();
+    await expect(page.getByRole("button", { name: t.home.loadingMore })).toHaveCount(0);
+  }
+  await expect(card).toHaveCount(1);
+  return card;
+}
 
 test("Mis preguntas lists a question; its link opens; deleting asks first, hides it from others, and it can be restored", async ({
   page,
@@ -72,15 +85,7 @@ test("the home page shows a question asked as a card with its picture, and a quo
 
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: t.home.title })).toBeVisible();
-  const card = page.getByTestId("question-card").filter({ hasText: asked });
-  // Other tests ask at the same time: the card may be on a later page.
-  await expect(page.getByTestId("question-card").first()).toBeVisible();
-  const more = page.getByRole("button", { name: t.home.more });
-  while ((await card.count()) === 0 && (await more.count()) > 0) {
-    await more.click();
-    await expect(page.getByRole("button", { name: t.home.loadingMore })).toHaveCount(0);
-  }
-  await expect(card).toHaveCount(1);
+  const card = await cardOf(page, asked);
   await expect(card).toContainText(t.home.asked(t.day(Date.now())));
   const picture = card.locator("img");
   await expect(picture).toBeVisible();
@@ -88,6 +93,34 @@ test("the home page shows a question asked as a card with its picture, and a quo
   await expect(page.getByTestId("question-card").filter({ hasText: quoted })).toHaveCount(0);
 
   await card.getByRole("link", { name: asked }).click();
+  await expect(page.getByRole("heading", { level: 1, name: asked })).toBeVisible();
+});
+
+test("on its card, an admin draws the picture again and the owner asks the question again; a reader sees neither", async ({
+  page,
+  browser,
+}) => {
+  const asked = uniqueQuestion();
+  // The page's cookie jar: the page is signed in as the admin who asked.
+  await finishedRun(page.request, asked);
+
+  const stranger = await browser.newPage();
+  await stranger.goto("/");
+  await expect((await cardOf(stranger, asked)).getByRole("button")).toHaveCount(0);
+  await stranger.close();
+
+  await page.goto("/");
+  const card = await cardOf(page, asked);
+  const before = await card.locator("img").getAttribute("src");
+  await card.getByRole("button", { name: t.home.redraw }).click();
+  await expect(card.getByRole("status")).toHaveText(t.home.drawn);
+  await expect(card.locator("img")).not.toHaveAttribute("src", before ?? "");
+
+  await card.getByRole("button", { name: t.run.refresh }).click();
+  const dialog = page.getByRole("dialog", { name: t.run.refreshTitle });
+  await expect(dialog).toContainText(asked);
+  await dialog.getByRole("button", { name: t.run.refreshConfirm }).click();
+  await page.waitForURL(/\/r\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { level: 1, name: asked })).toBeVisible();
 });
 

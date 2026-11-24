@@ -654,6 +654,7 @@ a.button {
 }
 
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -760,7 +761,7 @@ a.button {
   color: var(--muted);
 }
 
-.card-admin {
+.card-error {
   padding: 0 1rem 0.9rem;
 }
 
@@ -773,6 +774,10 @@ a.button {
 @media (prefers-reduced-motion: reduce) {
   .card-link:hover .card-picture img {
     transform: none;
+  }
+
+  .card-actions .icon-button[aria-busy="true"] {
+    animation: none;
   }
 }
 
@@ -879,6 +884,35 @@ a.button {
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* Over the picture: ask it again (its owner), draw the picture again (an admin). */
+.card-actions {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.card-actions .icon-button {
+  width: 2.25rem;
+  height: 2.25rem;
+  background: var(--paper-raised);
+  border: 1px solid var(--ink);
+  box-shadow: 2px 2px 0 0 var(--ink);
+}
+
+.card-actions .icon-button:hover {
+  background: var(--paper);
+}
+
+.card-actions .icon-button:disabled {
+  cursor: progress;
+}
+
+.card-actions .icon-button[aria-busy="true"] {
+  animation: breathe 1.2s ease-in-out infinite;
 }
 
 .run-grid {

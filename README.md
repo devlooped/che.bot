@@ -114,7 +114,8 @@ of each role and the two prices (admins only; the menu of the account hides it f
 
 On the page of a run, its owner cancels it while it is in progress (quoted, waiting for its
 payment or running): after a confirmation it stops and is deleted for good, its payment job
-cancelled or ended. Once it ended, its owner asks the question again or deletes it. Asking again
+cancelled or ended. Once it ended, its owner asks the question again (there, or from the ↻ on its
+card on the home page) or deletes it. Asking again
 is a new run of the same text, quoted and paid as any other, with the models of today; once it
 starts, the old run
 is deleted and its link leads to the new one. A deleted run stays (`deleted_at` in the list, see
@@ -128,7 +129,8 @@ and the model of the `image` role draws it (Grok Imagine by default, `spacexai/g
 `/admin` changes it like any other role). Two tries at most, one per tick. The run keeps the picture
 in its object, in chunks of 1 MB (a value of the storage holds 2 MB), and its version in the `image`
 column of the list (`migrations/0004_run_image.sql`); its cost goes to the run's spend. A run asked
-before the pictures has none until an admin draws it from its card on the home page.
+before the pictures has none until an admin draws it from its card on the home page, where an
+admin also draws any picture again.
 
 A run is a UUID inside: its object, its payment job, its row in the list. Once it is paid and
 starts, the helper model (Claude Haiku at medium effort by default) sums the question up in at
@@ -156,7 +158,7 @@ hook back on the origin of the page, which it cannot reach on localhost).
 | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `GET /auth/login?returnTo=/path`, `/auth/callback`, `/auth/logout`              | anyone: the sign-in, see below                                                                                                |
 | `GET /api/me` → `{id, name, admin, mayAsk}` or `null`                           | anyone: the signed-in user                                                                                                    |
-| `GET /api/runs?after=:id` → `{runs, next}`                                      | anyone: the questions asked (running, completed or failed, not deleted), newest first; `next` is the `after` of the next page |
+| `GET /api/runs?after=:id` → `{runs, next}`                                      | anyone: the questions asked (running, completed or failed, not deleted), newest first, `mine` on the caller's; `next` is the `after` of the next page |
 | `POST /api/runs {question, replaces?}` → `201 {runId, class, amount, currency}` | signed in; the `Admin` or `Contrib` role until `LAUNCHED` is `"true"`; `replaces`, a run of theirs                            |
 | `POST /api/runs/:id/pay` → `202`                                                | the owner; an `Admin` owner runs free, with no payment job                                                                    |
 | `POST /api/runs/:id/rerun` → `202`                                              | the owner, once, after a paid run failed                                                                                      |

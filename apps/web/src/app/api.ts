@@ -92,6 +92,8 @@ export interface PublicRun {
   link: string | null;
   /** The version of its picture; null before it has one. */
   image: string | null;
+  /** The signed-in user asked it: the card offers to ask it again. */
+  mine: boolean;
 }
 
 /** The picture of a run at a version: a URL that never changes, cached for good. */

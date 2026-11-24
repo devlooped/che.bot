@@ -28,7 +28,8 @@ import { spendMeter } from "./spend-meter.ts";
 //                                    redirects for good to the run's link once it has one
 //   GET    /api/links/:ref            anyone: the UUID and the link of a run, by its link
 //   GET    /api/me                    anyone: the signed-in user, or null
-//   GET    /api/runs?after=:id        anyone: the questions asked, newest first (the home page)
+//   GET    /api/runs?after=:id        anyone: the questions asked, newest first (the home page);
+//                                    `mine` marks the caller's
 //   POST   /api/runs                  signed in, Admin or Contrib role until launch: the quote;
 //                                    `replaces`, a run of the caller's that the new one replaces
 //   POST   /api/runs/:id/pay          the owner (an admin owner runs free, with no job)
@@ -198,8 +199,9 @@ export const PUBLIC_PAGE = 24;
 /**
  * GET /api/runs: the questions that were asked, newest first, PUBLIC_PAGE at a time; `after`, the
  * last run of the page before. `next` is the run to ask after for the next page, null at the end.
+ * `mine` marks the caller's questions.
  */
-async function publicRuns(env: Env, url: URL): Promise<Response> {
+async function publicRuns(env: Env, url: URL, identity: Identity): Promise<Response> {
   const after = url.searchParams.get("after");
   let before: { createdAt: string; id: string } | null = null;
   if (after !== null) {
@@ -207,7 +209,8 @@ async function publicRuns(env: Env, url: URL): Promise<Response> {
     before = await cursorOf(env.DB, after.toLowerCase());
     if (!before) return error(404, "No such run.");
   }
-  const runs = await listPublicRuns(env.DB, PUBLIC_PAGE + 1, before);
+  const reader = identity.kind === "user" ? identity.userId : null;
+  const runs = await listPublicRuns(env.DB, PUBLIC_PAGE + 1, before, reader);
   const page = runs.slice(0, PUBLIC_PAGE);
   return json(200, {
     runs: page,
@@ -270,7 +273,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   }
 
   if (url.pathname === "/api/runs") {
-    if (method === "GET") return publicRuns(env, url);
+    if (method === "GET") return publicRuns(env, url, identity);
     if (method !== "POST") return error(405, "Method not allowed.");
     return ask(request, env, identity);
   }

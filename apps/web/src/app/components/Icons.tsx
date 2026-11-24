@@ -42,6 +42,15 @@ export const RefreshIcon = () => (
   </Icon>
 );
 
+/** A framed landscape: draw the picture of a question again. */
+export const ImageIcon = () => (
+  <Icon>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+    <circle cx="9" cy="9.5" r="1.6" />
+    <path d="M4 17.5l5-5 3.5 3.5 2.5-2.5 5 5" />
+  </Icon>
+);
+
 /** A square in a circle: stop a question in progress. */
 export const StopIcon = () => (
   <Icon>

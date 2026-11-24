@@ -10,7 +10,7 @@ import { api, as, fakes, paidRun, QUESTION, quoted } from "./helpers.ts";
 const user = () => `user-${crypto.randomUUID()}`;
 
 interface PublicList {
-  runs: { id: string; question: string; status: string; image: string | null }[];
+  runs: { id: string; question: string; status: string; image: string | null; mine: boolean }[];
   next: string | null;
 }
 
@@ -135,6 +135,19 @@ describe("the questions of the home page", () => {
 
     await api(`/api/runs/${older.id}`, { method: "DELETE", headers: as(owner) });
     expect((await list()).runs.map((r) => r.id)).not.toContain(older.id);
+  });
+
+  test("marks the reader's questions as theirs, and no one's for a signed-out reader", async () => {
+    fakes();
+    const owner = user();
+    const { id } = await paidRun(owner);
+    const mine = async (headers: Record<string, string> = {}) =>
+      ((await (await api("/api/runs", { headers })).json()) as PublicList).runs.find(
+        (r) => r.id === id,
+      )?.mine;
+    expect(await mine(as(owner))).toBe(true);
+    expect(await mine(as(user()))).toBe(false);
+    expect(await mine()).toBe(false);
   });
 
   test("pages through the list after the last run of a page", async () => {
