@@ -154,24 +154,24 @@ needs `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET` and `SESSION_SECR
 `AI_GATEWAY_API_KEY` to ask, and `JOBS_URL` and `JOBS_TOKEN` to pay (the jobs service calls the
 hook back on the origin of the page, which it cannot reach on localhost).
 
-| Route                                                                           | Who may call it                                                                                                               |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `GET /auth/login?returnTo=/path`, `/auth/callback`, `/auth/logout`              | anyone: the sign-in, see below                                                                                                |
-| `GET /api/me` → `{id, name, admin, mayAsk}` or `null`                           | anyone: the signed-in user                                                                                                    |
-| `GET /api/runs?after=:id` → `{runs, next}`                                      | anyone: the questions asked (running, completed or failed, not deleted), newest first, `mine` on the caller's; `next` is the `after` of the next page |
-| `POST /api/runs {question, replaces?}` → `201 {runId, class, amount, currency}` | signed in; the `Admin` or `Contrib` role until `LAUNCHED` is `"true"`; `replaces`, a run of theirs                            |
-| `POST /api/runs/:id/pay` → `202`                                                | the owner; an `Admin` owner runs free, with no payment job                                                                    |
-| `POST /api/runs/:id/rerun` → `202`                                              | the owner, once, after a paid run failed                                                                                      |
-| `DELETE /api/runs/:id`                                                          | the owner, who may restore it; an admin, for good                                                                             |
-| `POST /api/runs/:id/restore` → `204`                                            | the owner, after deleting it                                                                                                  |
-| `POST /api/runs/:id/cancel` → `204`                                             | the owner, while the run is in progress (`409` once it ended): deletes it for good                                            |
-| `GET /api/runs/:id`, `/events?after=`, `/ws?after=`, `/snapshots/:v`            | anyone with the link (`mine` in the summary: the caller owns it); a deleted run, its owner only (`410` for anyone else)       |
-| `GET /api/runs/:id/charts/:chart/:v.svg`                                        | anyone with the link: the render of a chart (`c1`) at version `v`                                                             |
-| `GET /api/runs/:id/image?v=`                                                    | anyone with the link: the picture of the question (immutable with its version `v`)                                            |
-| `POST /api/runs/:id/image` → `{image}`                                          | `Admin`: draws the picture again with today's models, also for a run asked before the pictures                                |
-| `GET /api/me/runs`                                                              | signed in                                                                                                                     |
-| `GET`, `PUT /api/admin/models`, `/api/admin/prices`                             | `Admin`                                                                                                                       |
-| `POST /api/pay/hook`                                                            | the jobs service, with the run's own token as Bearer                                                                          |
+| Route                                                                           | Who may call it                                                                                                         |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `GET /auth/login?returnTo=/path`, `/auth/callback`, `/auth/logout`              | anyone: the sign-in, see below                                                                                          |
+| `GET /api/me` → `{id, name, admin, mayAsk}` or `null`                           | anyone: the signed-in user                                                                                              |
+| `GET /api/runs?after=:id` → `{runs, next}`                                      | anyone: the questions started and not deleted, newest first; `mine`: the caller's; `next`: the `after` of the next page |
+| `POST /api/runs {question, replaces?}` → `201 {runId, class, amount, currency}` | signed in; the `Admin` or `Contrib` role until `LAUNCHED` is `"true"`; `replaces`, a run of theirs                      |
+| `POST /api/runs/:id/pay` → `202`                                                | the owner; an `Admin` owner runs free, with no payment job                                                              |
+| `POST /api/runs/:id/rerun` → `202`                                              | the owner, once, after a paid run failed                                                                                |
+| `DELETE /api/runs/:id`                                                          | the owner, who may restore it; an admin, for good                                                                       |
+| `POST /api/runs/:id/restore` → `204`                                            | the owner, after deleting it                                                                                            |
+| `POST /api/runs/:id/cancel` → `204`                                             | the owner, while the run is in progress (`409` once it ended): deletes it for good                                      |
+| `GET /api/runs/:id`, `/events?after=`, `/ws?after=`, `/snapshots/:v`            | anyone with the link (`mine` in the summary: the caller owns it); a deleted run, its owner only (`410` for anyone else) |
+| `GET /api/runs/:id/charts/:chart/:v.svg`                                        | anyone with the link: the render of a chart (`c1`) at version `v`                                                       |
+| `GET /api/runs/:id/image?v=`                                                    | anyone with the link: the picture of the question (immutable with its version `v`)                                      |
+| `POST /api/runs/:id/image` → `{image}`                                          | `Admin`: draws the picture again with today's models, also for a run asked before the pictures                          |
+| `GET /api/me/runs`                                                              | signed in                                                                                                               |
+| `GET`, `PUT /api/admin/models`, `/api/admin/prices`                             | `Admin`                                                                                                                 |
+| `POST /api/pay/hook`                                                            | the jobs service, with the run's own token as Bearer                                                                    |
 
 Nobody asks for a chart: the drafts propose them, and the summary of a run says how many charts its
 answer has (`charts`).
