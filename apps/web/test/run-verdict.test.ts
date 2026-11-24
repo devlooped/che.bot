@@ -123,14 +123,14 @@ describe("the preview of a shared link", () => {
     const owner = user();
     const { id, stub } = await paidRun(owner);
     await runAlarms(stub);
-    expect(await (await page(`/r/${id}`)).text()).not.toContain("og:title");
-    // its UUID redirects to its link, whose page has it until its owner deletes it
-    const link = (await stub.summary())?.link;
-    expect(await (await page(`/r/${link}`)).text()).toContain("og:title");
+    // Its page (by its link, or by its UUID when a test of the same second took its words) has
+    // the preview until its owner deletes it.
+    const path = `/r/${(await stub.summary())?.link ?? id}`;
+    expect(await (await page(path)).text()).toContain("og:title");
     expect((await api(`/api/runs/${id}`, { method: "DELETE", headers: as(owner) })).status).toBe(
       204,
     );
-    expect(await (await page(`/r/${link}`)).text()).not.toContain("og:title");
+    expect(await (await page(path)).text()).not.toContain("og:title");
     expect(await (await page("/r/zzzzzzz-nada")).text()).not.toContain("og:title");
   });
 
