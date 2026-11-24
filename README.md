@@ -147,8 +147,7 @@ verdict (👍 👎 ⚠️ 🤔 ❓ 📊, and ⚖️ for a split vote), in the `t
 `answer.summarized`; a lone point takes the emoji of the run's verdict. The card of a question, on
 the home page and at the top of its page, shows its picture with the verdict over it, as the cards
 of grokeado: the label of the outcome and, for a claim or a question, each model's rating beside its
-logo; the summary goes under the question, as a list whose emoji stand on tags that point at their
-sentences. The page of a run (`/r/:ref`) carries the preview of its link for the sites it is shared
+logo; the summary goes under the question, as a list of its sentences, each after its emoji. The page of a run (`/r/:ref`) carries the preview of its link for the sites it is shared
 on: the Worker writes the Open Graph and Twitter tags into index.html (`src/worker/share.ts`): the
 question with the emoji of its verdict, the summary and the picture.
 

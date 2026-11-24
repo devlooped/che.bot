@@ -3,8 +3,8 @@ import { t } from "../i18n/index.ts";
 
 /**
  * The summary of an answer, on the card of its question and at the top of its page: a point for
- * each thing the person asked or stated, its sentence after the emoji of its verdict on a tag that
- * points at it. `verdict`, the run's, marks a summary written before the points.
+ * each thing the person asked or stated, its sentence after the emoji of its verdict. `verdict`,
+ * the run's, marks a summary written before the points.
  */
 export function Summary({ text, verdict }: { text: string; verdict: RunVerdict | null }) {
   return (
