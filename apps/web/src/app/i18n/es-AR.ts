@@ -141,7 +141,8 @@ export const esAR = {
     /** What a screen reader reads for the card: "Afirmación: Engañoso. Grok: Verdadero; ...". */
     said: (heading: string, votes: readonly string[]) =>
       votes.length ? `${heading}. ${votes.join("; ")}.` : `${heading}.`,
-    tldr: "TL;DR",
+    /** The name of the list of points that sums the answer up, for a screen reader. */
+    summary: "En resumen",
   },
 
   quote: {

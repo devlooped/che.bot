@@ -140,13 +140,17 @@ check (Verdadero, Falso, Engañoso, Insostenible), a question of yes or no (Sí,
 or a fact (Dato, with no vote). The verdict of a run (`verdictOf` of the protocol) is the kind most
 drafts gave and the rating most models gave, Dividido on a tie. Once the run completes, it goes to
 the `verdict` column of the list (`migrations/0005_run_verdict.sql`), and the helper sums the answer
-up in one sentence, its TL;DR (the `tldr` column and the event `answer.summarized`; three tries at
-most, its cost in the run's spend). The card of a question, on the home page and at the top of its
-page, shows its picture with the verdict over it, as the cards of grokeado: the label of the outcome
-and, for a claim or a question, each model's rating beside its logo; the TL;DR goes under the
-question. The page of a run (`/r/:ref`) carries the preview of its link for the sites it is shared
+up in a few points, one for each thing the person asked or stated: what that part asks, the answer's
+rating of it and one sentence (`src/summary.ts` of the protocol; five points at most, three tries,
+its cost in the run's spend). The summary is kept as text, a line per point led by the emoji of its
+verdict (👍 👎 ⚠️ 🤔 ❓ 📊, and ⚖️ for a split vote), in the `tldr` column and the event
+`answer.summarized`; a lone point takes the emoji of the run's verdict. The card of a question, on
+the home page and at the top of its page, shows its picture with the verdict over it, as the cards
+of grokeado: the label of the outcome and, for a claim or a question, each model's rating beside its
+logo; the summary goes under the question, as a list whose emoji stand on tags that point at their
+sentences. The page of a run (`/r/:ref`) carries the preview of its link for the sites it is shared
 on: the Worker writes the Open Graph and Twitter tags into index.html (`src/worker/share.ts`): the
-question with the emoji of its verdict, the TL;DR and the picture.
+question with the emoji of its verdict, the summary and the picture.
 
 A run is a UUID inside: its object, its payment job, its row in the list. Once it is paid and
 starts, the helper model (Claude Haiku at medium effort by default) sums the question up in at

@@ -319,7 +319,7 @@ describe("the spend of a run", () => {
     const ended = (await eventsOf(stub)).find((e) => e.type === "run.completed");
     if (ended?.type !== "run.completed") throw new Error("the run did not complete");
     // Beside the run's own spend: the classification, the helper's link, the prompt of the picture
-    // and the TL;DR, US$0.001 a call, and the picture, US$0.04. The link may take another try when
+    // and the summary, US$0.001 a call, and the picture, US$0.04. The link may take another try when
     // a test of the same second has its words.
     const calls = (stage: string) => done.rows.stage.find((r) => r.label === stage)?.calls ?? 0;
     expect(calls("classify")).toBe(1);

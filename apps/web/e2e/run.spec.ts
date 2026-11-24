@@ -110,7 +110,7 @@ test("a shared link opens signed out; the UUID and the short link lead to the ru
   await expect(page.getByTestId("quote")).toHaveCount(0);
 });
 
-test("the card of an answered question: its picture, its verdict and its TL;DR, on its page, the home page and the preview of its link", async ({
+test("the card of an answered question: its picture, its verdict and its summary, on its page, the home page and the preview of its link", async ({
   page,
   request,
 }) => {
@@ -124,7 +124,11 @@ test("the card of an answered question: its picture, its verdict and its TL;DR, 
   await expect(card.locator(".card-verdict-kind")).toHaveText(t.verdict.kinds.claim);
   await expect(card.locator(".card-verdict-row")).toHaveCount(3);
   await expect(card.locator(".card-verdict-model")).toHaveCount(4);
-  await expect(page.getByTestId("tldr")).toContainText("15.400 litros");
+  // The scripted question asks a figure and doubts a claim: a point for each, after its emoji.
+  const points = page.getByTestId("summary").getByRole("listitem");
+  await expect(points).toHaveCount(2);
+  await expect(points.first()).toHaveText(/^📊\s*Hacen falta unos 15\.400 litros/);
+  await expect(points.last()).toHaveText(/^⚠️\s*La cifra de 15\.000 litros no exagera/);
 
   const html = await (await request.get(new URL(page.url()).pathname)).text();
   expect(html).toContain('<meta property="og:image"');
@@ -135,7 +139,8 @@ test("the card of an answered question: its picture, its verdict and its TL;DR, 
     .getByTestId("question-card")
     .filter({ has: page.locator(`[id="card-${runId}"]`) });
   await expect(listed.locator(".card-verdict-label")).toHaveText(t.verdict.ratings.claim.depends);
-  await expect(listed.locator(".card-tldr")).toContainText("15.400 litros");
+  await expect(listed.getByTestId("summary").getByRole("listitem")).toHaveCount(2);
+  await expect(listed.getByTestId("summary")).toContainText("15.400 litros");
 });
 
 test("an admin runs without paying", async ({ page }) => {

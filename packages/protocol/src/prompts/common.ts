@@ -9,6 +9,10 @@ export interface Prompt {
 export const LANGUAGE_RULE =
   "Write every text you return in the language of the question (Spanish if the question is in Spanish, and so on), whatever the language of these instructions.";
 
+/** What a question, or one point of it, asks (kind) and its answer in one word (rating). */
+export const VERDICT_RULE =
+  "kind: claim when it asks to check something stated (a statement, a quote, a rumor, «¿Es cierto que...?»); question when it asks for a yes or a no; fact when it asks for a fact, a figure, a list, an explanation or advice. rating: for a claim, true, false, depends (misleading: true only in part, out of context or exaggerated) or unknown (the evidence does not settle it); for a question, true (yes), false (no), depends (it depends, or it is debated) or unknown (nobody can tell yet); for a fact, none.";
+
 export const STRUCTURED_RULE =
   "Return only the structured object requested, with every field present. Leave a list empty rather than inventing content.";
 

@@ -176,7 +176,7 @@ function verdictOfRow(json: string | null): RunVerdict | null {
   }
 }
 
-/** A card of the home page: a question that was asked, its picture, its verdict and its TL;DR. */
+/** A card of the home page: a question that was asked, its picture, its verdict and its summary. */
 export interface PublicRun {
   id: string;
   createdAt: string;

@@ -778,14 +778,43 @@ a.button {
   outline-offset: -3px;
 }
 
-/* The answer in one sentence, under the question. */
-.card-tldr {
-  display: -webkit-box;
-  overflow: hidden;
-  padding: 0.45rem 1rem 0;
-  font-size: 0.9rem;
+/* The summary of an answer, under the question: a point for each thing the person asked or
+   stated, its sentence after the emoji of its verdict on a tag that points at it. */
+.summary {
+  display: grid;
+  gap: 0.5rem;
   line-height: 1.4;
   color: var(--ink-soft);
+}
+
+.summary-point {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.35rem;
+}
+
+/* As tall as the first line of the sentence (1.4 of its size), its right end cut to a point. */
+.summary-mark {
+  display: grid;
+  place-items: center;
+  height: calc(1.4em / 1.08);
+  padding: 0 0.7em 0 0.35em;
+  border-radius: 4px 0 0 4px;
+  font-size: 1.08em;
+  line-height: 1;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--rule) 60%, var(--paper-raised));
+  clip-path: polygon(0 0, calc(100% - 0.5em) 0, 100% 50%, calc(100% - 0.5em) 100%, 0 100%);
+}
+
+.card .summary {
+  padding: 0.55rem 1rem 0;
+  font-size: 0.9rem;
+}
+
+.card .summary-text {
+  display: -webkit-box;
+  overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   line-clamp: 3;
@@ -952,18 +981,9 @@ a.button {
   font-size: 1.1rem;
 }
 
-.run-tldr {
+.run-head .summary {
   max-width: 40rem;
   font-size: 1.05rem;
-  color: var(--ink-soft);
-}
-
-.tldr-label {
-  margin-right: 0.35rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--muted);
 }
 
 .question {

@@ -43,6 +43,31 @@ function verdictOf(prompt: string, seat: ModelId) {
   return { kind: "claim", rating: ratings[seat] };
 }
 
+/**
+ * The points of the summary, by the markers of the question: one for a question of yes or no or a
+ * fact; without them two, for the scripted question asks a figure and doubts a claim.
+ */
+function summaryOf(prompt: string) {
+  const figure = "Hacen falta unos 15.400 litros por kilo, como promedio mundial.";
+  if (prompt.includes(MARKERS.fact)) return [{ kind: "fact", rating: "none", text: figure }];
+  if (prompt.includes(MARKERS.question))
+    return [
+      {
+        kind: "question",
+        rating: "true",
+        text: "Sí: son unos 15.400 litros por kilo como promedio mundial, casi todos de agua de lluvia.",
+      },
+    ];
+  return [
+    { kind: "fact", rating: "none", text: figure },
+    {
+      kind: "claim",
+      rating: "depends",
+      text: "La cifra de 15.000 litros no exagera, pero casi toda es agua de lluvia: el agua de riego es mucho menos.",
+    },
+  ];
+}
+
 /** The models whose first draft already failed, per question (the `fail` marker): this isolate. */
 const failedOnce = new Set<string>();
 
@@ -426,9 +451,7 @@ export function respond(req: GenerateRequest<unknown>): FakeOutcome {
         prompt: `An editorial illustration about: ${req.prompt.replace(/^Question:\s*/, "")}`,
       });
     case "tldr":
-      return out({
-        text: "Unos 15.400 litros por kilo como promedio mundial, pero casi toda es agua de lluvia: el agua de riego es mucho menos.",
-      });
+      return out({ points: summaryOf(req.prompt) });
   }
   return { kind: "error", message: `The local scenario has no answer for ${req.callKey}.` };
 }

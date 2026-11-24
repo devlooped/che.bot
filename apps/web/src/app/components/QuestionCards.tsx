@@ -8,6 +8,7 @@ import { runPath } from "../routes.tsx";
 import { errorText } from "../view/errors.ts";
 import { ConfirmSheet } from "./ConfirmSheet.tsx";
 import { ImageIcon, RefreshIcon } from "./Icons.tsx";
+import { Summary } from "./Summary.tsx";
 import { useRedraw } from "./useRedraw.ts";
 import { VerdictOverlay, verdictText } from "./Verdict.tsx";
 
@@ -114,8 +115,8 @@ function CardActions({
 }
 
 /**
- * A question asked: its picture with its verdict over it, its text, its TL;DR and when it was
- * asked; its status while it is not done.
+ * A question asked: its picture with its verdict over it, its text, the summary of its answer and
+ * when it was asked; its status while it is not done.
  */
 function Card({
   run,
@@ -154,7 +155,7 @@ function Card({
           {run.question}
         </span>
         {verdict && <span className="sr-only">{verdictText(verdict)}</span>}
-        {run.tldr && <span className="card-tldr">{run.tldr}</span>}
+        {run.tldr && <Summary text={run.tldr} verdict={run.verdict} />}
       </Link>
       <p className="card-meta">
         <time dateTime={run.createdAt}>{t.home.asked(t.day(run.createdAt))}</time>

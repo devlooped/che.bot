@@ -45,6 +45,16 @@ export const chartBriefSchema = z.object({
     .describe("The data, one row per value, each with its citation."),
 });
 
+/** What a question, or one point of it, asks and its answer in one word (see VERDICT_RULE). */
+const verdictShape = {
+  kind: z
+    .enum(["claim", "question", "fact"])
+    .describe("What it asks: to check a claim, a yes or a no, or a fact."),
+  rating: z
+    .enum(["true", "false", "depends", "unknown", "none"])
+    .describe("The answer in one word; none for a fact."),
+};
+
 export const draftSchema = z.object({
   answer: z.string().describe("The complete answer, in paragraphs separated by blank lines."),
   claims: z
@@ -63,14 +73,7 @@ export const draftSchema = z.object({
     .describe(
       "Up to 3 charts, one per measure, when figures compared across time, places or categories make the answer clearer; [] otherwise.",
     ),
-  verdict: z.object({
-    kind: z
-      .enum(["claim", "question", "fact"])
-      .describe("What the question asks: to check a claim, a yes or a no, or a fact."),
-    rating: z
-      .enum(["true", "false", "depends", "unknown", "none"])
-      .describe("Your answer in one word; none for a fact."),
-  }),
+  verdict: z.object(verdictShape),
 });
 
 export const mergeSchema = z.object({
@@ -158,9 +161,16 @@ export const illustrationSchema = z.object({
   prompt: z.string().min(10).max(2_000).describe("The prompt of the illustration, in English."),
 });
 
-/** The helper's one-sentence summary of a completed answer (see tldrPrompt). */
+/** The helper's summary of a completed answer, a point per assertion or question (see tldrPrompt). */
 export const tldrSchema = z.object({
-  text: z.string().describe("One sentence, at most 25 words."),
+  points: z
+    .array(
+      z.object({
+        ...verdictShape,
+        text: z.string().describe("One sentence, at most 20 words."),
+      }),
+    )
+    .describe("One point per assertion or question of what the person wrote, in their order."),
 });
 
 export const momentsSchema = z.object({

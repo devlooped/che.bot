@@ -99,7 +99,7 @@ export const HELPER_TIMEOUT_MS = 30_000;
  */
 export const LINK_SECONDS = 3;
 
-/** The helper's tries at the TL;DR of a completed run, at most: one when it completes, then one per alarm. */
+/** The helper's tries at the summary of a completed run, at most: one when it completes, then one per alarm. */
 export const TLDR_TRIES = 3;
 
 /** The tries at the picture of a run, at most: one per tick until it has one. */
@@ -815,11 +815,11 @@ export class RunObject extends DurableObject<Env> {
   }
 
   /**
-   * Sums the answer of a completed run up in one sentence, its TL;DR, for its card and its page:
-   * the helper writes it when the run completes and, after a failure, once per alarm, at most
-   * TLDR_TRIES. It reaches the page as `answer.summarized` and the cards through the list of runs;
-   * its cost goes to the run's spend and the SpendMeter. A run whose models predate the helper gets
-   * none. Never throws.
+   * Sums the answer of a completed run up in a few points, one for each thing the person asked or
+   * stated (summary.ts), for its card and its page: the helper writes them when the run completes
+   * and, after a failure, once per alarm, at most TLDR_TRIES. It reaches the page as
+   * `answer.summarized` and the cards through the list of runs; its cost goes to the run's spend
+   * and the SpendMeter. A run whose models predate the helper gets none. Never throws.
    */
   private async sumUp(): Promise<void> {
     const run = this.store.run();
@@ -840,7 +840,7 @@ export class RunObject extends DurableObject<Env> {
         maxOutputTokens: 2_000,
         signal: AbortSignal.timeout(HELPER_TIMEOUT_MS),
       });
-      tldr = tldrOf(result.output.text);
+      tldr = tldrOf(result.output.points, run.state ? verdictOf(run.state.drafts) : null);
       cost = { model: model.id, costUsd: result.costUsd, ...result.usage };
     } catch (error) {
       console.warn(`The helper could not sum up run ${run.id} (try ${tries}).`, error);
@@ -850,7 +850,7 @@ export class RunObject extends DurableObject<Env> {
       await spendMeter(this.env)
         .settle(`${run.id}:tldr:${tries}`, cost.costUsd)
         .catch((error: unknown) => {
-          console.warn(`The cost of the TL;DR of run ${run.id} could not be recorded.`, error);
+          console.warn(`The cost of the summary of run ${run.id} could not be recorded.`, error);
         });
     // The run may have been deleted while the helper answered.
     const kept = this.ctx.storage.transactionSync(() => {
@@ -867,7 +867,7 @@ export class RunObject extends DurableObject<Env> {
     if (kept && tldr) {
       this.broadcast();
       await setRunTldr(this.env.DB, run.id, tldr).catch((error: unknown) => {
-        console.error(`The TL;DR of run ${run.id} could not be listed in D1.`, error);
+        console.error(`The summary of run ${run.id} could not be listed in D1.`, error);
       });
     } else if (this.store.run() && tries < TLDR_TRIES)
       await this.ctx.storage.setAlarm(Date.now() + backoffMs(tries));

@@ -19,6 +19,29 @@ export interface RunVerdict {
   votes: Partial<Record<ModelId, Rating | null>>;
 }
 
+/**
+ * The emoji of a verdict, for a text without the marks of the cards (the preview of a link, the
+ * points of a summary): one per rating, the scale for a split vote; null when nothing was rated.
+ */
+export function verdictEmoji(verdict: Pick<RunVerdict, "kind" | "outcome"> | null): string | null {
+  if (!verdict) return null;
+  if (verdict.kind === "fact") return "📊";
+  switch (verdict.outcome) {
+    case "true":
+      return "👍";
+    case "false":
+      return "👎";
+    case "depends":
+      return verdict.kind === "claim" ? "⚠️" : "🤔";
+    case "unknown":
+      return "❓";
+    case "split":
+      return "⚖️";
+    default:
+      return null;
+  }
+}
+
 /** A draft's verdict from its output: the rating "none", or any rating of a fact, is no rating. */
 export function readVerdict(output: { kind: QuestionKind; rating: Rating | "none" }): DraftVerdict {
   const rating = output.kind === "fact" || output.rating === "none" ? null : output.rating;

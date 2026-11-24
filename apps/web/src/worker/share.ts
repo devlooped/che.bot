@@ -1,29 +1,10 @@
-import type { RunVerdict } from "@chebot/protocol";
+import { verdictEmoji } from "@chebot/protocol";
 import type { RunShare } from "./settings.ts";
 
 // The preview of the link of a run where it is shared (WhatsApp, X, Slack...): the crawlers of those
 // sites read the meta tags of the page and run no script, so the Worker writes them into the app's
-// index.html. The preview is the question, with the emoji of its verdict, its TL;DR and its picture.
-
-/** The emoji of a verdict, as grokeado's previews: one per rating, the scale for a split vote. */
-export function verdictEmoji(verdict: RunVerdict | null): string | null {
-  if (!verdict) return null;
-  if (verdict.kind === "fact") return "📊";
-  switch (verdict.outcome) {
-    case "true":
-      return "👍";
-    case "false":
-      return "👎";
-    case "depends":
-      return verdict.kind === "claim" ? "⚠️" : "🤔";
-    case "unknown":
-      return "❓";
-    case "split":
-      return "⚖️";
-    default:
-      return null;
-  }
-}
+// index.html. The preview is the question, with the emoji of its verdict, its summary (the points
+// on one line, each after its emoji) and its picture.
 
 const attribute = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -32,7 +13,7 @@ const attribute = (text: string) =>
 export function previewTags(share: RunShare, origin: string): { title: string; html: string } {
   const emoji = verdictEmoji(share.verdict);
   const title = emoji ? `${share.question} ${emoji}` : share.question;
-  const description = share.tldr ?? share.question;
+  const description = share.tldr?.replaceAll("\n", " ") ?? share.question;
   const url = new URL(`/r/${share.link ?? share.id}`, origin).href;
   const image = share.image
     ? new URL(`/api/runs/${share.id}/image?v=${encodeURIComponent(share.image)}`, origin).href

@@ -59,7 +59,7 @@ export interface RunView {
   disputes: Record<string, Dispute>;
   renders: ChartRender[];
   droppedPatches: DroppedPatch[];
-  /** The helper's one-sentence summary of the answer, once the run completed and it wrote one. */
+  /** The helper's summary of the answer (summary.ts), once the run completed and it wrote one. */
   tldr: string | null;
 }
 

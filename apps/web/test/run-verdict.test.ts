@@ -9,7 +9,8 @@ import { previewTags } from "../src/worker/share.ts";
 import { api, as, eventsOf, fakes, ORIGIN, paidRun, QUESTION, runAlarms } from "./helpers.ts";
 
 const user = () => `user-${crypto.randomUUID()}`;
-const TLDR = "La capital de Australia es Canberra, donde viven unas 470.000 personas.";
+/** The summary of the driver's fake helper: the question asks two facts, a point each. */
+const TLDR = "📊 La capital de Australia es Canberra.\n📊 En Canberra viven unas 470.000 personas.";
 
 /** The prose run of the driver, its drafts taking the question for one of yes or no. */
 const RATINGS: Record<ModelId, string> = {
@@ -47,7 +48,7 @@ const listed = (id: string) =>
     .first<{ verdict: string | null; tldr: string | null }>();
 
 describe("the card of a question", () => {
-  test("a completed run lists its verdict and its TL;DR; the page gets the TL;DR as an event", async () => {
+  test("a completed run lists its verdict and its summary; the page gets the summary as an event", async () => {
     const { provider } = fakes({ respond: asQuestion });
     const { id, stub } = await paidRun(user());
     await runAlarms(stub);
@@ -102,7 +103,7 @@ describe("the card of a question", () => {
 });
 
 describe("the preview of a shared link", () => {
-  test("the page of a run has its question with the emoji of its verdict, its TL;DR and its picture", async () => {
+  test("the page of a run has its question with the emoji of its verdict, its summary and its picture", async () => {
     fakes({ respond: asQuestion });
     const { id, stub } = await paidRun(user());
     await runAlarms(stub);
@@ -111,7 +112,9 @@ describe("the preview of a shared link", () => {
     const image = `${ORIGIN}/api/runs/${id}/image?v=${summary?.image}`;
     expect(html).toContain(`<title>${QUESTION} 👍 · che.bot</title>`);
     expect(html).toContain(`<meta property="og:title" content="${QUESTION} 👍" />`);
-    expect(html).toContain(`<meta property="og:description" content="${TLDR}" />`);
+    expect(html).toContain(
+      `<meta property="og:description" content="${TLDR.replace("\n", " ")}" />`,
+    );
     expect(html).toContain(`<meta property="og:image" content="${image}" />`);
     expect(html).toContain(`<meta name="twitter:image" content="${image}" />`);
     expect(html).toContain(`<meta name="twitter:card" content="summary_large_image" />`);

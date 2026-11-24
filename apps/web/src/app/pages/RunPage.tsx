@@ -12,6 +12,7 @@ import { RunActions } from "../components/RunActions.tsx";
 import { Panel, Sources } from "../components/RunDetails.tsx";
 import { Seats, useSettled } from "../components/Seats.tsx";
 import { Spend } from "../components/Spend.tsx";
+import { Summary } from "../components/Summary.tsx";
 import { VerdictOverlay, verdictText } from "../components/Verdict.tsx";
 import { useRun } from "../events/useRun.ts";
 import { t } from "../i18n/index.ts";
@@ -196,11 +197,7 @@ function RunView({ runId }: { runId: string }) {
         ) : (
           <p className="muted">{t.common.loading}</p>
         )}
-        {final && view.tldr && (
-          <p className="run-tldr" data-testid="tldr">
-            <span className="tldr-label">{t.verdict.tldr}</span> {view.tldr}
-          </p>
-        )}
+        {final && view.tldr && <Summary text={view.tldr} verdict={verdict} />}
         <div className="run-share">
           <RunActions
             runId={runId}

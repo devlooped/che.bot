@@ -154,7 +154,7 @@ export type RunEvent = { key: string; batch: number } & (
   | { type: "moment"; text: string; origin: "model" | "template" }
   | { type: "run.completed"; version: number; flags: Flags; spentUsd: number }
   | { type: "run.failed"; reason: FailureReason; spentUsd: number }
-  /** After the run completed, beside the protocol: the helper's one-sentence summary of the answer. */
+  /** After the run completed, beside the protocol: the helper's summary of the answer (summary.ts). */
   | { type: "answer.summarized"; text: string }
 );
 

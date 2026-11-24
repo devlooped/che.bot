@@ -144,7 +144,7 @@ describe("the alarm driver", () => {
     expect(view.status).toBe("completed");
     expect(view.snapshots).toEqual(cli.state.snapshots);
     expect(selectAnswer(view)).toEqual(selectAnswer(cli.state));
-    // The same events, and after them the helper's TL;DR, which the CLI does not write.
+    // The same events, and after them the helper's summary, which the CLI does not write.
     expect(keysAfterStart(log)).toEqual([
       ...keysAfterStart(cli.log),
       "answer.summarized|answer.summarized",
