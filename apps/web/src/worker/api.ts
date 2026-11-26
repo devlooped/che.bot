@@ -1,7 +1,7 @@
 import { linkOf, parseRunRef, resolveConfig } from "@chebot/protocol";
 import { readModels, updateModels, updatePrices } from "./admin.ts";
 import { handleAuth } from "./auth0.ts";
-import { cardPng, cardVersion } from "./card.ts";
+import { CARD_TYPE, cardJpeg, cardVersion, recentCard, rememberCard } from "./card.ts";
 import { deps } from "./deps.ts";
 import type { Env } from "./env.ts";
 import { type Identity, isAdmin, mayAsk, type User } from "./identity.ts";
@@ -45,10 +45,10 @@ import { spendMeter } from "./spend-meter.ts";
 //                                    a deleted run, its owner only: 410 for anyone else
 //   GET    /api/runs/:id/charts/:chart/:v.svg  the render of a chart at version v, as above
 //   GET    /api/runs/:id/image[?v=]   the picture of the question, as above
-//   GET    /api/runs/:id/card[?v=]    that picture with its verdict over it, as a PNG: what a
+//   GET    /api/runs/:id/card[?v=]    that picture with its verdict over it, as a JPEG: what a
 //                                    shared link previews (the plain picture when it has no verdict).
-//                                    Drawn once per picture and verdict and kept with the run; any
-//                                    query string but its own `v` draws it again, unkept
+//                                    Drawn once per picture and verdict and kept with the run;
+//                                    another `v` than its own draws it again, unkept
 //   POST   /api/runs/:id/image        the owner, once it was asked, or an admin: draws the picture
 //                                    again, with today's models
 //   GET    /api/runs/:id/spend        admin: what the run's model calls cost so far
@@ -131,7 +131,9 @@ async function previewPage(request: Request, env: Env, id: string | null): Promi
   if (!page.headers.get("content-type")?.includes("text/html")) return page;
   try {
     const share = await shareOf(env.DB, id);
-    if (share && !share.deleted) return withPreview(page, share, new URL(request.url).origin);
+    const url = new URL(request.url);
+    if (share && !share.deleted)
+      return withPreview(page, share, url.origin, url.searchParams.get("v"));
   } catch (e) {
     console.error("The preview of a run page could not be read.", e);
   }
@@ -501,44 +503,52 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   }
 
   if (sub === "/card") {
-    const image = await stub.image();
-    if (!image) return error(404, "No picture.");
-    const verdict = (await shareOf(env.DB, id))?.verdict ?? null;
-    const version = cardVersion(image.version, verdict);
     const headers = {
       "content-security-policy": "default-src 'none'",
       "x-content-type-options": "nosniff",
     };
-    const plain = (cache: string) =>
-      new Response(image.bytes, {
-        headers: { ...headers, "content-type": image.mediaType, "cache-control": cache },
-      });
-    if (!verdict) return plain("public, max-age=300");
-    // The URL of a card is `?v=` its version: the one kept with the run is served as it is. Any
-    // other query string (another `v`, or any other part) draws the card again, to see a change
-    // of the drawing without waiting for a new picture or verdict; that one is not kept.
-    const current = [...url.searchParams].every(([key, value]) => key === "v" && value === version);
-    try {
-      let card = current ? await stub.card(version) : null;
-      if (!card) {
-        card = await cardPng(image, verdict);
-        if (current) await stub.saveCard(version, card);
-      }
-      return new Response(card, {
+    const send = (bytes: Uint8Array, type: string, versioned: boolean) =>
+      new Response(bytes, {
         headers: {
           ...headers,
-          "content-type": "image/png",
+          "content-type": type,
           // A versioned URL never changes: another picture or verdict is another version.
-          "cache-control":
-            current && url.searchParams.has("v")
-              ? "public, max-age=31536000, immutable"
-              : "public, max-age=300",
+          "cache-control": versioned
+            ? "public, max-age=31536000, immutable"
+            : "public, max-age=300",
         },
       });
+    // The URL of a card is `?v=` its version, with the version of the picture that D1 lists: the
+    // card kept for it is served without reading the picture. Another `v` draws the card again and
+    // keeps nothing, to see a change of the drawing; any other part of the query is ignored (the
+    // page passes its own `v` there, so that an app that keeps previews fetches the card again).
+    const share = await shareOf(env.DB, id);
+    const verdict = share?.verdict ?? null;
+    const asked = url.searchParams.get("v");
+    const listed = share?.image ? cardVersion(share.image, verdict) : null;
+    const redraw = asked !== null && asked !== listed;
+    if (verdict && listed && !redraw) {
+      const kept = recentCard(id, listed) ?? (await stub.card(listed));
+      if (kept) {
+        rememberCard(id, listed, kept);
+        return send(kept, CARD_TYPE, asked === listed);
+      }
+    }
+    const image = await stub.image();
+    if (!image) return error(404, "No picture.");
+    if (!verdict) return send(image.bytes, image.mediaType, false);
+    const version = cardVersion(image.version, verdict);
+    try {
+      const card = await cardJpeg(image, verdict);
+      if (!redraw) {
+        await stub.saveCard(version, card);
+        rememberCard(id, version, card);
+      }
+      return send(card, CARD_TYPE, asked === version);
     } catch (e) {
       // A preview with the plain picture is better than none.
       console.error(`The card of run ${id} could not be drawn.`, e);
-      return plain("public, max-age=300");
+      return send(image.bytes, image.mediaType, false);
     }
   }
 

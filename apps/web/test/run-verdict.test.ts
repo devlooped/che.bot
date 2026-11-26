@@ -120,6 +120,10 @@ describe("the preview of a shared link", () => {
     expect(html).toContain(`<meta property="og:image" content="${image}" />`);
     expect(html).toContain(`<meta name="twitter:image" content="${image}" />`);
     expect(html).toContain(`<meta name="twitter:card" content="summary_large_image" />`);
+    expect(html).toContain(`<meta property="og:image:type" content="image/jpeg" />`);
+    // the v of the page goes on to the picture, so an app that keeps previews fetches it again
+    const again = await (await page(`/r/${summary?.link}?v=5`)).text();
+    expect(again).toContain(`<meta property="og:image" content="${image}&amp;refresh=5" />`);
     expect(html).toContain(`<meta property="og:url" content="${ORIGIN}/r/${summary?.link}" />`);
   });
 

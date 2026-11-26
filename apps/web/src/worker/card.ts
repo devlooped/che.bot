@@ -1,4 +1,6 @@
 import { MODELS_BY_NAME, type ModelId, type RunVerdict } from "@chebot/protocol";
+import jpegWasm from "@jsquash/jpeg/codec/enc/mozjpeg_enc.wasm?module";
+import encodeJpeg, { init as initJpeg } from "@jsquash/jpeg/encode.js";
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
 import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm?module";
 import { verdictEsAR } from "../app/i18n/verdict.ts";
@@ -10,12 +12,15 @@ import bold from "./fonts/instrument-sans-700.ttf?inline";
 // as the page shows it (the label of the outcome at the top left, the votes at the bottom right),
 // on the light theme. The crawlers of WhatsApp, X or Slack run no stylesheet, so the marks are
 // drawn into the picture: an SVG (this file) with the picture and the marks over it, rasterized by
-// resvg.
+// resvg and encoded as a JPEG by mozjpeg. WhatsApp shows no picture of a preview that weighs too
+// much (a PNG of 731 KB failed where one of 605 KB passed); the JPEG weighs about a sixth of it.
 
-/** The side of the card in the units of its SVG, and in pixels once rasterized: a PNG of a picture is
- *  heavy, and the apps that show a preview skip the large ones. */
+/** The side of the card in the units of its SVG. */
 export const CARD_SIZE = 1000;
-const CARD_PIXELS = 800;
+/** The side of the card in pixels, and its media type. */
+export const CARD_PIXELS = 800;
+export const CARD_TYPE = "image/jpeg";
+const JPEG_QUALITY = 82;
 
 // The sizes of the stylesheet (.card-verdict), in rem, drawn here at 46.4 pixels each: a rem of
 // the 26 rem card of a run's page, scaled up so that the marks read on a thumbnail.
@@ -61,12 +66,18 @@ function bytesOf(dataUrl: string): Uint8Array {
 }
 
 const fonts = [bytesOf(semiBold), bytesOf(bold)];
+// init of @jsquash/jpeg takes the compiled module, though its types say otherwise: a Worker may not
+// compile WebAssembly from bytes.
+const initEncoder = initJpeg as unknown as (module: WebAssembly.Module) => Promise<void>;
 let ready: Promise<void> | null = null;
 const loadWasm = () => {
-  ready ??= initWasm(resvgWasm).catch((error: unknown) => {
-    ready = null;
-    throw error;
-  });
+  ready ??= Promise.all([initWasm(resvgWasm), initEncoder(jpegWasm)]).then(
+    () => {},
+    (error: unknown) => {
+      ready = null;
+      throw error;
+    },
+  );
   return ready;
 };
 
@@ -215,7 +226,7 @@ export async function cardSvg(
 }
 
 /** Raise it when the drawing of the card changes: the cards kept with the runs are drawn again. */
-const DESIGN = 2;
+const DESIGN = 3;
 
 /** What the card of a run shows: its picture, its verdict and the drawing. Changing any makes a new card. */
 export function cardVersion(image: string, verdict: RunVerdict | null): string {
@@ -225,10 +236,43 @@ export function cardVersion(image: string, verdict: RunVerdict | null): string {
   return `${image}.${(hash >>> 0).toString(36)}`;
 }
 
-/** The picture with its verdict over it, as a PNG. */
-export async function cardPng(
+/** The picture with its verdict over it, as a JPEG. */
+export async function cardJpeg(
   picture: { bytes: Uint8Array; mediaType: string },
   verdict: RunVerdict,
 ): Promise<Uint8Array> {
-  return new Resvg(await cardSvg(picture, verdict), options(CARD_PIXELS)).render().asPng();
+  const rendered = new Resvg(await cardSvg(picture, verdict), options(CARD_PIXELS)).render();
+  const pixels = rendered.pixels;
+  const image = {
+    data: new Uint8ClampedArray(pixels.buffer, pixels.byteOffset, pixels.byteLength),
+    width: rendered.width,
+    height: rendered.height,
+    colorSpace: "srgb",
+  } as Parameters<typeof encodeJpeg>[0];
+  return new Uint8Array(await encodeJpeg(image, { quality: JPEG_QUALITY }));
+}
+
+// The cards this isolate served last, by run and version: a crawler that comes back, or several
+// that come at once when a link is shared, get them without a read of the Durable Object.
+const recent = new Map<string, Uint8Array>();
+const RECENT_CARDS = 20;
+
+/** A card this isolate served for the run `id` at `version`; null when it has none. */
+export function recentCard(id: string, version: string): Uint8Array | null {
+  const key = `${id}:${version}`;
+  const card = recent.get(key);
+  if (!card) return null;
+  recent.delete(key);
+  recent.set(key, card);
+  return card;
+}
+
+/** Remembers a card for `recentCard`, forgetting the oldest beyond RECENT_CARDS. */
+export function rememberCard(id: string, version: string, card: Uint8Array): void {
+  recent.delete(`${id}:${version}`);
+  recent.set(`${id}:${version}`, card);
+  for (const key of recent.keys()) {
+    if (recent.size <= RECENT_CARDS) break;
+    recent.delete(key);
+  }
 }

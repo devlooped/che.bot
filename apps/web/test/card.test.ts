@@ -1,8 +1,10 @@
 import { env } from "cloudflare:workers";
 import { ONE_PIXEL_PNG } from "@chebot/providers";
 import { describe, expect, test } from "vitest";
-import { cardPng, cardSvg, cardVersion } from "../src/worker/card.ts";
+import { cardJpeg, cardSvg, cardVersion, rememberCard } from "../src/worker/card.ts";
 import { api, fakes, paidRun, runAlarms } from "./helpers.ts";
+
+const JPEG = [0xff, 0xd8, 0xff];
 
 const user = () => `user-${crypto.randomUUID()}`;
 
@@ -32,9 +34,9 @@ describe("the verdict over the picture of a shared link", () => {
     expect(unrated).not.toContain("<text");
   });
 
-  test("the card is rasterized to a PNG", async () => {
-    const png = await cardPng(PICTURE, CLAIM);
-    expect([...png.slice(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
+  test("the card is encoded as a JPEG", async () => {
+    const jpeg = await cardJpeg(PICTURE, CLAIM);
+    expect([...jpeg.slice(0, 3)]).toEqual(JPEG);
   });
 
   test("the version of a card changes with its picture and with its verdict", () => {
@@ -44,7 +46,7 @@ describe("the verdict over the picture of a shared link", () => {
     expect(cardVersion("a", null)).not.toBe(cardVersion("a", CLAIM));
   });
 
-  test("the card of a run is its picture with the verdict laid over it, as a PNG", async () => {
+  test("the card of a run is its picture with the verdict laid over it, as a JPEG", async () => {
     fakes();
     const { id, stub } = await paidRun(user());
     await runAlarms(stub);
@@ -59,17 +61,17 @@ describe("the verdict over the picture of a shared link", () => {
     const version = cardVersion(image, verdict);
     const response = await api(`/api/runs/${id}/card?v=${version}`);
     expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(response.headers.get("content-type")).toBe("image/jpeg");
     expect(response.headers.get("cache-control")).toContain("immutable");
     const bytes = new Uint8Array(await response.arrayBuffer());
-    expect([...bytes.slice(0, 2)]).toEqual([0x89, 0x50]);
+    expect([...bytes.slice(0, 3)]).toEqual(JPEG);
     expect((await api(`/api/runs/${id}/card`)).headers.get("cache-control")).toBe(
       "public, max-age=300",
     );
     expect((await api(`/api/runs/${crypto.randomUUID()}/card`)).status).toBe(404);
   });
 
-  test("the card is drawn once and kept with the run; any other query string draws it again, unkept", async () => {
+  test("the card is drawn once and kept; another v draws it again, unkept; the rest of the query is ignored", async () => {
     fakes();
     const { id, stub } = await paidRun(user());
     await runAlarms(stub);
@@ -80,22 +82,29 @@ describe("the verdict over the picture of a shared link", () => {
     const version = cardVersion(image, JSON.parse(row?.verdict ?? "null"));
     expect(await stub.card(version)).toBeNull();
 
-    const bytes = async (query: string) =>
-      new Uint8Array(await (await api(`/api/runs/${id}/card${query}`)).arrayBuffer());
-    const first = await bytes(`?v=${version}`);
-    expect(await stub.card(version)).toEqual(first);
-
-    // what is kept is what the next request gets: plant another card and ask again
-    await stub.saveCard(version, Uint8Array.of(1, 2, 3));
-    expect(await bytes(`?v=${version}`)).toEqual(Uint8Array.of(1, 2, 3));
-
-    // another v, or any other part of the query, draws it again and keeps nothing
-    for (const query of ["?v=test", `?v=${version}&x=1`, "?x=1"]) {
+    const get = async (query: string) => {
       const response = await api(`/api/runs/${id}/card${query}`);
-      expect(response.headers.get("cache-control")).toBe("public, max-age=300");
-      expect(new Uint8Array(await response.arrayBuffer())).toEqual(first);
-    }
-    expect(await stub.card(version)).toEqual(Uint8Array.of(1, 2, 3));
+      return {
+        cache: response.headers.get("cache-control"),
+        bytes: new Uint8Array(await response.arrayBuffer()),
+      };
+    };
+    const first = await get(`?v=${version}`);
+    expect(await stub.card(version)).toEqual(first.bytes);
+
+    // what is kept is what the next request gets, from the isolate's memory before the object's
+    const planted = Uint8Array.of(...JPEG, 1);
+    rememberCard(id, version, planted);
+    expect((await get(`?v=${version}`)).bytes).toEqual(planted);
+    // the page's own v, passed on, changes the URL and nothing else
+    expect(await get(`?v=${version}&refresh=6`)).toEqual({ cache: first.cache, bytes: planted });
+    expect((await get("?refresh=6")).bytes).toEqual(planted);
+
+    // another v draws it again, with a short cache, and keeps nothing
+    const redrawn = await get("?v=test");
+    expect(redrawn).toEqual({ cache: "public, max-age=300", bytes: first.bytes });
+    expect((await get(`?v=${version}`)).bytes).toEqual(planted);
+    expect(await stub.card(version)).toEqual(first.bytes);
 
     // another picture is another version: the card kept for the old one is not served
     expect(await stub.card(cardVersion("otra", null))).toBeNull();

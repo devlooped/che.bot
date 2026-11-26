@@ -1,5 +1,5 @@
 import { verdictEmoji } from "@chebot/protocol";
-import { cardVersion } from "./card.ts";
+import { CARD_PIXELS, CARD_TYPE, cardVersion } from "./card.ts";
 import type { RunShare } from "./settings.ts";
 
 // The preview of the link of a run where it is shared (WhatsApp, X, Slack...): the crawlers of those
@@ -10,18 +10,35 @@ import type { RunShare } from "./settings.ts";
 const attribute = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/** The meta tags of the preview of a run, as HTML; `origin`, the site's. */
-export function previewTags(share: RunShare, origin: string): { title: string; html: string } {
+/**
+ * The meta tags of the preview of a run, as HTML; `origin`, the site's. `refresh`, the `v` of the
+ * page's URL: it goes on to the URL of the picture, so that sharing the link with another `v` makes
+ * an app that keeps the previews it showed (WhatsApp) fetch the picture again.
+ */
+export function previewTags(
+  share: RunShare,
+  origin: string,
+  refresh: string | null = null,
+): { title: string; html: string } {
   const emoji = verdictEmoji(share.verdict);
   const title = emoji ? `${share.question} ${emoji}` : share.question;
   const description = share.tldr?.replaceAll("\n", " ") ?? share.question;
   const url = new URL(`/r/${share.link ?? share.id}`, origin).href;
-  const image = share.image
-    ? new URL(
-        `/api/runs/${share.id}/card?v=${encodeURIComponent(cardVersion(share.image, share.verdict))}`,
-        origin,
-      ).href
-    : null;
+  let image: string | null = null;
+  if (share.image) {
+    const card = new URL(`/api/runs/${share.id}/card`, origin);
+    card.searchParams.set("v", cardVersion(share.image, share.verdict));
+    if (refresh) card.searchParams.set("refresh", refresh);
+    image = card.href;
+  }
+  // with a verdict, the picture is the card: a JPEG of a known size
+  const card = share.verdict
+    ? ([
+        ["property", "og:image:type", CARD_TYPE],
+        ["property", "og:image:width", String(CARD_PIXELS)],
+        ["property", "og:image:height", String(CARD_PIXELS)],
+      ] satisfies [string, string, string][])
+    : [];
   const tags: [string, string, string][] = [
     ["name", "description", description],
     ["property", "og:type", "article"],
@@ -32,6 +49,7 @@ export function previewTags(share: RunShare, origin: string): { title: string; h
     ...(image
       ? ([
           ["property", "og:image", image],
+          ...card,
           ["property", "og:image:alt", share.question],
           ["name", "twitter:image", image],
         ] satisfies [string, string, string][])
@@ -49,8 +67,13 @@ export function previewTags(share: RunShare, origin: string): { title: string; h
 }
 
 /** The page of the app with the preview of the run in its head. */
-export function withPreview(page: Response, share: RunShare, origin: string): Response {
-  const { title, html } = previewTags(share, origin);
+export function withPreview(
+  page: Response,
+  share: RunShare,
+  origin: string,
+  refresh: string | null = null,
+): Response {
+  const { title, html } = previewTags(share, origin, refresh);
   return new HTMLRewriter()
     .on("title", {
       element(el) {
