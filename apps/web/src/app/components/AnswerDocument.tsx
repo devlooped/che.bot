@@ -111,6 +111,17 @@ export function AnswerDocument({
                     onClick={() => setOpen(p.id)}
                   >
                     <Support support={p.support} />
+                    <svg
+                      className="mark-open"
+                      width={12}
+                      height={12}
+                      viewBox="0 0 12 12"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <circle cx="5" cy="5" r="3.6" />
+                      <path d="M7.6 7.6L11 11" />
+                    </svg>
                   </button>
                 )}
               </div>

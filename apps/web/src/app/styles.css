@@ -1592,6 +1592,19 @@ a.button {
   }
 }
 
+/* Below the marks, a magnifier as large as one of them: the marks open the paragraph's details. */
+.mark-open {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.6px;
+  stroke-linecap: round;
+}
+
+.mark:hover .mark-open,
+.mark[aria-expanded="true"] .mark-open {
+  stroke: var(--ink);
+}
+
 .dissent-notes {
   display: grid;
   gap: 0.6rem;
