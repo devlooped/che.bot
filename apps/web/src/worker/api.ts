@@ -46,7 +46,9 @@ import { spendMeter } from "./spend-meter.ts";
 //   GET    /api/runs/:id/charts/:chart/:v.svg  the render of a chart at version v, as above
 //   GET    /api/runs/:id/image[?v=]   the picture of the question, as above
 //   GET    /api/runs/:id/card[?v=]    that picture with its verdict over it, as a PNG: what a
-//                                    shared link previews (the plain picture when it has no verdict)
+//                                    shared link previews (the plain picture when it has no verdict).
+//                                    Drawn once per picture and verdict and kept with the run; any
+//                                    query string but its own `v` draws it again, unkept
 //   POST   /api/runs/:id/image        the owner, once it was asked, or an admin: draws the picture
 //                                    again, with today's models
 //   GET    /api/runs/:id/spend        admin: what the run's model calls cost so far
@@ -506,23 +508,38 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     const headers = {
       "content-security-policy": "default-src 'none'",
       "x-content-type-options": "nosniff",
-      // A versioned URL never changes: another picture or another verdict is another version.
-      "cache-control":
-        url.searchParams.get("v") === version
-          ? "public, max-age=31536000, immutable"
-          : "public, max-age=300",
     };
-    if (verdict) {
-      try {
-        const card = await cardPng(image, verdict);
-        return new Response(card, { headers: { ...headers, "content-type": "image/png" } });
-      } catch (e) {
-        // A preview with the plain picture is better than none.
-        console.error(`The card of run ${id} could not be drawn.`, e);
-        headers["cache-control"] = "public, max-age=300";
+    const plain = (cache: string) =>
+      new Response(image.bytes, {
+        headers: { ...headers, "content-type": image.mediaType, "cache-control": cache },
+      });
+    if (!verdict) return plain("public, max-age=300");
+    // The URL of a card is `?v=` its version: the one kept with the run is served as it is. Any
+    // other query string (another `v`, or any other part) draws the card again, to see a change
+    // of the drawing without waiting for a new picture or verdict; that one is not kept.
+    const current = [...url.searchParams].every(([key, value]) => key === "v" && value === version);
+    try {
+      let card = current ? await stub.card(version) : null;
+      if (!card) {
+        card = await cardPng(image, verdict);
+        if (current) await stub.saveCard(version, card);
       }
+      return new Response(card, {
+        headers: {
+          ...headers,
+          "content-type": "image/png",
+          // A versioned URL never changes: another picture or verdict is another version.
+          "cache-control":
+            current && url.searchParams.has("v")
+              ? "public, max-age=31536000, immutable"
+              : "public, max-age=300",
+        },
+      });
+    } catch (e) {
+      // A preview with the plain picture is better than none.
+      console.error(`The card of run ${id} could not be drawn.`, e);
+      return plain("public, max-age=300");
     }
-    return new Response(image.bytes, { headers: { ...headers, "content-type": image.mediaType } });
   }
 
   if (match[4] !== undefined) {

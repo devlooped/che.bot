@@ -214,10 +214,14 @@ export async function cardSvg(
   );
 }
 
-/** What the card of a run shows: its picture and its verdict. Changing either makes a new card. */
+/** Raise it when the drawing of the card changes: the cards kept with the runs are drawn again. */
+const DESIGN = 2;
+
+/** What the card of a run shows: its picture, its verdict and the drawing. Changing any makes a new card. */
 export function cardVersion(image: string, verdict: RunVerdict | null): string {
   let hash = 2166136261;
-  for (const char of JSON.stringify(verdict)) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  for (const char of JSON.stringify([DESIGN, verdict]))
+    hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
   return `${image}.${(hash >>> 0).toString(36)}`;
 }
 

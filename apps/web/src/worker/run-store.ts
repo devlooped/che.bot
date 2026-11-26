@@ -14,13 +14,15 @@ import type {
 // writes in `transactionSync` where they must land together.
 
 /**
- * The picture of the question, in chunks: a value of the storage holds at most 2 MB, and an image
- * model may draw more.
+ * The picture of the question, and the card made from it (the picture with its verdict over it,
+ * see card.ts), in chunks: a value of the storage holds at most 2 MB, and an image may be larger.
  */
-const IMAGE_CHUNKS = `CREATE TABLE IF NOT EXISTS image_chunks (
+const chunksTable = (table: string) => `CREATE TABLE IF NOT EXISTS ${table} (
   n INTEGER PRIMARY KEY,
   bytes BLOB NOT NULL
 )`;
+const IMAGE_CHUNKS = chunksTable("image_chunks");
+const CARD_CHUNKS = chunksTable("card_chunks");
 
 /** The size of a chunk of the picture. */
 const CHUNK_BYTES = 1_000_000;
@@ -62,7 +64,8 @@ const SCHEMA = [
      tldr TEXT,
      tldr_tries INTEGER NOT NULL DEFAULT 0,
      tldr_calls TEXT,
-     country TEXT
+     country TEXT,
+     card TEXT
    )`,
   `CREATE TABLE IF NOT EXISTS events (
      seq INTEGER PRIMARY KEY,
@@ -87,6 +90,7 @@ const SCHEMA = [
      seq INTEGER NOT NULL
    )`,
   IMAGE_CHUNKS,
+  CARD_CHUNKS,
 ];
 
 /**
@@ -106,6 +110,7 @@ const ADDED_COLUMNS: readonly [string, string][] = [
   ["tldr_tries", "INTEGER NOT NULL DEFAULT 0"],
   ["tldr_calls", "TEXT"],
   ["country", "TEXT"],
+  ["card", "TEXT"],
 ];
 
 /** A model call made beside the protocol (the classification, the link): what it cost. */
@@ -243,6 +248,7 @@ interface RunRow extends Record<string, SqlStorageValue> {
   tldr_tries: number;
   tldr_calls: string | null;
   country: string | null;
+  card: string | null;
 }
 
 /** The columns of the run row that `updateRun` may set. */
@@ -280,6 +286,7 @@ export class RunStore {
   /** Brings the tables of an object created by an earlier version up to date. */
   private upgrade(): void {
     this.sql.exec(IMAGE_CHUNKS);
+    this.sql.exec(CARD_CHUNKS);
     const have = new Set(
       this.sql
         .exec<{ name: string }>("SELECT name FROM pragma_table_info('run')")
@@ -343,15 +350,35 @@ export class RunStore {
     };
   }
 
+  /** Replaces the chunks of a table with `bytes`. */
+  private writeChunks(table: string, bytes: Uint8Array): void {
+    this.sql.exec(`DELETE FROM ${table}`);
+    for (let n = 0; n * CHUNK_BYTES < bytes.byteLength; n++)
+      this.sql.exec(
+        `INSERT INTO ${table} (n, bytes) VALUES (?, ?)`,
+        n,
+        bytes.subarray(n * CHUNK_BYTES, (n + 1) * CHUNK_BYTES),
+      );
+  }
+
+  /** The bytes that the chunks of a table hold. */
+  private readChunks(table: string): Uint8Array {
+    const chunks = this.sql
+      .exec<{ bytes: ArrayBuffer }>(`SELECT bytes FROM ${table} ORDER BY n`)
+      .toArray()
+      .map((chunk) => new Uint8Array(chunk.bytes));
+    const bytes = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0));
+    let at = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, at);
+      at += chunk.byteLength;
+    }
+    return bytes;
+  }
+
   /** Stores the picture of the run in place of the one it had, with its new version. */
   saveImage(image: RunImage): void {
-    this.sql.exec("DELETE FROM image_chunks");
-    for (let n = 0; n * CHUNK_BYTES < image.bytes.byteLength; n++)
-      this.sql.exec(
-        "INSERT INTO image_chunks (n, bytes) VALUES (?, ?)",
-        n,
-        image.bytes.subarray(n * CHUNK_BYTES, (n + 1) * CHUNK_BYTES),
-      );
+    this.writeChunks("image_chunks", image.bytes);
     this.updateRun({ image: image.version, image_type: image.mediaType });
   }
 
@@ -364,17 +391,24 @@ export class RunStore {
       )
       .toArray()[0];
     if (!row?.image || !row.image_type) return null;
-    const chunks = this.sql
-      .exec<{ bytes: ArrayBuffer }>("SELECT bytes FROM image_chunks ORDER BY n")
-      .toArray()
-      .map((chunk) => new Uint8Array(chunk.bytes));
-    const bytes = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0));
-    let at = 0;
-    for (const chunk of chunks) {
-      bytes.set(chunk, at);
-      at += chunk.byteLength;
-    }
-    return { bytes, mediaType: row.image_type, version: row.image };
+    return {
+      bytes: this.readChunks("image_chunks"),
+      mediaType: row.image_type,
+      version: row.image,
+    };
+  }
+
+  /** Keeps the card (a PNG) of the run in place of the one it had, with its version. */
+  saveCard(version: string, bytes: Uint8Array): void {
+    this.writeChunks("card_chunks", bytes);
+    this.updateRun({ card: version });
+  }
+
+  /** The card of the run if it is the one of `version`; null when it has another or none. */
+  card(version: string): Uint8Array | null {
+    if (!this.exists()) return null;
+    const row = this.sql.exec<{ card: string | null }>("SELECT card FROM run LIMIT 1").toArray()[0];
+    return row?.card === version ? this.readChunks("card_chunks") : null;
   }
 
   insertRun(run: {

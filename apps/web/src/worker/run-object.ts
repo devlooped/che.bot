@@ -785,6 +785,16 @@ export class RunObject extends DurableObject<Env> {
     return this.store.image();
   }
 
+  /** The card of the run if it is the one of `version` (see card.ts); null when it has none yet. */
+  async card(version: string): Promise<Uint8Array | null> {
+    return this.store.card(version);
+  }
+
+  /** Keeps the card of the run, made for `version`, in place of the one it had. */
+  async saveCard(version: string, bytes: Uint8Array): Promise<void> {
+    this.store.saveCard(version, bytes);
+  }
+
   /** Claims the first free link of the run's words; null when none is, or D1 fails. */
   private async claim(run: RunRecord, words: string): Promise<string | null> {
     const second = quaranSeconds(run.createdAt);

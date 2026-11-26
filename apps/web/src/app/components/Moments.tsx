@@ -60,9 +60,5 @@ export function Moments({ view, notes }: { view: RunView; notes: readonly string
         {feed}
       </Fold>
     );
-  return (
-    <section className="moments">
-      {feed}
-    </section>
-  );
+  return <section className="moments">{feed}</section>;
 }

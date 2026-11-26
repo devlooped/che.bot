@@ -68,4 +68,36 @@ describe("the verdict over the picture of a shared link", () => {
     );
     expect((await api(`/api/runs/${crypto.randomUUID()}/card`)).status).toBe(404);
   });
+
+  test("the card is drawn once and kept with the run; any other query string draws it again, unkept", async () => {
+    fakes();
+    const { id, stub } = await paidRun(user());
+    await runAlarms(stub);
+    const image = (await stub.summary())?.image ?? "";
+    const row = await env.DB.prepare("SELECT verdict FROM runs WHERE id = ?")
+      .bind(id)
+      .first<{ verdict: string }>();
+    const version = cardVersion(image, JSON.parse(row?.verdict ?? "null"));
+    expect(await stub.card(version)).toBeNull();
+
+    const bytes = async (query: string) =>
+      new Uint8Array(await (await api(`/api/runs/${id}/card${query}`)).arrayBuffer());
+    const first = await bytes(`?v=${version}`);
+    expect(await stub.card(version)).toEqual(first);
+
+    // what is kept is what the next request gets: plant another card and ask again
+    await stub.saveCard(version, Uint8Array.of(1, 2, 3));
+    expect(await bytes(`?v=${version}`)).toEqual(Uint8Array.of(1, 2, 3));
+
+    // another v, or any other part of the query, draws it again and keeps nothing
+    for (const query of ["?v=test", `?v=${version}&x=1`, "?x=1"]) {
+      const response = await api(`/api/runs/${id}/card${query}`);
+      expect(response.headers.get("cache-control")).toBe("public, max-age=300");
+      expect(new Uint8Array(await response.arrayBuffer())).toEqual(first);
+    }
+    expect(await stub.card(version)).toEqual(Uint8Array.of(1, 2, 3));
+
+    // another picture is another version: the card kept for the old one is not served
+    expect(await stub.card(cardVersion("otra", null))).toBeNull();
+  });
 });
