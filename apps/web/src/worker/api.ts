@@ -1,6 +1,7 @@
 import { linkOf, parseRunRef, resolveConfig } from "@chebot/protocol";
 import { readModels, updateModels, updatePrices } from "./admin.ts";
 import { handleAuth } from "./auth0.ts";
+import { cardPng, cardVersion } from "./card.ts";
 import { deps } from "./deps.ts";
 import type { Env } from "./env.ts";
 import { type Identity, isAdmin, mayAsk, type User } from "./identity.ts";
@@ -44,6 +45,8 @@ import { spendMeter } from "./spend-meter.ts";
 //                                    a deleted run, its owner only: 410 for anyone else
 //   GET    /api/runs/:id/charts/:chart/:v.svg  the render of a chart at version v, as above
 //   GET    /api/runs/:id/image[?v=]   the picture of the question, as above
+//   GET    /api/runs/:id/card[?v=]    that picture with its verdict over it, as a PNG: what a
+//                                    shared link previews (the plain picture when it has no verdict)
 //   POST   /api/runs/:id/image        the owner, once it was asked, or an admin: draws the picture
 //                                    again, with today's models
 //   GET    /api/runs/:id/spend        admin: what the run's model calls cost so far
@@ -68,7 +71,7 @@ const error = (status: number, message: string, extra: Record<string, unknown> =
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const UUID_ONLY = new RegExp(`^${UUID}$`, "i");
 const RUN_PATH = new RegExp(
-  `^/api/runs/(${UUID})(/events|/ws|/pay|/rerun|/restore|/cancel|/spend|/image|/snapshots/(\\d+)|/charts/(c\\d+)/(\\d+)\\.svg)?$`,
+  `^/api/runs/(${UUID})(/events|/ws|/pay|/rerun|/restore|/cancel|/spend|/image|/card|/snapshots/(\\d+)|/charts/(c\\d+)/(\\d+)\\.svg)?$`,
   "i",
 );
 
@@ -493,6 +496,33 @@ export async function handle(request: Request, env: Env): Promise<Response> {
         "cache-control": versioned ? "public, max-age=31536000, immutable" : "public, max-age=300",
       },
     });
+  }
+
+  if (sub === "/card") {
+    const image = await stub.image();
+    if (!image) return error(404, "No picture.");
+    const verdict = (await shareOf(env.DB, id))?.verdict ?? null;
+    const version = cardVersion(image.version, verdict);
+    const headers = {
+      "content-security-policy": "default-src 'none'",
+      "x-content-type-options": "nosniff",
+      // A versioned URL never changes: another picture or another verdict is another version.
+      "cache-control":
+        url.searchParams.get("v") === version
+          ? "public, max-age=31536000, immutable"
+          : "public, max-age=300",
+    };
+    if (verdict) {
+      try {
+        const card = await cardPng(image, verdict);
+        return new Response(card, { headers: { ...headers, "content-type": "image/png" } });
+      } catch (e) {
+        // A preview with the plain picture is better than none.
+        console.error(`The card of run ${id} could not be drawn.`, e);
+        headers["cache-control"] = "public, max-age=300";
+      }
+    }
+    return new Response(image.bytes, { headers: { ...headers, "content-type": image.mediaType } });
   }
 
   if (match[4] !== undefined) {

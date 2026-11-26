@@ -1,10 +1,11 @@
 import { verdictEmoji } from "@chebot/protocol";
+import { cardVersion } from "./card.ts";
 import type { RunShare } from "./settings.ts";
 
 // The preview of the link of a run where it is shared (WhatsApp, X, Slack...): the crawlers of those
 // sites read the meta tags of the page and run no script, so the Worker writes them into the app's
 // index.html. The preview is the question, with the emoji of its verdict, its summary (the points
-// on one line, each after its emoji) and its picture.
+// on one line, each after its emoji) and its picture, with the verdict over it as on the page.
 
 const attribute = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -16,7 +17,10 @@ export function previewTags(share: RunShare, origin: string): { title: string; h
   const description = share.tldr?.replaceAll("\n", " ") ?? share.question;
   const url = new URL(`/r/${share.link ?? share.id}`, origin).href;
   const image = share.image
-    ? new URL(`/api/runs/${share.id}/image?v=${encodeURIComponent(share.image)}`, origin).href
+    ? new URL(
+        `/api/runs/${share.id}/card?v=${encodeURIComponent(cardVersion(share.image, share.verdict))}`,
+        origin,
+      ).href
     : null;
   const tags: [string, string, string][] = [
     ["name", "description", description],

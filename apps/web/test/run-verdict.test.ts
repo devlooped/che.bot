@@ -4,6 +4,7 @@ import type { ModelId } from "@chebot/protocol";
 import type { FakeResponder } from "@chebot/providers";
 import { describe, expect, test } from "vitest";
 import { handle } from "../src/worker/api.ts";
+import { cardVersion } from "../src/worker/card.ts";
 import { TLDR_TRIES } from "../src/worker/run-object.ts";
 import { previewTags } from "../src/worker/share.ts";
 import { api, as, eventsOf, fakes, ORIGIN, paidRun, QUESTION, runAlarms } from "./helpers.ts";
@@ -109,7 +110,8 @@ describe("the preview of a shared link", () => {
     await runAlarms(stub);
     const summary = await stub.summary();
     const html = await (await page(`/r/${summary?.link}`)).text();
-    const image = `${ORIGIN}/api/runs/${id}/image?v=${summary?.image}`;
+    const verdict = JSON.parse((await listed(id))?.verdict ?? "null");
+    const image = `${ORIGIN}/api/runs/${id}/card?v=${cardVersion(summary?.image ?? "", verdict)}`;
     expect(html).toContain(`<title>${QUESTION} 👍 · che.bot</title>`);
     expect(html).toContain(`<meta property="og:title" content="${QUESTION} 👍" />`);
     expect(html).toContain(
